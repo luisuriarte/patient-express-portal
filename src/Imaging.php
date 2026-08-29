@@ -24,7 +24,9 @@ class Imaging
     }
 
     /**
-     * Obtiene los estudios de imágenes y documentos gráficos del paciente desde OpenEMR y PACS Orthanc
+     * Obtiene exclusivamente los estudios y documentos de imágenes del paciente,
+     * filtrando por las categorías y subcategorías de imágenes en OpenEMR
+     * y complementando con estudios DICOM indexados en Orthanc PACS.
      * 
      * @param int $pid ID de paciente en OpenEMR
      * @param string|null $patientDni DNI / Documento del paciente
@@ -36,7 +38,134 @@ class Imaging
         $registeredStudyUids = [];
 
         // =========================================================================
-        // 1. Consultar estudios DICOM e Informes Radiológicos en procedure_order
+        // 1. Obtener IDs de todas las categorías y subcategorías de imágenes
+        // =========================================================================
+        $imageCategoryIds = $this->getImageCategoryIds();
+
+        // =========================================================================
+        // 2. Consultar Documentos pertenecientes a las categorías de imágenes
+        // =========================================================================
+        if (!empty($imageCategoryIds)) {
+            $placeholders = implode(',', array_fill(0, count($imageCategoryIds), '?'));
+            $params = array_merge([$pid], $imageCategoryIds);
+
+            $sqlDocs = "SELECT 
+                            d.id AS doc_id,
+                            d.type,
+                            d.size,
+                            d.date AS doc_date,
+                            d.docdate,
+                            d.url,
+                            d.mimetype,
+                            d.name AS doc_name,
+                            d.foreign_id AS patient_id,
+                            c.id AS category_id,
+                            c.name AS category_name,
+                            cp.name AS parent_category_name
+                        FROM documents d
+                        INNER JOIN categories_to_documents ctd ON d.id = ctd.document_id
+                        INNER JOIN categories c ON ctd.category_id = c.id
+                        LEFT JOIN categories cp ON c.parent = cp.id
+                        WHERE d.foreign_id = ? 
+                          AND (d.deleted = 0 OR d.deleted IS NULL)
+                          AND ctd.category_id IN ($placeholders)
+                        ORDER BY COALESCE(d.docdate, d.date) DESC, d.id DESC";
+
+            $resDocs = sqlStatement($sqlDocs, $params);
+            if ($resDocs) {
+                while ($dRow = sqlFetchArray($resDocs)) {
+                    $docName = !empty($dRow['doc_name']) ? $dRow['doc_name'] : basename((string)$dRow['url']);
+                    $mime = strtolower((string)$dRow['mimetype']);
+                    $urlLower = strtolower((string)$dRow['url']);
+                    $nameLower = strtolower($docName);
+
+                    // Determinar si es DICOM, Imagen Estándar (JPG/PNG) o PDF
+                    $isDicom = ($mime === 'application/dicom') 
+                        || str_ends_with($urlLower, '.dcm') 
+                        || str_ends_with($nameLower, '.dcm');
+
+                    $isImage = str_starts_with($mime, 'image/') 
+                        || str_ends_with($urlLower, '.jpg') 
+                        || str_ends_with($urlLower, '.jpeg') 
+                        || str_ends_with($urlLower, '.png') 
+                        || str_ends_with($urlLower, '.webp') 
+                        || str_ends_with($nameLower, '.jpg') 
+                        || str_ends_with($nameLower, '.jpeg') 
+                        || str_ends_with($nameLower, '.png');
+
+                    $isPdf = ($mime === 'application/pdf') 
+                        || str_ends_with($urlLower, '.pdf') 
+                        || str_ends_with($nameLower, '.pdf');
+
+                    $categoryLabel = !empty($dRow['category_name']) ? $dRow['category_name'] : 'Diagnóstico por Imágenes';
+                    $studyTitle = $categoryLabel . ' - ' . $docName;
+                    $modality = $this->detectModality($studyTitle);
+
+                    $docDate = $dRow['docdate'] ?: ($dRow['doc_date'] ? date('Y-m-d', strtotime($dRow['doc_date'])) : date('Y-m-d'));
+                    $formattedDate = date('d/m/Y', strtotime($docDate));
+
+                    $viewUrl = 'view_document.php?id=' . $dRow['doc_id'];
+                    $downloadUrl = 'view_document.php?id=' . $dRow['doc_id'] . '&download=1';
+
+                    if ($isDicom) {
+                        $studyUid = basename((string)$dRow['url'], '.dcm');
+                        $studies[] = [
+                            'id'                => 'doc_' . $dRow['doc_id'],
+                            'report_id'         => null,
+                            'order_id'          => 0,
+                            'doc_id'            => (int)$dRow['doc_id'],
+                            'title'             => $studyTitle,
+                            'modality'          => $modality,
+                            'date_study'        => $formattedDate,
+                            'date_raw'          => $docDate,
+                            'provider_name'     => 'Servicio de Diagnóstico por Imágenes',
+                            'provider_spec'     => $categoryLabel,
+                            'status'            => 'Estudio DICOM Listo',
+                            'has_report'        => false,
+                            'accession_number'  => 'DOC-' . $dRow['doc_id'],
+                            'study_uid'         => $studyUid,
+                            'format_type'       => 'dicom',
+                            'viewer_type'       => 'ohif',
+                            'viewer_url'        => $this->buildOhifViewerUrl($studyUid),
+                            'direct_view_url'   => $viewUrl,
+                            'download_url'      => $downloadUrl,
+                            'mimetype'          => $mime,
+                            'source'            => 'openemr_document'
+                        ];
+                    } else {
+                        $formatType = $isImage ? 'image' : ($isPdf ? 'pdf' : 'standard_file');
+                        $viewerType = $isImage ? 'inline_image' : ($isPdf ? 'inline_pdf' : 'download');
+
+                        $studies[] = [
+                            'id'                => 'doc_' . $dRow['doc_id'],
+                            'report_id'         => null,
+                            'order_id'          => 0,
+                            'doc_id'            => (int)$dRow['doc_id'],
+                            'title'             => $studyTitle,
+                            'modality'          => $modality,
+                            'date_study'        => $formattedDate,
+                            'date_raw'          => $docDate,
+                            'provider_name'     => 'Servicio de Diagnóstico por Imágenes',
+                            'provider_spec'     => $categoryLabel,
+                            'status'            => 'Imagen Disponible',
+                            'has_report'        => false,
+                            'accession_number'  => 'DOC-' . $dRow['doc_id'],
+                            'study_uid'         => null,
+                            'format_type'       => $formatType, // 'image' o 'pdf'
+                            'viewer_type'       => $viewerType, // 'inline_image' o 'inline_pdf' (sin OHIF)
+                            'viewer_url'        => $viewUrl,
+                            'direct_view_url'   => $viewUrl,
+                            'download_url'      => $downloadUrl,
+                            'mimetype'          => $mime,
+                            'source'            => 'openemr_document'
+                        ];
+                    }
+                }
+            }
+        }
+
+        // =========================================================================
+        // 3. Consultar Órdenes e Informes Radiológicos en procedure_order
         // =========================================================================
         $sqlOrders = "SELECT 
                         pr.procedure_report_id,
@@ -118,96 +247,7 @@ class Imaging
         }
 
         // =========================================================================
-        // 2. Consultar Documentos de Imágenes Estándar en OpenEMR (JPG / PNG / PDF)
-        // =========================================================================
-        $sqlDocs = "SELECT 
-                        d.id AS doc_id,
-                        d.type,
-                        d.size,
-                        d.date AS doc_date,
-                        d.docdate,
-                        d.url,
-                        d.mimetype,
-                        d.name AS doc_name,
-                        d.foreign_id AS patient_id,
-                        c.name AS category_name
-                    FROM documents d
-                    LEFT JOIN categories_to_documents ctd ON d.id = ctd.document_id
-                    LEFT JOIN categories c ON ctd.category_id = c.id
-                    WHERE d.foreign_id = ? 
-                      AND (d.deleted = 0 OR d.deleted IS NULL)
-                      AND (
-                           d.mimetype LIKE 'image/%' 
-                           OR d.mimetype = 'application/pdf'
-                           OR LOWER(d.url) LIKE '%.jpg'
-                           OR LOWER(d.url) LIKE '%.jpeg'
-                           OR LOWER(d.url) LIKE '%.png'
-                           OR LOWER(d.url) LIKE '%.pdf'
-                           OR LOWER(d.name) LIKE '%.jpg'
-                           OR LOWER(d.name) LIKE '%.jpeg'
-                           OR LOWER(d.name) LIKE '%.png'
-                           OR LOWER(d.name) LIKE '%.pdf'
-                           OR LOWER(c.name) LIKE '%imagen%'
-                           OR LOWER(c.name) LIKE '%estudio%'
-                           OR LOWER(c.name) LIKE '%rayos%'
-                           OR LOWER(c.name) LIKE '%ecografia%'
-                      )
-                    ORDER BY COALESCE(d.docdate, d.date) DESC";
-
-        $resDocs = sqlStatement($sqlDocs, [$pid]);
-        if ($resDocs) {
-            while ($dRow = sqlFetchArray($resDocs)) {
-                $docName = !empty($dRow['doc_name']) ? $dRow['doc_name'] : basename((string)$dRow['url']);
-                $mime = strtolower((string)$dRow['mimetype']);
-                $urlLower = strtolower((string)$dRow['url']);
-                $nameLower = strtolower($docName);
-
-                $isImage = str_starts_with($mime, 'image/') || str_ends_with($urlLower, '.jpg') || str_ends_with($urlLower, '.jpeg') || str_ends_with($urlLower, '.png') || str_ends_with($nameLower, '.jpg') || str_ends_with($nameLower, '.jpeg') || str_ends_with($nameLower, '.png');
-                $isPdf = ($mime === 'application/pdf') || str_ends_with($urlLower, '.pdf') || str_ends_with($nameLower, '.pdf');
-
-                $formatType = $isImage ? 'image' : ($isPdf ? 'pdf' : 'standard_file');
-                $viewerType = $isImage ? 'inline_image' : ($isPdf ? 'inline_pdf' : 'download');
-                
-                $studyTitle = $docName;
-                if (!empty($dRow['category_name']) && $dRow['category_name'] !== 'General') {
-                    $studyTitle = $dRow['category_name'] . ' - ' . $docName;
-                }
-
-                $modality = $this->detectModality($studyTitle);
-                $docDate = $dRow['docdate'] ?: ($dRow['doc_date'] ? date('Y-m-d', strtotime($dRow['doc_date'])) : date('Y-m-d'));
-                $formattedDate = date('d/m/Y', strtotime($docDate));
-
-                $viewUrl = 'view_document.php?id=' . $dRow['doc_id'];
-                $downloadUrl = 'view_document.php?id=' . $dRow['doc_id'] . '&download=1';
-
-                $studies[] = [
-                    'id'                => 'doc_' . $dRow['doc_id'],
-                    'report_id'         => null,
-                    'order_id'          => 0,
-                    'doc_id'            => (int)$dRow['doc_id'],
-                    'title'             => $studyTitle,
-                    'modality'          => $modality,
-                    'date_study'        => $formattedDate,
-                    'date_raw'          => $docDate,
-                    'provider_name'     => 'Servicio de Diagnóstico / Digitalización',
-                    'provider_spec'     => 'Documentación Médica',
-                    'status'            => 'Archivo Listo para Visualizar',
-                    'has_report'        => false,
-                    'accession_number'  => 'DOC-' . $dRow['doc_id'],
-                    'study_uid'         => null,
-                    'format_type'       => $formatType, // 'image' o 'pdf' estándar
-                    'viewer_type'       => $viewerType, // 'inline_image' o 'inline_pdf' (sin OHIF)
-                    'viewer_url'        => $viewUrl,
-                    'direct_view_url'   => $viewUrl,
-                    'download_url'      => $downloadUrl,
-                    'mimetype'          => $mime,
-                    'source'            => 'openemr_document'
-                ];
-            }
-        }
-
-        // =========================================================================
-        // 3. Consultar Orthanc PACS directamente vía REST API
+        // 4. Consultar Orthanc PACS directamente vía REST API
         // =========================================================================
         $orthancStudies = $this->fetchOrthancStudies((string)$pid, $patientDni);
         if (!empty($orthancStudies)) {
@@ -219,6 +259,7 @@ class Imaging
             }
         }
 
+        // Ordenar todos los estudios cronológicamente descendente
         usort($studies, function ($a, $b) {
             $timeA = strtotime((string)($a['date_raw'] ?? '1970-01-01'));
             $timeB = strtotime((string)($b['date_raw'] ?? '1970-01-01'));
@@ -229,12 +270,68 @@ class Imaging
     }
 
     /**
+     * Obtiene la lista de IDs de categorías que representan imágenes y sus subcategorías
+     */
+    private function getImageCategoryIds(): array
+    {
+        $categoryIds = [];
+
+        // Consultar categorías con palabras clave o pertenecientes a las ramas de imágenes
+        $sql = "SELECT id, name, parent, lft, rght FROM categories 
+                WHERE name LIKE '%Imágen%' 
+                   OR name LIKE '%Imagen%' 
+                   OR name LIKE '%Imaging%' 
+                   OR name LIKE '%Ecograf%' 
+                   OR name LIKE '%Radiolog%' 
+                   OR name LIKE '%Resonancia%' 
+                   OR name LIKE '%Tomograf%' 
+                   OR name LIKE '%X-Ray%' 
+                   OR name LIKE '%Rayos%' 
+                   OR name LIKE '%Doppler%' 
+                   OR name LIKE '%Cardiología%' 
+                   OR name LIKE '%Electrocardiograma%'
+                   OR name LIKE '%Ecocardiograma%'
+                   OR name LIKE '%Photos%'
+                   OR name LIKE '%Photographs%'
+                   OR name LIKE '%SIP Perinatal%'
+                   OR parent IN (9753, 17, 10001, 20002, 21002, 9800, 10010, 10011, 10012, 10013)
+                   OR (lft >= 69 AND rght <= 94)
+                   OR (lft >= 32 AND rght <= 51)";
+
+        $res = sqlStatement($sql);
+        if ($res) {
+            while ($row = sqlFetchArray($res)) {
+                $categoryIds[] = (int)$row['id'];
+            }
+        }
+
+        // Categorías predefinidas de imágenes encontradas en la estructura de OpenEMR
+        $knownImageCategoryIds = [
+            17, 18, 19, 20, 21, 22, 23, 24, 25, 26, // Eye Imaging
+            9753, 9762, 9772, 9800, 9801, 9802, 9803, // Imágenes Generales
+            10001, 10010, 10011, 10012, 10013, 10100, 10101, 10102, 10110, 10111, 10112, 10113, 10114, 10120, 10121, 10122, 10123, 10130, 10131, 10132, // Imaging Preop
+            20002, 20020, 20021, 20022, 20023, 20024, // Dental Imaging
+            21002 // SIP Ecografías
+        ];
+
+        $merged = array_unique(array_merge($categoryIds, $knownImageCategoryIds));
+        return array_values($merged);
+    }
+
+    /**
      * Consulta REST a Orthanc PACS para encontrar estudios asociados al PatientID / DNI
      */
     public function fetchOrthancStudies(string $patientId, ?string $dni = null): array
     {
         $results = [];
-        $idsToSearch = array_filter([$patientId, $dni]);
+        $idsToSearch = array_unique(array_filter([
+            $patientId,
+            $dni,
+            (string)ltrim($patientId, '0'),
+            (string)str_pad($patientId, 4, '0', STR_PAD_LEFT),
+            (string)str_pad($patientId, 6, '0', STR_PAD_LEFT),
+            (string)str_pad($patientId, 8, '0', STR_PAD_LEFT)
+        ]));
 
         foreach ($idsToSearch as $idVal) {
             try {
@@ -304,6 +401,7 @@ class Imaging
                     }
                 }
             } catch (\Throwable $e) {
+                // Registrar aviso silencioso
                 error_log("Aviso: No se pudo consultar Orthanc PACS ({$e->getMessage()})");
             }
         }
@@ -312,12 +410,11 @@ class Imaging
     }
 
     /**
-     * Obtiene el documento físico o registro desde la tabla documents de OpenEMR
-     * usando sqlQuery()
+     * Obtiene el documento físico o contenido BLOB desde OpenEMR para servirlo de forma segura
      */
     public function getDocumentFile(int $docId, int $pid): ?array
     {
-        $sql = "SELECT id, foreign_id, url, mimetype, name, size, docdate 
+        $sql = "SELECT id, foreign_id, url, mimetype, name, size, docdate, type, document_data 
                 FROM documents 
                 WHERE id = ? AND foreign_id = ? AND (deleted = 0 OR deleted IS NULL)
                 LIMIT 1";
@@ -327,38 +424,81 @@ class Imaging
             return null;
         }
 
-        $url = $doc['url'];
+        $url = (string)$doc['url'];
+        $cleanUrl = ltrim(str_replace('file://', '', $url), '/');
+        $fileName = $doc['name'] ?: basename($cleanUrl);
+        $mimeType = $doc['mimetype'] ?: 'image/jpeg';
         $filePath = null;
+        $fileContent = null;
 
+        // 1. Probar ruta directa en el sistema de archivos
         if (file_exists($url)) {
             $filePath = $url;
+        } elseif (file_exists('/' . $cleanUrl)) {
+            $filePath = '/' . $cleanUrl;
+        } elseif (file_exists($cleanUrl)) {
+            $filePath = $cleanUrl;
         } else {
-            $basePaths = [
-                defined('OPENEMR_DOCUMENTS_PATH') ? OPENEMR_DOCUMENTS_PATH : '/var/www/html/openemr/sites/default/documents',
-                dirname(__DIR__, 2) . '/sites/default/documents',
-                dirname(__DIR__) . '/storage/documents',
+            // 2. Probar rutas del sitio OpenEMR
+            $siteDir = $GLOBALS['OE_SITE_DIR'] ?? null;
+            $candidatePaths = [];
+
+            if ($siteDir) {
+                $candidatePaths[] = rtrim($siteDir, '/') . '/documents/' . $cleanUrl;
+                $candidatePaths[] = rtrim($siteDir, '/') . '/documents/' . $pid . '/' . basename($cleanUrl);
+                $candidatePaths[] = rtrim($siteDir, '/') . '/documents/' . basename($cleanUrl);
+            }
+
+            // Rutas estándar adicionales
+            $docRoots = [
                 '/var/www/html/origen.ar/hcd/sites/default/documents',
-                '/var/www/html/openemr/sites/default/documents'
+                '/var/www/html/openemr/sites/default/documents',
+                dirname(__DIR__, 2) . '/sites/default/documents',
+                dirname(__DIR__) . '/storage/documents'
             ];
 
-            $cleanUrl = ltrim(str_replace('file://', '', $url), '/');
-            foreach ($basePaths as $base) {
-                $testPath = rtrim($base, '/') . '/' . $cleanUrl;
-                if (file_exists($testPath)) {
-                    $filePath = $testPath;
+            foreach ($docRoots as $dRoot) {
+                $candidatePaths[] = rtrim($dRoot, '/') . '/' . $cleanUrl;
+                $candidatePaths[] = rtrim($dRoot, '/') . '/' . $pid . '/' . basename($cleanUrl);
+                $candidatePaths[] = rtrim($dRoot, '/') . '/' . basename($cleanUrl);
+            }
+
+            foreach ($candidatePaths as $cPath) {
+                if (file_exists($cPath) && is_file($cPath)) {
+                    $filePath = $cPath;
                     break;
                 }
             }
         }
 
+        // 3. Si no se encontró en disco, intentar con la clase nativa C_Document de OpenEMR
+        if ($filePath === null && class_exists('\C_Document')) {
+            try {
+                $cDoc = new \C_Document();
+                $cDoc->onReturnRetrieveKey();
+                $retrieved = $cDoc->retrieve_action($pid, $docId, true, true, true);
+                if (!empty($retrieved)) {
+                    $fileContent = $retrieved;
+                }
+            } catch (\Throwable $e) {
+                error_log("Aviso: C_Document::retrieve_action fallo ({$e->getMessage()})");
+            }
+        }
+
+        // 4. Si es BLOB almacenado directamente en la base de datos
+        if ($filePath === null && $fileContent === null && !empty($doc['document_data'])) {
+            $fileContent = $doc['document_data'];
+        }
+
         return [
-            'id'        => (int)$doc['id'],
-            'pid'       => (int)$doc['foreign_id'],
-            'name'      => $doc['name'] ?: basename((string)$doc['url']),
-            'mimetype'  => $doc['mimetype'] ?: 'application/octet-stream',
-            'url'       => $doc['url'],
-            'file_path' => $filePath,
-            'exists'    => ($filePath !== null && file_exists($filePath))
+            'id'           => (int)$doc['id'],
+            'pid'          => (int)$doc['foreign_id'],
+            'name'         => $fileName,
+            'mimetype'     => $mimeType,
+            'url'          => $url,
+            'file_path'    => $filePath,
+            'file_content' => $fileContent,
+            'exists'       => ($filePath !== null || $fileContent !== null)
         ];
     }
 
@@ -470,6 +610,8 @@ class Imaging
         if (str_contains($t, 'MAMOGRAFIA') || str_contains($t, 'MG')) return 'MG (Mamografía)';
         if (str_contains($t, 'RAYOS') || str_contains($t, 'RX') || str_contains($t, 'RADIOGRAFIA') || str_contains($t, 'CR') || str_contains($t, 'DX')) return 'RX (Radiografía Digital)';
         if (str_contains($t, 'DENSITOMETRIA') || str_contains($t, 'DEXA')) return 'DEXA (Densitometría)';
+        if (str_contains($t, 'ELECTROCARDIOGRAMA') || str_contains($t, 'ECG') || str_contains($t, 'EKG')) return 'ECG (Electrocardiograma)';
+        if (str_contains($t, 'FOTO') || str_contains($t, 'PHOTO') || str_contains($t, 'OCT')) return 'FOTO (Registro Gráfico)';
         return 'IMG (Diagnóstico por Imágenes)';
     }
 
