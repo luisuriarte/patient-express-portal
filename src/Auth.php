@@ -46,9 +46,9 @@ class Auth
     }
 
     /**
-     * Autentica al paciente contra la tabla patient_access_offsite y patient_data de OpenEMR
+     * Autentica al paciente contra la tabla patient_access_onsite y patient_data de OpenEMR
      * 
-     * @param string $username Usuario del portal o DNI / Email
+     * @param string $username Usuario del portal (portal_login_username o portal_username) o DNI / Email / PID
      * @param string $password Contraseña en texto plano
      * @return array ['success' => bool, 'message' => string, 'patient' => array|null]
      */
@@ -65,12 +65,14 @@ class Auth
         }
 
         try {
-            // 1. Buscar en patient_access_offsite por portal_username o cruce con patient_data (email, ss/dni, pid)
+            // 1. Buscar en patient_access_onsite por portal_login_username, portal_username o cruce con patient_data (email, ss/dni, pid)
             $sql = "SELECT 
+                        pao.id as onsite_id,
                         pao.pid,
                         pao.portal_username,
+                        pao.portal_login_username,
                         pao.portal_pwd,
-                        pao.portal_active,
+                        pao.portal_pwd_status,
                         pd.id as patient_id,
                         pd.fname,
                         pd.lname,
@@ -82,10 +84,12 @@ class Auth
                         pd.phone_cell,
                         pd.street,
                         pd.city,
-                        pd.postal_code
-                    FROM patient_access_offsite pao
+                        pd.postal_code,
+                        pd.allow_patient_portal
+                    FROM patient_access_onsite pao
                     INNER JOIN patient_data pd ON pao.pid = pd.pid
-                    WHERE (pao.portal_username = :username_direct 
+                    WHERE (pao.portal_login_username = :username_login
+                           OR pao.portal_username = :username_direct 
                            OR pd.ss = :username_ss 
                            OR pd.email = :username_email 
                            OR pao.pid = :username_pid)
@@ -93,6 +97,7 @@ class Auth
 
             $stmt = $this->db->prepare($sql);
             $stmt->execute([
+                ':username_login'  => $username,
                 ':username_direct' => $username,
                 ':username_ss'     => $username,
                 ':username_email'  => $username,
@@ -108,11 +113,11 @@ class Auth
                 ];
             }
 
-            // Verificar si el portal está habilitado para este paciente
-            if (isset($account['portal_active']) && (int)$account['portal_active'] === 0) {
+            // Verificar si el portal está habilitado en patient_data
+            if (isset($account['allow_patient_portal']) && strtoupper($account['allow_patient_portal']) === 'NO') {
                 return [
                     'success' => false,
-                    'message' => 'El acceso al portal se encuentra inactivo. Por favor contacte al centro médico.'
+                    'message' => 'El acceso al portal se encuentra inactivo para este paciente. Por favor contacte al centro médico.'
                 ];
             }
 
@@ -128,7 +133,7 @@ class Auth
                     $passwordValid = true;
                     // Actualizar a bcrypt/argon2
                     $newHash = password_hash($password, PASSWORD_DEFAULT);
-                    $updateStmt = $this->db->prepare("UPDATE patient_access_offsite SET portal_pwd = :new_pwd WHERE pid = :pid");
+                    $updateStmt = $this->db->prepare("UPDATE patient_access_onsite SET portal_pwd = :new_pwd WHERE pid = :pid");
                     $updateStmt->execute([':new_pwd' => $newHash, ':pid' => $account['pid']]);
                 }
             }
@@ -140,16 +145,7 @@ class Auth
                 ];
             }
 
-            // 3. Registrar último acceso
-            try {
-                $updateLogin = $this->db->prepare("UPDATE patient_access_offsite SET portal_login_date = NOW() WHERE pid = :pid");
-                $updateLogin->execute([':pid' => $account['pid']]);
-            } catch (\Exception $e) {
-                // Loguear pero no interrumpir el flujo
-                error_log("No se pudo actualizar portal_login_date: " . $e->getMessage());
-            }
-
-            // 4. Formatear datos del paciente y establecer sesión
+            // 3. Formatear datos del paciente y establecer sesión
             $fullName = trim(($account['fname'] ?? '') . ' ' . ($account['mname'] ?? '') . ' ' . ($account['lname'] ?? ''));
             if (empty($fullName)) {
                 $fullName = 'Paciente #' . $account['pid'];
@@ -158,8 +154,10 @@ class Auth
             // Regenerar ID de sesión para prevenir Session Fixation
             session_regenerate_id(true);
 
+            $preferredUsername = !empty($account['portal_login_username']) ? $account['portal_login_username'] : ($account['portal_username'] ?? $username);
+
             $_SESSION['patient_pid']      = (int)$account['pid'];
-            $_SESSION['patient_username'] = $account['portal_username'] ?? $username;
+            $_SESSION['patient_username'] = $preferredUsername;
             $_SESSION['patient_name']     = $fullName;
             $_SESSION['patient_data']     = [
                 'pid'         => (int)$account['pid'],
