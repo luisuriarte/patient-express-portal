@@ -73,7 +73,7 @@ class Imaging
                              OR poc.procedure_name LIKE '%DOPPLER%'
                              OR pr.report_notes LIKE '%DICOM%'
                              OR pr.report_notes LIKE '%ESTUDIO%'
-                             OR po.procedure_type = 'radiology'
+                             OR poc.procedure_name LIKE '%IMAGEN%'
                         )
                       ORDER BY COALESCE(pr.date_report, po.date_ordered) DESC";
 
