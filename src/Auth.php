@@ -59,88 +59,43 @@ class Auth
             ];
         }
 
-        $user = null;
+        // Consultar la tabla nativa del portal de pacientes de OpenEMR: patient_access_onsite
+        $sql = "SELECT 
+                    pao.pid,
+                    pao.portal_username,
+                    pao.portal_login_username,
+                    pao.portal_pwd,
+                    pao.portal_pwd_status,
+                    pd.id as patient_id,
+                    pd.pubpid,
+                    pd.fname,
+                    pd.lname,
+                    pd.mname,
+                    pd.DOB,
+                    pd.sex,
+                    pd.ss,
+                    pd.email,
+                    pd.phone_cell,
+                    pd.street,
+                    pd.city,
+                    pd.postal_code,
+                    pd.allow_patient_portal
+                FROM patient_access_onsite pao
+                INNER JOIN patient_data pd ON pao.pid = pd.pid
+                WHERE (pao.portal_login_username = ? 
+                       OR pao.portal_username = ? 
+                       OR pd.ss = ? 
+                       OR pd.email = ? 
+                       OR pao.pid = ?)
+                LIMIT 1";
 
-        // 1. Intentar consulta sobre patient_access_offsite
-        try {
-            $sqlOffsite = "SELECT 
-                                pao.pid,
-                                pao.portal_username,
-                                pao.portal_pwd,
-                                pd.id as patient_id,
-                                pd.pubpid,
-                                pd.fname,
-                                pd.lname,
-                                pd.mname,
-                                pd.DOB,
-                                pd.sex,
-                                pd.ss,
-                                pd.email,
-                                pd.phone_cell,
-                                pd.street,
-                                pd.city,
-                                pd.postal_code
-                           FROM patient_access_offsite pao
-                           INNER JOIN patient_data pd ON pao.pid = pd.pid
-                           WHERE (pao.portal_username = ? 
-                                  OR pd.ss = ? 
-                                  OR pd.email = ? 
-                                  OR pao.pid = ?)
-                             AND (pao.portal_status = 1 OR pao.portal_status IS NULL)
-                           LIMIT 1";
-
-            $user = sqlQuery($sqlOffsite, [
-                $username,
-                $username,
-                $username,
-                is_numeric($username) ? (int)$username : -1
-            ]);
-        } catch (\Throwable $e) {
-            $user = false;
-        }
-
-        // 2. Si no existe o no se encuentra en patient_access_offsite, consultar patient_access_onsite (OpenEMR 7+)
-        if (!$user) {
-            try {
-                $sqlOnsite = "SELECT 
-                                pao.pid,
-                                pao.portal_username,
-                                pao.portal_login_username,
-                                pao.portal_pwd,
-                                pd.id as patient_id,
-                                pd.pubpid,
-                                pd.fname,
-                                pd.lname,
-                                pd.mname,
-                                pd.DOB,
-                                pd.sex,
-                                pd.ss,
-                                pd.email,
-                                pd.phone_cell,
-                                pd.street,
-                                pd.city,
-                                pd.postal_code,
-                                pd.allow_patient_portal
-                              FROM patient_access_onsite pao
-                              INNER JOIN patient_data pd ON pao.pid = pd.pid
-                              WHERE (pao.portal_login_username = ? 
-                                     OR pao.portal_username = ? 
-                                     OR pd.ss = ? 
-                                     OR pd.email = ? 
-                                     OR pao.pid = ?)
-                              LIMIT 1";
-
-                $user = sqlQuery($sqlOnsite, [
-                    $username,
-                    $username,
-                    $username,
-                    $username,
-                    is_numeric($username) ? (int)$username : -1
-                ]);
-            } catch (\Throwable $e) {
-                $user = false;
-            }
-        }
+        $user = sqlQuery($sql, [
+            $username,
+            $username,
+            $username,
+            $username,
+            is_numeric($username) ? (int)$username : -1
+        ]);
 
         if (!$user || empty($user['pid'])) {
             return [
@@ -149,7 +104,7 @@ class Auth
             ];
         }
 
-        // Verificar estado de habilitación si está presente
+        // Verificar estado de habilitación si está configurado en NO
         if (isset($user['allow_patient_portal']) && strtoupper((string)$user['allow_patient_portal']) === 'NO') {
             return [
                 'success' => false,
@@ -157,7 +112,7 @@ class Auth
             ];
         }
 
-        // 3. Verificar Contraseña con password_verify()
+        // Verificar Contraseña con password_verify()
         $storedHash = $user['portal_pwd'] ?? '';
         $passwordValid = false;
 
@@ -176,7 +131,7 @@ class Auth
             ];
         }
 
-        // 4. Formatear datos y establecer la sesión exclusiva Express
+        // Formatear datos y establecer la sesión exclusiva Express
         $fullName = trim(($user['fname'] ?? '') . ' ' . ($user['mname'] ?? '') . ' ' . ($user['lname'] ?? ''));
         if (empty($fullName)) {
             $fullName = 'Paciente #' . $user['pid'];
@@ -184,9 +139,11 @@ class Auth
 
         session_regenerate_id(true);
 
+        $preferredUsername = !empty($user['portal_login_username']) ? $user['portal_login_username'] : ($user['portal_username'] ?? $username);
+
         $_SESSION['express_patient_pid']    = (int)$user['pid'];
         $_SESSION['express_patient_pubpid'] = $user['pubpid'] ?: (string)$user['pid'];
-        $_SESSION['express_patient_user']   = $user['portal_username'] ?? $username;
+        $_SESSION['express_patient_user']   = $preferredUsername;
         $_SESSION['express_logged_in']      = true;
         $_SESSION['express_logged_at']      = time();
         $_SESSION['express_last_activity']  = time();
