@@ -1,26 +1,21 @@
 <?php
 /**
- * Clase de Gestión de Diagnóstico por Imágenes e Integración Orthanc / OHIF Viewer
- * Patient Express Portal - Conexión PACS & OpenEMR
+ * Gestión de Diagnóstico por Imágenes e Integración Orthanc / OHIF Viewer
+ * Patient Express Portal - Integración Nativa con Funciones OpenEMR
  */
 
 namespace App;
 
-use PDO;
-use PDOException;
-
 class Imaging
 {
-    private PDO $db;
     private string $orthancUrl;
     private string $orthancUser;
     private string $orthancPass;
     private string $ohifBaseUrl;
     private string $orthancWadoUrl;
 
-    public function __construct(?PDO $db = null)
+    public function __construct()
     {
-        $this->db = $db ?? getDbConnection();
         $this->orthancUrl = defined('ORTHANC_URL') ? ORTHANC_URL : 'http://127.0.0.1:8042';
         $this->orthancUser = defined('ORTHANC_USER') ? ORTHANC_USER : 'orthanc';
         $this->orthancPass = defined('ORTHANC_PASS') ? ORTHANC_PASS : 'orthanc';
@@ -29,20 +24,21 @@ class Imaging
     }
 
     /**
-     * Obtiene los estudios de imágenes de un paciente desde la base de datos de OpenEMR
-     * complementando opcionalmente con estudios encontrados en Orthanc PACS.
+     * Obtiene los estudios de imágenes y documentos gráficos del paciente desde OpenEMR y PACS Orthanc
      * 
      * @param int $pid ID de paciente en OpenEMR
-     * @param string|null $patientDni DNI / Documento del paciente (para cruce en PACS)
-     * @return array Lista de estudios
+     * @param string|null $patientDni DNI / Documento del paciente
+     * @return array Lista de estudios clasificados
      */
     public function getStudiesByPatient(int $pid, ?string $patientDni = null): array
     {
         $studies = [];
+        $registeredStudyUids = [];
 
-        // 1. Consultar estudios registrados en OpenEMR (Órdenes e informes de imágenes)
-        try {
-            $sql = "SELECT 
+        // =========================================================================
+        // 1. Consultar estudios DICOM e Informes Radiológicos en procedure_order
+        // =========================================================================
+        $sqlOrders = "SELECT 
                         pr.procedure_report_id,
                         pr.procedure_order_id,
                         pr.date_report,
@@ -57,49 +53,48 @@ class Imaging
                         u.lname AS provider_lname,
                         u.title AS provider_title,
                         u.specialty AS provider_specialty
-                    FROM procedure_order po
-                    LEFT JOIN procedure_report pr ON po.procedure_order_id = pr.procedure_order_id
-                    LEFT JOIN procedure_order_code poc ON po.procedure_order_id = poc.procedure_order_id
-                    LEFT JOIN users u ON po.provider_id = u.id
-                    WHERE po.patient_id = :pid
-                      AND (
-                           poc.procedure_code LIKE 'RAD%' 
-                           OR poc.procedure_code LIKE 'IMG%' 
-                           OR poc.procedure_name LIKE '%RAYOS%' 
-                           OR poc.procedure_name LIKE '%RX%' 
-                           OR poc.procedure_name LIKE '%RESONANCIA%' 
-                           OR poc.procedure_name LIKE '%RMN%' 
-                           OR poc.procedure_name LIKE '%TOMOGRAFIA%' 
-                           OR poc.procedure_name LIKE '%TAC%' 
-                           OR poc.procedure_name LIKE '%ECOGRAFIA%' 
-                           OR poc.procedure_name LIKE '%ECO%' 
-                           OR poc.procedure_name LIKE '%MAMOGRAFIA%' 
-                           OR poc.procedure_name LIKE '%DOPPLER%'
-                           OR pr.report_notes LIKE '%DICOM%'
-                           OR pr.report_notes LIKE '%ESTUDIO%'
-                           OR po.procedure_type = 'radiology'
-                      )
-                    ORDER BY COALESCE(pr.date_report, po.date_ordered) DESC";
+                      FROM procedure_order po
+                      LEFT JOIN procedure_report pr ON po.procedure_order_id = pr.procedure_order_id
+                      LEFT JOIN procedure_order_code poc ON po.procedure_order_id = poc.procedure_order_id
+                      LEFT JOIN users u ON po.provider_id = u.id
+                      WHERE po.patient_id = ?
+                        AND (
+                             poc.procedure_code LIKE 'RAD%' 
+                             OR poc.procedure_code LIKE 'IMG%' 
+                             OR poc.procedure_name LIKE '%RAYOS%' 
+                             OR poc.procedure_name LIKE '%RX%' 
+                             OR poc.procedure_name LIKE '%RESONANCIA%' 
+                             OR poc.procedure_name LIKE '%RMN%' 
+                             OR poc.procedure_name LIKE '%TOMOGRAFIA%' 
+                             OR poc.procedure_name LIKE '%TAC%' 
+                             OR poc.procedure_name LIKE '%ECOGRAFIA%' 
+                             OR poc.procedure_name LIKE '%ECO%' 
+                             OR poc.procedure_name LIKE '%MAMOGRAFIA%' 
+                             OR poc.procedure_name LIKE '%DOPPLER%'
+                             OR pr.report_notes LIKE '%DICOM%'
+                             OR pr.report_notes LIKE '%ESTUDIO%'
+                             OR po.procedure_type = 'radiology'
+                        )
+                      ORDER BY COALESCE(pr.date_report, po.date_ordered) DESC";
 
-            $stmt = $this->db->prepare($sql);
-            $stmt->execute([':pid' => $pid]);
-            $dbRows = $stmt->fetchAll();
-
-            foreach ($dbRows as $row) {
+        $resOrders = sqlStatement($sqlOrders, [$pid]);
+        if ($resOrders) {
+            while ($row = sqlFetchArray($resOrders)) {
                 $providerName = trim(($row['provider_title'] ? $row['provider_title'] . ' ' : 'Dr. ') . ($row['provider_fname'] ?? '') . ' ' . ($row['provider_lname'] ?? ''));
                 if (trim($providerName) === 'Dr.' || empty(trim($providerName))) {
-                    $providerName = 'Médico Solicitante';
+                    $providerName = 'Médico Especialista';
                 }
 
-                $studyName = !empty($row['procedure_name']) ? $row['procedure_name'] : 'Estudio Radiológico / Diagnóstico por Imágenes';
+                $studyName = !empty($row['procedure_name']) ? $row['procedure_name'] : 'Estudio de Diagnóstico por Imágenes';
                 $modality = $this->detectModality($studyName);
 
-                // Determinar UID o Accession Number para el visor
                 $accessionNumber = !empty($row['accession_number']) ? $row['accession_number'] : 'ACC-' . $row['procedure_order_id'];
-                $studyUid = $this->extractStudyUidFromNotes($row['report_notes'] ?? '') ?: ('1.2.840.113619.2.55.' . $row['procedure_order_id'] . '.' . $pid);
+                $studyUid = $this->extractStudyUidFromNotes($row['report_notes'] ?? '');
+                $effectiveUid = $studyUid ?: ('1.2.840.113619.2.55.' . $row['procedure_order_id'] . '.' . $pid);
+                $registeredStudyUids[] = $effectiveUid;
 
                 $studies[] = [
-                    'id'                => (int)($row['procedure_report_id'] ?: $row['procedure_order_id']),
+                    'id'                => 'po_' . ($row['procedure_report_id'] ?: $row['procedure_order_id']),
                     'report_id'         => $row['procedure_report_id'] ? (int)$row['procedure_report_id'] : null,
                     'order_id'          => (int)$row['procedure_order_id'],
                     'title'             => $studyName,
@@ -111,34 +106,130 @@ class Imaging
                     'status'            => !empty($row['procedure_report_id']) ? 'Informe Disponible' : 'En proceso / Pendiente',
                     'has_report'        => !empty($row['procedure_report_id']),
                     'accession_number'  => $accessionNumber,
-                    'study_uid'         => $studyUid,
-                    'viewer_url'        => $this->buildOhifViewerUrl($studyUid, $accessionNumber),
-                    'source'            => 'openemr'
+                    'study_uid'         => $effectiveUid,
+                    'format_type'       => 'dicom', // DICOM -> Visor OHIF
+                    'viewer_type'       => 'ohif',
+                    'viewer_url'        => $this->buildOhifViewerUrl($effectiveUid),
+                    'direct_view_url'   => null,
+                    'download_url'      => null,
+                    'source'            => 'openemr_order'
                 ];
             }
-
-        } catch (PDOException $e) {
-            error_log('Error en Imaging::getStudiesByPatient (DB): ' . $e->getMessage());
         }
 
-        // 2. Si no hay estudios en DB o se quiere consultar Orthanc directamente vía REST
+        // =========================================================================
+        // 2. Consultar Documentos de Imágenes Estándar en OpenEMR (JPG / PNG / PDF)
+        // =========================================================================
+        $sqlDocs = "SELECT 
+                        d.id AS doc_id,
+                        d.type,
+                        d.size,
+                        d.date AS doc_date,
+                        d.docdate,
+                        d.url,
+                        d.mimetype,
+                        d.name AS doc_name,
+                        d.foreign_id AS patient_id,
+                        c.name AS category_name
+                    FROM documents d
+                    LEFT JOIN categories_to_documents ctd ON d.id = ctd.document_id
+                    LEFT JOIN categories c ON ctd.category_id = c.id
+                    WHERE d.foreign_id = ? 
+                      AND (d.deleted = 0 OR d.deleted IS NULL)
+                      AND (
+                           d.mimetype LIKE 'image/%' 
+                           OR d.mimetype = 'application/pdf'
+                           OR LOWER(d.url) LIKE '%.jpg'
+                           OR LOWER(d.url) LIKE '%.jpeg'
+                           OR LOWER(d.url) LIKE '%.png'
+                           OR LOWER(d.url) LIKE '%.pdf'
+                           OR LOWER(d.name) LIKE '%.jpg'
+                           OR LOWER(d.name) LIKE '%.jpeg'
+                           OR LOWER(d.name) LIKE '%.png'
+                           OR LOWER(d.name) LIKE '%.pdf'
+                           OR LOWER(c.name) LIKE '%imagen%'
+                           OR LOWER(c.name) LIKE '%estudio%'
+                           OR LOWER(c.name) LIKE '%rayos%'
+                           OR LOWER(c.name) LIKE '%ecografia%'
+                      )
+                    ORDER BY COALESCE(d.docdate, d.date) DESC";
+
+        $resDocs = sqlStatement($sqlDocs, [$pid]);
+        if ($resDocs) {
+            while ($dRow = sqlFetchArray($resDocs)) {
+                $docName = !empty($dRow['doc_name']) ? $dRow['doc_name'] : basename((string)$dRow['url']);
+                $mime = strtolower((string)$dRow['mimetype']);
+                $urlLower = strtolower((string)$dRow['url']);
+                $nameLower = strtolower($docName);
+
+                $isImage = str_starts_with($mime, 'image/') || str_ends_with($urlLower, '.jpg') || str_ends_with($urlLower, '.jpeg') || str_ends_with($urlLower, '.png') || str_ends_with($nameLower, '.jpg') || str_ends_with($nameLower, '.jpeg') || str_ends_with($nameLower, '.png');
+                $isPdf = ($mime === 'application/pdf') || str_ends_with($urlLower, '.pdf') || str_ends_with($nameLower, '.pdf');
+
+                $formatType = $isImage ? 'image' : ($isPdf ? 'pdf' : 'standard_file');
+                $viewerType = $isImage ? 'inline_image' : ($isPdf ? 'inline_pdf' : 'download');
+                
+                $studyTitle = $docName;
+                if (!empty($dRow['category_name']) && $dRow['category_name'] !== 'General') {
+                    $studyTitle = $dRow['category_name'] . ' - ' . $docName;
+                }
+
+                $modality = $this->detectModality($studyTitle);
+                $docDate = $dRow['docdate'] ?: ($dRow['doc_date'] ? date('Y-m-d', strtotime($dRow['doc_date'])) : date('Y-m-d'));
+                $formattedDate = date('d/m/Y', strtotime($docDate));
+
+                $viewUrl = 'view_document.php?id=' . $dRow['doc_id'];
+                $downloadUrl = 'view_document.php?id=' . $dRow['doc_id'] . '&download=1';
+
+                $studies[] = [
+                    'id'                => 'doc_' . $dRow['doc_id'],
+                    'report_id'         => null,
+                    'order_id'          => 0,
+                    'doc_id'            => (int)$dRow['doc_id'],
+                    'title'             => $studyTitle,
+                    'modality'          => $modality,
+                    'date_study'        => $formattedDate,
+                    'date_raw'          => $docDate,
+                    'provider_name'     => 'Servicio de Diagnóstico / Digitalización',
+                    'provider_spec'     => 'Documentación Médica',
+                    'status'            => 'Archivo Listo para Visualizar',
+                    'has_report'        => false,
+                    'accession_number'  => 'DOC-' . $dRow['doc_id'],
+                    'study_uid'         => null,
+                    'format_type'       => $formatType, // 'image' o 'pdf' estándar
+                    'viewer_type'       => $viewerType, // 'inline_image' o 'inline_pdf' (sin OHIF)
+                    'viewer_url'        => $viewUrl,
+                    'direct_view_url'   => $viewUrl,
+                    'download_url'      => $downloadUrl,
+                    'mimetype'          => $mime,
+                    'source'            => 'openemr_document'
+                ];
+            }
+        }
+
+        // =========================================================================
+        // 3. Consultar Orthanc PACS directamente vía REST API
+        // =========================================================================
         $orthancStudies = $this->fetchOrthancStudies((string)$pid, $patientDni);
         if (!empty($orthancStudies)) {
-            // Fusionar o agregar estudios de Orthanc que no estén ya en la lista
             foreach ($orthancStudies as $oStudy) {
+                if (!empty($oStudy['study_uid']) && in_array($oStudy['study_uid'], $registeredStudyUids, true)) {
+                    continue;
+                }
                 $studies[] = $oStudy;
             }
         }
+
+        usort($studies, function ($a, $b) {
+            $timeA = strtotime((string)($a['date_raw'] ?? '1970-01-01'));
+            $timeB = strtotime((string)($b['date_raw'] ?? '1970-01-01'));
+            return $timeB <=> $timeA;
+        });
 
         return $studies;
     }
 
     /**
-     * Consulta REST a Orthanc PACS para encontrar estudios asociados al PatientID
-     * 
-     * @param string $patientId PID o DNI
-     * @param string|null $dni
-     * @return array
+     * Consulta REST a Orthanc PACS para encontrar estudios asociados al PatientID / DNI
      */
     public function fetchOrthancStudies(string $patientId, ?string $dni = null): array
     {
@@ -179,7 +270,6 @@ class Imaging
                             $mainDicom = $study['MainDicomTags'] ?? [];
                             $studyUid = $mainDicom['StudyInstanceUID'] ?? ($study['ID'] ?? '');
                             $studyDate = $mainDicom['StudyDate'] ?? '';
-                            $studyTime = $mainDicom['StudyTime'] ?? '';
                             $formattedDate = 'Sin fecha';
                             if (strlen($studyDate) === 8) {
                                 $formattedDate = substr($studyDate, 6, 2) . '/' . substr($studyDate, 4, 2) . '/' . substr($studyDate, 0, 4);
@@ -203,14 +293,17 @@ class Imaging
                                 'has_report'       => false,
                                 'accession_number' => $accession,
                                 'study_uid'        => $studyUid,
-                                'viewer_url'       => $this->buildOhifViewerUrl($studyUid, $accession),
+                                'format_type'      => 'dicom', // DICOM -> Visor OHIF
+                                'viewer_type'      => 'ohif',
+                                'viewer_url'       => $this->buildOhifViewerUrl($studyUid),
+                                'direct_view_url'  => null,
+                                'download_url'     => null,
                                 'source'           => 'orthanc'
                             ];
                         }
                     }
                 }
-            } catch (\Exception $e) {
-                // PACS puede estar temporalmente inactivo o aislado en red interna
+            } catch (\Throwable $e) {
                 error_log("Aviso: No se pudo consultar Orthanc PACS ({$e->getMessage()})");
             }
         }
@@ -219,121 +312,153 @@ class Imaging
     }
 
     /**
-     * Obtiene el detalle de un informe de imagen para visualización o PDF
-     * 
-     * @param int $reportId ID de procedure_report
-     * @param int $pid ID de paciente autenticado
-     * @return array|null
+     * Obtiene el documento físico o registro desde la tabla documents de OpenEMR
+     * usando sqlQuery()
      */
-    public function getStudyReportDetails(int $reportId, int $pid): ?array
+    public function getDocumentFile(int $docId, int $pid): ?array
     {
-        try {
-            $sql = "SELECT 
-                        pr.procedure_report_id,
-                        pr.procedure_order_id,
-                        pr.date_report,
-                        pr.report_status,
-                        pr.report_notes,
-                        pr.specimen_num AS accession_number,
-                        po.date_ordered,
-                        po.patient_instructions,
-                        poc.procedure_name,
-                        poc.procedure_code,
-                        u.fname AS provider_fname,
-                        u.lname AS provider_lname,
-                        u.title AS provider_title,
-                        u.specialty AS provider_specialty,
-                        u.npi AS provider_license,
-                        pd.pid,
-                        pd.fname AS patient_fname,
-                        pd.lname AS patient_lname,
-                        pd.mname AS patient_mname,
-                        pd.DOB AS patient_dob,
-                        pd.sex AS patient_sex,
-                        pd.ss AS patient_dni,
-                        pd.phone_cell AS patient_phone,
-                        pd.email AS patient_email,
-                        pd.street AS patient_street,
-                        pd.city AS patient_city
-                    FROM procedure_report pr
-                    INNER JOIN procedure_order po ON pr.procedure_order_id = po.procedure_order_id
-                    LEFT JOIN procedure_order_code poc ON po.procedure_order_id = poc.procedure_order_id
-                    LEFT JOIN users u ON po.provider_id = u.id
-                    INNER JOIN patient_data pd ON po.patient_id = pd.pid
-                    WHERE pr.procedure_report_id = :report_id AND po.patient_id = :pid
-                    LIMIT 1";
+        $sql = "SELECT id, foreign_id, url, mimetype, name, size, docdate 
+                FROM documents 
+                WHERE id = ? AND foreign_id = ? AND (deleted = 0 OR deleted IS NULL)
+                LIMIT 1";
 
-            $stmt = $this->db->prepare($sql);
-            $stmt->execute([
-                ':report_id' => $reportId,
-                ':pid'       => $pid
-            ]);
-
-            $row = $stmt->fetch();
-            if (!$row) {
-                return null;
-            }
-
-            $patientFullName = trim(($row['patient_fname'] ?? '') . ' ' . ($row['patient_mname'] ?? '') . ' ' . ($row['patient_lname'] ?? ''));
-            $providerFullName = trim(($row['provider_title'] ? $row['provider_title'] . ' ' : 'Dr. ') . ($row['provider_fname'] ?? '') . ' ' . ($row['provider_lname'] ?? ''));
-            $studyTitle = !empty($row['procedure_name']) ? $row['procedure_name'] : 'Estudio de Diagnóstico por Imágenes';
-            $modality = $this->detectModality($studyTitle);
-            $accession = !empty($row['accession_number']) ? $row['accession_number'] : 'ACC-' . $row['procedure_order_id'];
-            $studyUid = $this->extractStudyUidFromNotes($row['report_notes'] ?? '') ?: ('1.2.840.113619.2.55.' . $row['procedure_order_id'] . '.' . $pid);
-
-            // Separar notas en hallazgos y conclusión si están estructuradas
-            $parsedNotes = $this->parseReportNotes($row['report_notes'] ?? '');
-
-            return [
-                'report_id'          => (int)$row['procedure_report_id'],
-                'order_id'           => (int)$row['procedure_order_id'],
-                'study_name'         => $studyTitle,
-                'modality'           => $modality,
-                'accession_number'   => $accession,
-                'study_uid'          => $studyUid,
-                'viewer_url'         => $this->buildOhifViewerUrl($studyUid, $accession),
-                'date_report'        => $row['date_report'] ? date('d/m/Y H:i', strtotime($row['date_report'])) : 'N/A',
-                'date_ordered'       => $row['date_ordered'] ? date('d/m/Y', strtotime($row['date_ordered'])) : 'N/A',
-                'report_status'      => 'Informe Oficial Aprobado',
-                'findings'           => $parsedNotes['findings'],
-                'conclusion'         => $parsedNotes['conclusion'],
-                'raw_notes'          => $row['report_notes'] ?? '',
-                'patient'            => [
-                    'pid'            => (int)$row['pid'],
-                    'full_name'      => $patientFullName,
-                    'dni'            => $row['patient_dni'] ?? 'N/A',
-                    'dob'            => $row['patient_dob'] ? date('d/m/Y', strtotime($row['patient_dob'])) : 'N/A',
-                    'age'            => $this->calculateAge($row['patient_dob'] ?? ''),
-                    'sex'            => $this->formatSex($row['patient_sex'] ?? ''),
-                    'phone'          => $row['patient_phone'] ?? '',
-                    'email'          => $row['patient_email'] ?? '',
-                    'address'        => trim(($row['patient_street'] ?? '') . ', ' . ($row['patient_city'] ?? ''))
-                ],
-                'provider'           => [
-                    'full_name'      => $providerFullName,
-                    'specialty'      => $row['provider_specialty'] ?? 'Diagnóstico por Imágenes',
-                    'license'        => $row['provider_license'] ?? 'M.N. / M.P. Radiología'
-                ]
-            ];
-
-        } catch (PDOException $e) {
-            error_log('Error en Imaging::getStudyReportDetails: ' . $e->getMessage());
+        $doc = sqlQuery($sql, [$docId, $pid]);
+        if (!$doc) {
             return null;
         }
+
+        $url = $doc['url'];
+        $filePath = null;
+
+        if (file_exists($url)) {
+            $filePath = $url;
+        } else {
+            $basePaths = [
+                defined('OPENEMR_DOCUMENTS_PATH') ? OPENEMR_DOCUMENTS_PATH : '/var/www/html/openemr/sites/default/documents',
+                dirname(__DIR__, 2) . '/sites/default/documents',
+                dirname(__DIR__) . '/storage/documents',
+                '/var/www/html/origen.ar/hcd/sites/default/documents',
+                '/var/www/html/openemr/sites/default/documents'
+            ];
+
+            $cleanUrl = ltrim(str_replace('file://', '', $url), '/');
+            foreach ($basePaths as $base) {
+                $testPath = rtrim($base, '/') . '/' . $cleanUrl;
+                if (file_exists($testPath)) {
+                    $filePath = $testPath;
+                    break;
+                }
+            }
+        }
+
+        return [
+            'id'        => (int)$doc['id'],
+            'pid'       => (int)$doc['foreign_id'],
+            'name'      => $doc['name'] ?: basename((string)$doc['url']),
+            'mimetype'  => $doc['mimetype'] ?: 'application/octet-stream',
+            'url'       => $doc['url'],
+            'file_path' => $filePath,
+            'exists'    => ($filePath !== null && file_exists($filePath))
+        ];
     }
 
     /**
-     * Construye la URL hacia el visor DICOM OHIF
-     * 
-     * @param string $studyUid
-     * @param string $accessionNumber
-     * @return string
+     * Obtiene el detalle de un informe de imagen para PDF
      */
-    public function buildOhifViewerUrl(string $studyUid, string $accessionNumber = ''): string
+    public function getStudyReportDetails(int $reportId, int $pid): ?array
     {
-        // Si el OHIF espera formato ?url=... o ?StudyInstanceUIDs=...
-        $wadoUrl = rtrim($this->orthancWadoUrl, '/') . '/studies/' . urlencode($studyUid);
-        return rtrim($this->ohifBaseUrl, '/') . '?url=' . urlencode($wadoUrl);
+        $sql = "SELECT 
+                    pr.procedure_report_id,
+                    pr.procedure_order_id,
+                    pr.date_report,
+                    pr.report_status,
+                    pr.report_notes,
+                    pr.specimen_num AS accession_number,
+                    po.date_ordered,
+                    po.patient_instructions,
+                    poc.procedure_name,
+                    poc.procedure_code,
+                    u.fname AS provider_fname,
+                    u.lname AS provider_lname,
+                    u.title AS provider_title,
+                    u.specialty AS provider_specialty,
+                    u.npi AS provider_license,
+                    pd.pid,
+                    pd.pubpid,
+                    pd.fname AS patient_fname,
+                    pd.lname AS patient_lname,
+                    pd.mname AS patient_mname,
+                    pd.DOB AS patient_dob,
+                    pd.sex AS patient_sex,
+                    pd.ss AS patient_dni,
+                    pd.phone_cell AS patient_phone,
+                    pd.email AS patient_email,
+                    pd.street AS patient_street,
+                    pd.city AS patient_city
+                FROM procedure_report pr
+                INNER JOIN procedure_order po ON pr.procedure_order_id = po.procedure_order_id
+                LEFT JOIN procedure_order_code poc ON po.procedure_order_id = poc.procedure_order_id
+                LEFT JOIN users u ON po.provider_id = u.id
+                INNER JOIN patient_data pd ON po.patient_id = pd.pid
+                WHERE pr.procedure_report_id = ? AND po.patient_id = ?
+                LIMIT 1";
+
+        $row = sqlQuery($sql, [$reportId, $pid]);
+        if (!$row) {
+            return null;
+        }
+
+        $patientFullName = trim(($row['patient_fname'] ?? '') . ' ' . ($row['patient_mname'] ?? '') . ' ' . ($row['patient_lname'] ?? ''));
+        $providerFullName = trim(($row['provider_title'] ? $row['provider_title'] . ' ' : 'Dr. ') . ($row['provider_fname'] ?? '') . ' ' . ($row['provider_lname'] ?? ''));
+        $studyTitle = !empty($row['procedure_name']) ? $row['procedure_name'] : 'Estudio de Diagnóstico por Imágenes';
+        $modality = $this->detectModality($studyTitle);
+        $accession = !empty($row['accession_number']) ? $row['accession_number'] : 'ACC-' . $row['procedure_order_id'];
+        $studyUid = $this->extractStudyUidFromNotes($row['report_notes'] ?? '') ?: ('1.2.840.113619.2.55.' . $row['procedure_order_id'] . '.' . $pid);
+
+        $parsedNotes = $this->parseReportNotes($row['report_notes'] ?? '');
+
+        return [
+            'report_id'          => (int)$row['procedure_report_id'],
+            'order_id'           => (int)$row['procedure_order_id'],
+            'study_name'         => $studyTitle,
+            'modality'           => $modality,
+            'accession_number'   => $accession,
+            'study_uid'          => $studyUid,
+            'viewer_url'         => $this->buildOhifViewerUrl($studyUid),
+            'date_report'        => $row['date_report'] ? date('d/m/Y H:i', strtotime($row['date_report'])) : 'N/A',
+            'date_ordered'       => $row['date_ordered'] ? date('d/m/Y', strtotime($row['date_ordered'])) : 'N/A',
+            'report_status'      => 'Informe Oficial Aprobado',
+            'findings'           => $parsedNotes['findings'],
+            'conclusion'         => $parsedNotes['conclusion'],
+            'raw_notes'          => $row['report_notes'] ?? '',
+            'patient'            => [
+                'pid'            => (int)$row['pid'],
+                'pubpid'         => $row['pubpid'] ?: (string)$row['pid'],
+                'full_name'      => $patientFullName,
+                'dni'            => $row['patient_dni'] ?? 'N/A',
+                'dob'            => $row['patient_dob'] ? date('d/m/Y', strtotime($row['patient_dob'])) : 'N/A',
+                'age'            => $this->calculateAge($row['patient_dob'] ?? ''),
+                'sex'            => $this->formatSex($row['patient_sex'] ?? ''),
+                'phone'          => $row['patient_phone'] ?? '',
+                'email'          => $row['patient_email'] ?? '',
+                'address'        => trim(($row['patient_street'] ?? '') . ', ' . ($row['patient_city'] ?? ''))
+            ],
+            'provider'           => [
+                'full_name'      => $providerFullName,
+                'specialty'      => $row['provider_specialty'] ?? 'Diagnóstico por Imágenes',
+                'license'        => $row['provider_license'] ?? 'M.N. / M.P. Radiología'
+            ]
+        ];
+    }
+
+    /**
+     * Construye la URL exacta hacia el visor DICOM OHIF:
+     * https://imagenes.origen.ar/viewer?url=https://pacs.origen.ar/dicom-web/studies/{StudyInstanceUID}
+     */
+    public function buildOhifViewerUrl(string $studyUid): string
+    {
+        $dicomWebStudyUrl = rtrim($this->orthancWadoUrl, '/') . '/studies/' . $studyUid;
+        return rtrim($this->ohifBaseUrl, '/') . '?url=' . urlencode($dicomWebStudyUrl);
     }
 
     private function detectModality(string $title): string

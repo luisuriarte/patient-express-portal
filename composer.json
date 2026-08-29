@@ -1,21 +1,15 @@
 {
-    "name": "openemr/patient-express-portal",
-    "description": "Patient Express Portal - Hub de acceso rápido a Laboratorio, Imágenes DICOM y OpenEMR",
-    "type": "project",
-    "license": "MIT",
-    "authors": [
-        {
-            "name": "Medical Systems Team",
-            "email": "dev@origen.ar"
-        }
-    ],
-    "require": {
-        "php": ">=8.0",
-        "dompdf/dompdf": "^2.0 || ^3.0"
-    },
-    "autoload": {
-        "psr-4": {
-            "App\\": "src/"
-        }
+  "name": "origen/patient-express-portal",
+  "description": "Patient Express Portal - OpenEMR Native Integration",
+  "type": "project",
+  "license": "GPL-3.0-or-later",
+  "require": {
+    "php": ">=8.1",
+    "dompdf/dompdf": "^2.0 || ^3.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "App\\": "src/"
     }
+  }
 }

@@ -1,22 +1,17 @@
 <?php
 /**
  * Clase de Autenticación y Manejo de Sesión de Pacientes
- * Patient Express Portal - OpenEMR Compatible
+ * Patient Express Portal - Integración Nativa con Funciones OpenEMR
  */
 
 namespace App;
 
-use PDO;
-use PDOException;
-
 class Auth
 {
-    private PDO $db;
     private const SESSION_LIFETIME = 1800; // 30 minutos de inactividad
 
-    public function __construct(?PDO $db = null)
+    public function __construct()
     {
-        $this->db = $db ?? getDbConnection();
         $this->startSession();
     }
 
@@ -38,17 +33,17 @@ class Auth
             session_start();
         }
 
-        // Control de tiempo de expiración por inactividad
-        if (isset($_SESSION['last_activity']) && (time() - $_SESSION['last_activity'] > self::SESSION_LIFETIME)) {
+        // Control de expiración por inactividad
+        if (isset($_SESSION['express_last_activity']) && (time() - $_SESSION['express_last_activity'] > self::SESSION_LIFETIME)) {
             $this->logout();
         }
-        $_SESSION['last_activity'] = time();
+        $_SESSION['express_last_activity'] = time();
     }
 
     /**
-     * Autentica al paciente contra la tabla patient_access_onsite y patient_data de OpenEMR
+     * Autentica al paciente contra OpenEMR usando sqlQuery() y password_verify()
      * 
-     * @param string $username Usuario del portal (portal_login_username o portal_username) o DNI / Email / PID
+     * @param string $username Usuario del portal o DNI / Email / PID
      * @param string $password Contraseña en texto plano
      * @return array ['success' => bool, 'message' => string, 'patient' => array|null]
      */
@@ -64,190 +59,213 @@ class Auth
             ];
         }
 
+        $user = null;
+
+        // 1. Intentar consulta sobre patient_access_offsite
         try {
-            // 1. Buscar en patient_access_onsite por portal_login_username, portal_username o cruce con patient_data (email, ss/dni, pid)
-            $sql = "SELECT 
-                        pao.id as onsite_id,
-                        pao.pid,
-                        pao.portal_username,
-                        pao.portal_login_username,
-                        pao.portal_pwd,
-                        pao.portal_pwd_status,
-                        pd.id as patient_id,
-                        pd.fname,
-                        pd.lname,
-                        pd.mname,
-                        pd.DOB,
-                        pd.sex,
-                        pd.ss,
-                        pd.email,
-                        pd.phone_cell,
-                        pd.street,
-                        pd.city,
-                        pd.postal_code,
-                        pd.allow_patient_portal
-                    FROM patient_access_onsite pao
-                    INNER JOIN patient_data pd ON pao.pid = pd.pid
-                    WHERE (pao.portal_login_username = :username_login
-                           OR pao.portal_username = :username_direct 
-                           OR pd.ss = :username_ss 
-                           OR pd.email = :username_email 
-                           OR pao.pid = :username_pid)
-                    LIMIT 1";
+            $sqlOffsite = "SELECT 
+                                pao.pid,
+                                pao.portal_username,
+                                pao.portal_pwd,
+                                pd.id as patient_id,
+                                pd.pubpid,
+                                pd.fname,
+                                pd.lname,
+                                pd.mname,
+                                pd.DOB,
+                                pd.sex,
+                                pd.ss,
+                                pd.email,
+                                pd.phone_cell,
+                                pd.street,
+                                pd.city,
+                                pd.postal_code
+                           FROM patient_access_offsite pao
+                           INNER JOIN patient_data pd ON pao.pid = pd.pid
+                           WHERE (pao.portal_username = ? 
+                                  OR pd.ss = ? 
+                                  OR pd.email = ? 
+                                  OR pao.pid = ?)
+                             AND (pao.portal_status = 1 OR pao.portal_status IS NULL)
+                           LIMIT 1";
 
-            $stmt = $this->db->prepare($sql);
-            $stmt->execute([
-                ':username_login'  => $username,
-                ':username_direct' => $username,
-                ':username_ss'     => $username,
-                ':username_email'  => $username,
-                ':username_pid'    => is_numeric($username) ? (int)$username : -1
+            $user = sqlQuery($sqlOffsite, [
+                $username,
+                $username,
+                $username,
+                is_numeric($username) ? (int)$username : -1
             ]);
+        } catch (\Throwable $e) {
+            $user = false;
+        }
 
-            $account = $stmt->fetch();
+        // 2. Si no existe o no se encuentra en patient_access_offsite, consultar patient_access_onsite (OpenEMR 7+)
+        if (!$user) {
+            try {
+                $sqlOnsite = "SELECT 
+                                pao.pid,
+                                pao.portal_username,
+                                pao.portal_login_username,
+                                pao.portal_pwd,
+                                pd.id as patient_id,
+                                pd.pubpid,
+                                pd.fname,
+                                pd.lname,
+                                pd.mname,
+                                pd.DOB,
+                                pd.sex,
+                                pd.ss,
+                                pd.email,
+                                pd.phone_cell,
+                                pd.street,
+                                pd.city,
+                                pd.postal_code,
+                                pd.allow_patient_portal
+                              FROM patient_access_onsite pao
+                              INNER JOIN patient_data pd ON pao.pid = pd.pid
+                              WHERE (pao.portal_login_username = ? 
+                                     OR pao.portal_username = ? 
+                                     OR pd.ss = ? 
+                                     OR pd.email = ? 
+                                     OR pao.pid = ?)
+                              LIMIT 1";
 
-            if (!$account) {
-                return [
-                    'success' => false,
-                    'message' => 'Credenciales inválidas o paciente no registrado en el portal.'
-                ];
+                $user = sqlQuery($sqlOnsite, [
+                    $username,
+                    $username,
+                    $username,
+                    $username,
+                    is_numeric($username) ? (int)$username : -1
+                ]);
+            } catch (\Throwable $e) {
+                $user = false;
             }
+        }
 
-            // Verificar si el portal está habilitado en patient_data
-            if (isset($account['allow_patient_portal']) && strtoupper($account['allow_patient_portal']) === 'NO') {
-                return [
-                    'success' => false,
-                    'message' => 'El acceso al portal se encuentra inactivo para este paciente. Por favor contacte al centro médico.'
-                ];
-            }
-
-            // 2. Verificar contraseña con password_verify() (Hash de OpenEMR)
-            $storedHash = $account['portal_pwd'] ?? '';
-            $passwordValid = false;
-
-            if (!empty($storedHash)) {
-                if (password_verify($password, $storedHash)) {
-                    $passwordValid = true;
-                } elseif (hash_equals($storedHash, sha1($password)) || hash_equals($storedHash, md5($password))) {
-                    // Soporte de compatibilidad para esquemas legacy de OpenEMR
-                    $passwordValid = true;
-                    // Actualizar a bcrypt/argon2
-                    $newHash = password_hash($password, PASSWORD_DEFAULT);
-                    $updateStmt = $this->db->prepare("UPDATE patient_access_onsite SET portal_pwd = :new_pwd WHERE pid = :pid");
-                    $updateStmt->execute([':new_pwd' => $newHash, ':pid' => $account['pid']]);
-                }
-            }
-
-            if (!$passwordValid) {
-                return [
-                    'success' => false,
-                    'message' => 'Contraseña incorrecta. Verifique sus datos.'
-                ];
-            }
-
-            // 3. Formatear datos del paciente y establecer sesión
-            $fullName = trim(($account['fname'] ?? '') . ' ' . ($account['mname'] ?? '') . ' ' . ($account['lname'] ?? ''));
-            if (empty($fullName)) {
-                $fullName = 'Paciente #' . $account['pid'];
-            }
-
-            // Regenerar ID de sesión para prevenir Session Fixation
-            session_regenerate_id(true);
-
-            $preferredUsername = !empty($account['portal_login_username']) ? $account['portal_login_username'] : ($account['portal_username'] ?? $username);
-
-            $_SESSION['patient_pid']      = (int)$account['pid'];
-            $_SESSION['patient_username'] = $preferredUsername;
-            $_SESSION['patient_name']     = $fullName;
-            $_SESSION['patient_data']     = [
-                'pid'         => (int)$account['pid'],
-                'fname'       => $account['fname'] ?? '',
-                'lname'       => $account['lname'] ?? '',
-                'mname'       => $account['mname'] ?? '',
-                'full_name'   => $fullName,
-                'dob'         => $account['DOB'] ?? '',
-                'sex'         => $account['sex'] ?? '',
-                'dni'         => $account['ss'] ?? '',
-                'email'       => $account['email'] ?? '',
-                'phone'       => $account['phone_cell'] ?? '',
-                'address'     => trim(($account['street'] ?? '') . ', ' . ($account['city'] ?? '')),
-                'postal_code' => $account['postal_code'] ?? ''
-            ];
-            $_SESSION['logged_in']    = true;
-            $_SESSION['logged_at']    = time();
-            $_SESSION['last_activity']= time();
-
-            return [
-                'success' => true,
-                'message' => 'Ingreso exitoso.',
-                'patient' => $_SESSION['patient_data']
-            ];
-
-        } catch (PDOException $e) {
-            error_log('Error en Auth::login: ' . $e->getMessage());
+        if (!$user || empty($user['pid'])) {
             return [
                 'success' => false,
-                'message' => 'Ocurrió un error en el servidor al intentar autenticar. Intente nuevamente.'
+                'message' => 'Credenciales inválidas o paciente no registrado en el portal.'
             ];
         }
+
+        // Verificar estado de habilitación si está presente
+        if (isset($user['allow_patient_portal']) && strtoupper((string)$user['allow_patient_portal']) === 'NO') {
+            return [
+                'success' => false,
+                'message' => 'El acceso al portal se encuentra inactivo para este paciente. Por favor contacte al centro médico.'
+            ];
+        }
+
+        // 3. Verificar Contraseña con password_verify()
+        $storedHash = $user['portal_pwd'] ?? '';
+        $passwordValid = false;
+
+        if (!empty($storedHash)) {
+            if (password_verify($password, $storedHash)) {
+                $passwordValid = true;
+            } elseif (hash_equals($storedHash, sha1($password)) || hash_equals($storedHash, md5($password))) {
+                $passwordValid = true;
+            }
+        }
+
+        if (!$passwordValid) {
+            return [
+                'success' => false,
+                'message' => 'Contraseña incorrecta. Verifique los datos ingresados.'
+            ];
+        }
+
+        // 4. Formatear datos y establecer la sesión exclusiva Express
+        $fullName = trim(($user['fname'] ?? '') . ' ' . ($user['mname'] ?? '') . ' ' . ($user['lname'] ?? ''));
+        if (empty($fullName)) {
+            $fullName = 'Paciente #' . $user['pid'];
+        }
+
+        session_regenerate_id(true);
+
+        $_SESSION['express_patient_pid']    = (int)$user['pid'];
+        $_SESSION['express_patient_pubpid'] = $user['pubpid'] ?: (string)$user['pid'];
+        $_SESSION['express_patient_user']   = $user['portal_username'] ?? $username;
+        $_SESSION['express_logged_in']      = true;
+        $_SESSION['express_logged_at']      = time();
+        $_SESSION['express_last_activity']  = time();
+        
+        $_SESSION['express_patient_data']   = [
+            'pid'         => (int)$user['pid'],
+            'pubpid'      => $user['pubpid'] ?: (string)$user['pid'],
+            'fname'       => $user['fname'] ?? '',
+            'lname'       => $user['lname'] ?? '',
+            'mname'       => $user['mname'] ?? '',
+            'full_name'   => $fullName,
+            'dob'         => $user['DOB'] ?? '',
+            'sex'         => $user['sex'] ?? '',
+            'dni'         => $user['ss'] ?? '',
+            'email'       => $user['email'] ?? '',
+            'phone'       => $user['phone_cell'] ?? '',
+            'address'     => trim(($user['street'] ?? '') . ', ' . ($user['city'] ?? '')),
+            'postal_code' => $user['postal_code'] ?? ''
+        ];
+
+        return [
+            'success' => true,
+            'message' => 'Ingreso exitoso.',
+            'patient' => $_SESSION['express_patient_data']
+        ];
     }
 
     /**
-     * Verifica si hay un paciente actualmente autenticado
+     * Comprueba si el paciente tiene sesión Express activa
      */
     public function isAuthenticated(): bool
     {
-        return isset($_SESSION['logged_in']) && $_SESSION['logged_in'] === true && !empty($_SESSION['patient_pid']);
+        return isset($_SESSION['express_logged_in']) 
+            && $_SESSION['express_logged_in'] === true 
+            && !empty($_SESSION['express_patient_pid']);
     }
 
-    /**
-     * Obtiene el PID del paciente en sesión
-     */
     public function getPatientPid(): ?int
     {
-        return $this->isAuthenticated() ? (int)$_SESSION['patient_pid'] : null;
+        return $this->isAuthenticated() ? (int)$_SESSION['express_patient_pid'] : null;
     }
 
-    /**
-     * Obtiene todos los datos del paciente en sesión
-     */
+    public function getPatientPubpid(): ?string
+    {
+        return $this->isAuthenticated() ? (string)$_SESSION['express_patient_pubpid'] : null;
+    }
+
     public function getCurrentPatient(): ?array
     {
-        return $this->isAuthenticated() ? ($_SESSION['patient_data'] ?? null) : null;
+        return $this->isAuthenticated() ? ($_SESSION['express_patient_data'] ?? null) : null;
     }
 
     /**
-     * Guardia de seguridad: Redirige al login si no está autenticado
+     * Guardia de seguridad
      */
     public function requireAuth(string $redirectUrl = 'index.php'): void
     {
         if (!$this->isAuthenticated()) {
-            $_SESSION['flash_error'] = 'Debe iniciar sesión para acceder a esta sección.';
+            $_SESSION['flash_error'] = 'Debe iniciar sesión para acceder al portal.';
             header("Location: {$redirectUrl}");
             exit;
         }
     }
 
     /**
-     * Cierra la sesión activa del paciente
+     * Cierra la sesión
      */
     public function logout(): void
     {
         if (session_status() === PHP_SESSION_ACTIVE) {
-            $_SESSION = [];
-            if (ini_get("session.use_cookies")) {
-                $params = session_get_cookie_params();
-                setcookie(
-                    session_name(),
-                    '',
-                    time() - 42000,
-                    $params["path"],
-                    $params["domain"],
-                    $params["secure"],
-                    $params["httponly"]
-                );
-            }
-            session_destroy();
+            unset(
+                $_SESSION['express_patient_pid'],
+                $_SESSION['express_patient_pubpid'],
+                $_SESSION['express_patient_user'],
+                $_SESSION['express_logged_in'],
+                $_SESSION['express_logged_at'],
+                $_SESSION['express_last_activity'],
+                $_SESSION['express_patient_data']
+            );
         }
     }
 }

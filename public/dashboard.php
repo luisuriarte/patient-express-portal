@@ -1,12 +1,12 @@
 <?php
 /**
  * Dashboard Principal - Hub de Acceso Rápido para Pacientes
- * Patient Express Portal
+ * Patient Express Portal - OpenEMR Native Integration
  */
 
 declare(strict_types=1);
 
-require_once dirname(__DIR__) . '/config/database.php';
+require_once dirname(__DIR__) . '/config.php';
 
 $auth = new \App\Auth();
 $auth->requireAuth('index.php');
@@ -17,11 +17,16 @@ $pid = $auth->getPatientPid();
 $labService = new \App\Laboratory();
 $imgService = new \App\Imaging();
 
-// Obtener datos del paciente
-$labReports = $labService->getReportsByPatient($pid);
-$imagingStudies = $imgService->getStudiesByPatient($pid, $patient['dni'] ?? null);
+// 1. Obtener lotes de laboratorio agrupados por fecha
+$labBatches = $labService->getReportsGroupedByDate($pid);
+$totalLabBatches = count($labBatches);
+$totalIndividualLabs = 0;
+foreach ($labBatches as $b) {
+    $totalIndividualLabs += $b['total_studies'];
+}
 
-$totalLabs = count($labReports);
+// 2. Obtener estudios de imágenes clasificados (DICOM vs estándar)
+$imagingStudies = $imgService->getStudiesByPatient($pid, $patient['dni'] ?? null);
 $totalImages = count($imagingStudies);
 
 // Calcular edad del paciente
@@ -31,7 +36,7 @@ if (!empty($patient['dob']) && $patient['dob'] !== '0000-00-00') {
         $dobDate = new \DateTime($patient['dob']);
         $now = new \DateTime();
         $patientAge = $now->diff($dobDate)->y . ' años';
-    } catch (\Exception $e) {
+    } catch (\Throwable $e) {
         $patientAge = 'N/A';
     }
 }
@@ -63,7 +68,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
                         Hola, <?= htmlspecialchars($patient['full_name'] ?? 'Estimado Paciente') ?>
                     </h1>
                     <p class="text-xs sm:text-sm text-slate-300 mt-1">
-                        Bienvenido a tu centro de consulta médica. Aquí puedes revisar tus estudios de diagnóstico al instante.
+                        Bienvenido a tu centro de consulta médica. Aquí puedes revisar tus estudios y protocolos de diagnóstico al instante.
                     </p>
                 </div>
 
@@ -87,8 +92,8 @@ require_once dirname(__DIR__) . '/templates/header.php';
             <!-- Accesos rápidos / Estadísticas en Banner -->
             <div class="grid grid-cols-2 gap-3 min-w-[240px]">
                 <div class="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-4 text-center">
-                    <span class="block text-2xl sm:text-3xl font-extrabold font-heading text-sky-300"><?= $totalLabs ?></span>
-                    <span class="text-xs text-slate-300 font-medium">Laboratorios</span>
+                    <span class="block text-2xl sm:text-3xl font-extrabold font-heading text-sky-300"><?= $totalLabBatches ?></span>
+                    <span class="text-xs text-slate-300 font-medium">Protocolos Lab</span>
                 </div>
                 <div class="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-4 text-center">
                     <span class="block text-2xl sm:text-3xl font-extrabold font-heading text-teal-300"><?= $totalImages ?></span>
@@ -105,16 +110,16 @@ require_once dirname(__DIR__) . '/templates/header.php';
         <button type="button" 
                 onclick="switchTab('tab-laboratories', this)" 
                 id="btn-tab-laboratories"
-                class="tab-btn flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-xl text-xs sm:text-sm font-heading font-bold transition-all duration-150 bg-sky-600 text-white shadow-sm">
+                class="tab-btn flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-xl text-xs sm:text-sm font-heading font-bold transition-all duration-150 bg-sky-600 text-white shadow-sm cursor-pointer">
             <i data-lucide="test-tube" class="w-4 h-4"></i>
-            <span>Resultados de Laboratorio</span>
-            <span class="ml-1.5 py-0.5 px-2 rounded-full text-[11px] bg-white/20 text-white"><?= $totalLabs ?></span>
+            <span>Protocolos de Laboratorio</span>
+            <span class="ml-1.5 py-0.5 px-2 rounded-full text-[11px] bg-white/20 text-white"><?= $totalLabBatches ?></span>
         </button>
 
         <button type="button" 
                 onclick="switchTab('tab-imaging', this)" 
                 id="btn-tab-imaging"
-                class="tab-btn flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-xl text-xs sm:text-sm font-heading font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all duration-150">
+                class="tab-btn flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-xl text-xs sm:text-sm font-heading font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all duration-150 cursor-pointer">
             <i data-lucide="scan" class="w-4 h-4"></i>
             <span>Diagnóstico por Imágenes & DICOM</span>
             <span class="ml-1.5 py-0.5 px-2 rounded-full text-[11px] bg-slate-200 text-slate-700"><?= $totalImages ?></span>
@@ -123,7 +128,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
         <button type="button" 
                 onclick="switchTab('tab-fullportal', this)" 
                 id="btn-tab-fullportal"
-                class="tab-btn flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-xl text-xs sm:text-sm font-heading font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all duration-150">
+                class="tab-btn flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-xl text-xs sm:text-sm font-heading font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all duration-150 cursor-pointer">
             <i data-lucide="layout-grid" class="w-4 h-4"></i>
             <span>Portal Completo OpenEMR</span>
             <i data-lucide="external-link" class="w-3.5 h-3.5 ml-1 text-slate-400"></i>
@@ -132,7 +137,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
     </div>
 
     <!-- ========================================================================= -->
-    <!-- TAB 1: RESULTADOS DE LABORATORIO -->
+    <!-- TAB 1: RESULTADOS DE LABORATORIO (PDF AGRUPADO POR FECHA) -->
     <!-- ========================================================================= -->
     <div id="tab-laboratories" class="tab-pane active space-y-4">
         
@@ -142,15 +147,15 @@ require_once dirname(__DIR__) . '/templates/header.php';
                 <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
                 <input type="text" 
                        id="searchLabInput" 
-                       placeholder="Buscar por análisis, fecha o médico..." 
+                       placeholder="Buscar por fecha, análisis o médico..." 
                        class="w-full pl-10 pr-4 py-2 text-xs md:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-sky-500 transition-colors">
             </div>
             <div class="text-xs text-slate-500 font-medium">
-                Mostrando <span id="labCountText" class="font-bold text-slate-800"><?= $totalLabs ?></span> informes disponibles
+                Mostrando <span id="labCountText" class="font-bold text-slate-800"><?= $totalLabBatches ?></span> fechas de análisis (<?= $totalIndividualLabs ?> estudios en total)
             </div>
         </div>
 
-        <?php if (empty($labReports)): ?>
+        <?php if (empty($labBatches)): ?>
             <!-- Estado Vacío -->
             <div class="bg-white rounded-3xl p-12 text-center border border-slate-200 space-y-4 shadow-xs">
                 <div class="w-16 h-16 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center mx-auto">
@@ -159,78 +164,94 @@ require_once dirname(__DIR__) . '/templates/header.php';
                 <div class="space-y-1 max-w-md mx-auto">
                     <h3 class="font-heading font-bold text-lg text-slate-900">No se encontraron análisis de laboratorio</h3>
                     <p class="text-xs text-slate-500 leading-relaxed">
-                        Aún no tienes informes de análisis clínicos registrados en tu historia médica. Cuando el laboratorio cargue y firme tus resultados, aparecerán automáticamente en esta sección.
+                        Aún no tienes informes de análisis clínicos registrados en tu historia médica. Cuando el laboratorio procese y valide tus muestras, aparecerán agrupados por fecha en esta sección.
                     </p>
                 </div>
             </div>
         <?php else: ?>
-            <!-- Listado de Informes de Laboratorio -->
-            <div class="grid grid-cols-1 gap-3.5" id="labReportsList">
-                <?php foreach ($labReports as $lab): ?>
-                    <div class="lab-card bg-white rounded-2xl p-5 border border-slate-200/90 hover:border-sky-300 hover:shadow-md transition-all duration-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
-                         data-search="<?= strtolower(htmlspecialchars($lab['title'] . ' ' . $lab['provider_name'] . ' ' . $lab['date_report'] . ' ' . $lab['specimen_num'])) ?>">
+            <!-- Listado de Lotes de Laboratorio Agrupados por Fecha -->
+            <div class="grid grid-cols-1 gap-4" id="labReportsList">
+                <?php foreach ($labBatches as $batch): ?>
+                    <?php 
+                        $searchableText = strtolower(
+                            $batch['date_formatted'] . ' ' . 
+                            $batch['date_display'] . ' ' . 
+                            implode(' ', $batch['study_names']) . ' ' . 
+                            implode(' ', $batch['providers']) . ' ' . 
+                            implode(' ', $batch['specimens'])
+                        );
+                    ?>
+                    <div class="lab-card bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 hover:border-sky-300 hover:shadow-md transition-all duration-200 space-y-4"
+                         data-search="<?= htmlspecialchars($searchableText) ?>">
                         
-                        <!-- Icono y Datos Principales -->
-                        <div class="flex items-start space-x-4">
-                            <div class="w-11 h-11 rounded-2xl bg-sky-50 text-sky-600 border border-sky-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                <i data-lucide="flask-conical" class="w-5 h-5"></i>
-                            </div>
+                        <!-- Encabezado de la Tarjeta de Lote -->
+                        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-slate-100">
+                            
+                            <div class="flex items-center space-x-3.5">
+                                <div class="w-12 h-12 rounded-2xl bg-sky-50 text-sky-600 border border-sky-100 flex items-center justify-center flex-shrink-0">
+                                    <i data-lucide="calendar-check" class="w-6 h-6"></i>
+                                </div>
 
-                            <div class="space-y-1.5">
-                                <div class="flex flex-wrap items-center gap-2">
-                                    <h4 class="font-heading font-bold text-base text-slate-900 leading-snug">
-                                        <?= htmlspecialchars($lab['title']) ?>
-                                    </h4>
-                                    
-                                    <!-- Badge de Estado -->
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5"></span>
-                                        <?= htmlspecialchars($lab['status']) ?>
-                                    </span>
-
-                                    <?php if ($lab['has_abnormals']): ?>
-                                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200" title="Contiene determinaciones fuera del rango habitual">
-                                            <i data-lucide="alert-circle" class="w-3 h-3 mr-1"></i>
-                                            Valores a interpretar
+                                <div>
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <h3 class="font-heading font-bold text-lg text-slate-900">
+                                            Extracción del <?= htmlspecialchars($batch['date_display']) ?>
+                                        </h3>
+                                        <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200">
+                                            <?= $batch['total_studies'] ?> <?= $batch['total_studies'] === 1 ? 'análisis' : 'análisis agrupados' ?>
                                         </span>
-                                    <?php endif; ?>
-                                </div>
-
-                                <div class="flex flex-wrap items-center gap-y-1 gap-x-4 text-xs text-slate-500">
-                                    <span class="flex items-center gap-1.5">
-                                        <i data-lucide="calendar" class="w-3.5 h-3.5 text-slate-400"></i>
-                                        Fecha: <strong class="text-slate-700 font-medium"><?= htmlspecialchars($lab['date_report']) ?></strong>
-                                    </span>
-                                    <span class="flex items-center gap-1.5">
-                                        <i data-lucide="stethoscope" class="w-3.5 h-3.5 text-slate-400"></i>
-                                        Solicitó: <span class="text-slate-700 font-medium"><?= htmlspecialchars($lab['provider_name']) ?></span>
-                                    </span>
-                                    <span class="flex items-center gap-1.5">
-                                        <i data-lucide="hash" class="w-3.5 h-3.5 text-slate-400"></i>
-                                        Muestra: <span class="text-slate-600"><?= htmlspecialchars((string)$lab['specimen_num']) ?></span>
-                                    </span>
+                                        <?php if ($batch['has_abnormals']): ?>
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200" title="Contiene determinaciones fuera del rango de referencia habitual">
+                                                <i data-lucide="alert-circle" class="w-3 h-3 mr-1"></i>
+                                                <?= $batch['abnormal_count'] ?> valores a interpretar
+                                            </span>
+                                        <?php endif; ?>
+                                    </div>
+                                    <p class="text-xs text-slate-500 mt-0.5">
+                                        Fecha: <strong class="text-slate-700 font-medium"><?= htmlspecialchars($batch['date_formatted']) ?></strong> &bull; Solicitante(s): <?= htmlspecialchars(implode(', ', $batch['providers'])) ?>
+                                    </p>
                                 </div>
                             </div>
+
+                            <!-- Botones de Acción de Lote Completo -->
+                            <div class="flex items-center space-x-2 self-end sm:self-center">
+                                <button type="button" 
+                                        onclick="openPdfModal('print_pdf.php?type=lab&date=<?= urlencode($batch['date_iso']) ?>', 'Protocolo de Laboratorio - <?= htmlspecialchars(addslashes($batch['date_formatted'])) ?>')"
+                                        class="inline-flex items-center space-x-2 bg-sky-600 hover:bg-sky-700 text-white font-heading font-semibold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-all duration-150 cursor-pointer">
+                                    <i data-lucide="file-text" class="w-4 h-4"></i>
+                                    <span>Ver / Bajar PDF</span>
+                                </button>
+
+                                <a href="print_pdf.php?type=lab&date=<?= urlencode($batch['date_iso']) ?>" 
+                                   target="_blank" 
+                                   rel="noopener noreferrer"
+                                   title="Abrir PDF en pestaña independiente"
+                                   class="p-2.5 text-slate-500 hover:text-sky-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">
+                                    <i data-lucide="external-link" class="w-4 h-4"></i>
+                                </a>
+                            </div>
+
                         </div>
 
-                        <!-- Botones de Acción -->
-                        <div class="flex items-center space-x-2 w-full md:w-auto justify-end pt-2 md:pt-0 border-t md:border-t-0 border-slate-100">
-                            <!-- Botón Modal / Descarga PDF -->
-                            <button type="button" 
-                                    onclick="openPdfModal('print_pdf.php?type=lab&id=<?= $lab['id'] ?>', '<?= htmlspecialchars(addslashes($lab['title'])) ?>')"
-                                    class="inline-flex items-center space-x-2 bg-sky-600 hover:bg-sky-700 text-white font-heading font-semibold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-all duration-150 cursor-pointer">
-                                <i data-lucide="file-text" class="w-4 h-4"></i>
-                                <span>Ver / Imprimir PDF</span>
-                            </button>
-
-                            <!-- Abrir directo en nueva ventana -->
-                            <a href="print_pdf.php?type=lab&id=<?= $lab['id'] ?>" 
-                               target="_blank" 
-                               rel="noopener noreferrer"
-                               title="Abrir PDF en pestaña independiente"
-                               class="p-2.5 text-slate-500 hover:text-sky-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">
-                                <i data-lucide="external-link" class="w-4 h-4"></i>
-                            </a>
+                        <!-- Desglose de Estudios Incluidos en esta Fecha -->
+                        <div class="space-y-2">
+                            <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Estudios incluidos en este protocolo:</span>
+                            
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                                <?php foreach ($batch['reports'] as $report): ?>
+                                    <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-2">
+                                        <div class="flex items-center space-x-2 min-w-0">
+                                            <i data-lucide="flask-conical" class="w-4 h-4 text-sky-500 flex-shrink-0"></i>
+                                            <span class="text-xs font-semibold text-slate-800 truncate" title="<?= htmlspecialchars($report['title']) ?>">
+                                                <?= htmlspecialchars($report['title']) ?>
+                                            </span>
+                                        </div>
+                                        <span class="text-[10px] px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-600 flex-shrink-0">
+                                            <?= $report['total_results'] ?> determ.
+                                        </span>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
                         </div>
 
                     </div>
@@ -241,7 +262,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
     </div>
 
     <!-- ========================================================================= -->
-    <!-- TAB 2: DIAGNÓSTICO POR IMÁGENES & VISOR DICOM -->
+    <!-- TAB 2: DIAGNÓSTICO POR IMÁGENES (OHIF PARA DICOM / VISOR DIRECTO PARA JPG/PNG) -->
     <!-- ========================================================================= -->
     <div id="tab-imaging" class="tab-pane space-y-4">
         
@@ -251,11 +272,11 @@ require_once dirname(__DIR__) . '/templates/header.php';
                 <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
                 <input type="text" 
                        id="searchImgInput" 
-                       placeholder="Buscar estudio, modalidad o médico..." 
+                       placeholder="Buscar estudio, modalidad o archivo..." 
                        class="w-full pl-10 pr-4 py-2 text-xs md:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-teal-500 transition-colors">
             </div>
             <div class="text-xs text-slate-500 font-medium">
-                Mostrando <span id="imgCountText" class="font-bold text-slate-800"><?= $totalImages ?></span> estudios de imágenes
+                Mostrando <span id="imgCountText" class="font-bold text-slate-800"><?= $totalImages ?></span> estudios de imágenes y documentos
             </div>
         </div>
 
@@ -268,21 +289,32 @@ require_once dirname(__DIR__) . '/templates/header.php';
                 <div class="space-y-1 max-w-md mx-auto">
                     <h3 class="font-heading font-bold text-lg text-slate-900">No se registran estudios de imágenes</h3>
                     <p class="text-xs text-slate-500 leading-relaxed">
-                        Aún no tienes estudios de radiología, tomografía, resonancia o ecografía cargados en el servidor PACS.
+                        Aún no tienes estudios de radiología, tomografía, resonancia, ecografía o imágenes cargadas en el sistema.
                     </p>
                 </div>
             </div>
         <?php else: ?>
-            <!-- Listado de Estudios de Imágenes -->
+            <!-- Listado de Estudios de Imágenes (DICOM y Estándar) -->
             <div class="grid grid-cols-1 gap-3.5" id="imagingStudiesList">
                 <?php foreach ($imagingStudies as $study): ?>
+                    <?php 
+                        $isDicom = ($study['format_type'] ?? '') === 'dicom';
+                        $isStandardImg = ($study['format_type'] ?? '') === 'image';
+                        $isStandardPdf = ($study['format_type'] ?? '') === 'pdf';
+                    ?>
                     <div class="img-card bg-white rounded-2xl p-5 border border-slate-200/90 hover:border-teal-300 hover:shadow-md transition-all duration-200 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4"
-                         data-search="<?= strtolower(htmlspecialchars($study['title'] . ' ' . $study['modality'] . ' ' . $study['provider_name'] . ' ' . $study['date_study'] . ' ' . $study['accession_number'])) ?>">
+                         data-search="<?= strtolower(htmlspecialchars($study['title'] . ' ' . $study['modality'] . ' ' . $study['provider_name'] . ' ' . $study['date_study'] . ' ' . ($study['accession_number'] ?? ''))) ?>">
                         
                         <!-- Icono y Datos del Estudio -->
                         <div class="flex items-start space-x-4">
-                            <div class="w-11 h-11 rounded-2xl bg-teal-50 text-teal-600 border border-teal-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                                <i data-lucide="film" class="w-5 h-5"></i>
+                            <div class="w-11 h-11 rounded-2xl <?= $isDicom ? 'bg-teal-50 text-teal-600 border-teal-100' : ($isStandardImg ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-rose-50 text-rose-600 border-rose-100') ?> border flex items-center justify-center flex-shrink-0 mt-0.5">
+                                <?php if ($isDicom): ?>
+                                    <i data-lucide="film" class="w-5 h-5"></i>
+                                <?php elseif ($isStandardImg): ?>
+                                    <i data-lucide="image" class="w-5 h-5"></i>
+                                <?php else: ?>
+                                    <i data-lucide="file-text" class="w-5 h-5"></i>
+                                <?php endif; ?>
                             </div>
 
                             <div class="space-y-1.5">
@@ -297,10 +329,20 @@ require_once dirname(__DIR__) . '/templates/header.php';
                                         <?= htmlspecialchars($study['modality']) ?>
                                     </span>
 
-                                    <!-- Estado -->
-                                    <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-700">
-                                        <?= htmlspecialchars($study['status']) ?>
-                                    </span>
+                                    <!-- Badge de Tipo de Archivo -->
+                                    <?php if ($isDicom): ?>
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                            DICOM PACS
+                                        </span>
+                                    <?php elseif ($isStandardImg): ?>
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                            IMAGEN (JPG/PNG)
+                                        </span>
+                                    <?php elseif ($isStandardPdf): ?>
+                                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                            DOCUMENTO PDF
+                                        </span>
+                                    <?php endif; ?>
                                 </div>
 
                                 <div class="flex flex-wrap items-center gap-y-1 gap-x-4 text-xs text-slate-500">
@@ -312,36 +354,71 @@ require_once dirname(__DIR__) . '/templates/header.php';
                                         <i data-lucide="user" class="w-3.5 h-3.5 text-slate-400"></i>
                                         Médico: <span class="text-slate-700 font-medium"><?= htmlspecialchars($study['provider_name']) ?></span>
                                     </span>
-                                    <span class="flex items-center gap-1.5">
-                                        <i data-lucide="barcode" class="w-3.5 h-3.5 text-slate-400"></i>
-                                        Acc: <span class="text-slate-600"><?= htmlspecialchars($study['accession_number']) ?></span>
-                                    </span>
+                                    <?php if (!empty($study['accession_number'])): ?>
+                                        <span class="flex items-center gap-1.5">
+                                            <i data-lucide="barcode" class="w-3.5 h-3.5 text-slate-400"></i>
+                                            Ref: <span class="text-slate-600"><?= htmlspecialchars($study['accession_number']) ?></span>
+                                        </span>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                         </div>
 
-                        <!-- Botones de Acción: Informe PDF + Visor DICOM OHIF -->
+                        <!-- Botones de Acción según formato -->
                         <div class="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-end pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100">
                             
-                            <!-- Botón Informe PDF (si tiene reporte en OpenEMR) -->
-                            <?php if ($study['has_report'] && $study['report_id']): ?>
-                                <button type="button" 
-                                        onclick="openPdfModal('print_pdf.php?type=image&id=<?= $study['report_id'] ?>', 'Informe de Imagen - <?= htmlspecialchars(addslashes($study['title'])) ?>')"
-                                        class="inline-flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-heading font-semibold text-xs px-3.5 py-2.5 rounded-xl transition-colors cursor-pointer border border-slate-200">
-                                    <i data-lucide="file-text" class="w-4 h-4 text-slate-600"></i>
-                                    <span>Informe PDF</span>
-                                </button>
-                            <?php endif; ?>
+                            <?php if ($isDicom): ?>
+                                <!-- Caso a) Estudio DICOM en Orthanc: Visor OHIF -->
+                                <?php if ($study['has_report'] && !empty($study['report_id'])): ?>
+                                    <button type="button" 
+                                            onclick="openPdfModal('print_pdf.php?type=image&id=<?= $study['report_id'] ?>', 'Informe Radiológico - <?= htmlspecialchars(addslashes($study['title'])) ?>')"
+                                            class="inline-flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-heading font-semibold text-xs px-3.5 py-2.5 rounded-xl transition-colors cursor-pointer border border-slate-200">
+                                        <i data-lucide="file-text" class="w-4 h-4 text-slate-600"></i>
+                                        <span>Informe PDF</span>
+                                    </button>
+                                <?php endif; ?>
 
-                            <!-- Botón Visor DICOM OHIF -->
-                            <a href="<?= htmlspecialchars($study['viewer_url']) ?>" 
-                               target="_blank" 
-                               rel="noopener noreferrer"
-                               class="inline-flex items-center space-x-2 bg-teal-600 hover:bg-teal-700 text-white font-heading font-semibold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-all duration-150">
-                                <i data-lucide="monitor" class="w-4 h-4"></i>
-                                <span>Ver Imagen DICOM (OHIF)</span>
-                                <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 opacity-80"></i>
-                            </a>
+                                <a href="<?= htmlspecialchars($study['viewer_url']) ?>" 
+                                   target="_blank" 
+                                   rel="noopener noreferrer"
+                                   class="inline-flex items-center space-x-2 bg-teal-600 hover:bg-teal-700 text-white font-heading font-semibold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-all duration-150">
+                                    <i data-lucide="monitor" class="w-4 h-4"></i>
+                                    <span>Ver Imagen DICOM (OHIF)</span>
+                                    <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 opacity-80"></i>
+                                </a>
+
+                            <?php elseif ($isStandardImg): ?>
+                                <!-- Caso b1) Imagen Estándar (JPG/PNG): Visor directo en portal sin OHIF -->
+                                <button type="button" 
+                                        onclick="openImageModal('<?= htmlspecialchars($study['viewer_url']) ?>', '<?= htmlspecialchars(addslashes($study['title'])) ?>', '<?= htmlspecialchars($study['download_url'] ?? $study['viewer_url']) ?>')"
+                                        class="inline-flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white font-heading font-semibold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-all duration-150 cursor-pointer">
+                                    <i data-lucide="eye" class="w-4 h-4"></i>
+                                    <span>Ver Imagen</span>
+                                </button>
+
+                                <a href="<?= htmlspecialchars($study['download_url'] ?? $study['viewer_url']) ?>" 
+                                   download
+                                   class="p-2.5 text-slate-600 hover:text-indigo-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+                                   title="Descargar archivo">
+                                    <i data-lucide="download" class="w-4 h-4"></i>
+                                </a>
+
+                            <?php elseif ($isStandardPdf): ?>
+                                <!-- Caso b2) Documento PDF: Visor PDF directo en portal sin OHIF -->
+                                <button type="button" 
+                                        onclick="openPdfModal('<?= htmlspecialchars($study['viewer_url']) ?>', '<?= htmlspecialchars(addslashes($study['title'])) ?>')"
+                                        class="inline-flex items-center space-x-2 bg-rose-600 hover:bg-rose-700 text-white font-heading font-semibold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-all duration-150 cursor-pointer">
+                                    <i data-lucide="file-text" class="w-4 h-4"></i>
+                                    <span>Ver Documento PDF</span>
+                                </button>
+
+                                <a href="<?= htmlspecialchars($study['download_url'] ?? $study['viewer_url']) ?>" 
+                                   download
+                                   class="p-2.5 text-slate-600 hover:text-rose-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+                                   title="Descargar PDF">
+                                    <i data-lucide="download" class="w-4 h-4"></i>
+                                </a>
+                            <?php endif; ?>
 
                         </div>
 
@@ -431,24 +508,20 @@ require_once dirname(__DIR__) . '/templates/header.php';
 <!-- JavaScript para Switch de Tabs y Búsqueda en Vivo -->
 <script>
     function switchTab(tabId, btnElement) {
-        // Ocultar todos los panes
         document.querySelectorAll('.tab-pane').forEach(pane => {
             pane.classList.remove('active');
         });
 
-        // Desactivar estilos de todos los botones
         document.querySelectorAll('.tab-btn').forEach(btn => {
             btn.classList.remove('bg-sky-600', 'text-white', 'shadow-sm');
             btn.classList.add('text-slate-600', 'hover:text-slate-900', 'hover:bg-slate-100');
         });
 
-        // Activar el pane seleccionado
         const targetPane = document.getElementById(tabId);
         if (targetPane) {
             targetPane.classList.add('active');
         }
 
-        // Estilar botón activo
         if (btnElement) {
             btnElement.classList.remove('text-slate-600', 'hover:text-slate-900', 'hover:bg-slate-100');
             btnElement.classList.add('bg-sky-600', 'text-white', 'shadow-sm');
@@ -468,7 +541,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
             cards.forEach(card => {
                 const searchData = card.getAttribute('data-search') || '';
                 if (searchData.includes(query)) {
-                    card.style.display = 'flex';
+                    card.style.display = 'block';
                     visibleCount++;
                 } else {
                     card.style.display = 'none';

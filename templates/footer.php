@@ -135,6 +135,46 @@ declare(strict_types=1);
         </div>
     </div>
 
+    <!-- Modal Global para Visor de Imágenes Estándar (JPG/PNG) -->
+    <div id="imageModal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="image-modal-title" role="dialog" aria-modal="true">
+        <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            
+            <!-- Backdrop -->
+            <div id="imageModalBackdrop" class="fixed inset-0 bg-slate-950/85 backdrop-blur-xs transition-opacity modal-overlay" aria-hidden="true"></div>
+
+            <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+            <!-- Contenido Modal -->
+            <div class="relative inline-block align-bottom bg-slate-900 rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full border border-slate-700">
+                
+                <!-- Encabezado Modal -->
+                <div class="bg-slate-950 px-4 py-3 sm:px-6 flex items-center justify-between border-b border-slate-800">
+                    <div class="flex items-center space-x-2 text-white">
+                        <i data-lucide="image" class="w-5 h-5 text-teal-400"></i>
+                        <h3 class="text-sm font-semibold leading-6 text-white truncate max-w-md" id="imageModalTitle">
+                            Visor de Imagen
+                        </h3>
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <a id="imageModalDownloadBtn" href="#" download class="inline-flex items-center space-x-1.5 text-xs bg-teal-600 hover:bg-teal-500 text-white font-medium px-3 py-1.5 rounded-lg transition-colors">
+                            <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                            <span>Descargar</span>
+                        </a>
+                        <button type="button" id="closeImageModalBtn" class="text-slate-400 hover:text-white rounded-lg p-1.5 transition-colors">
+                            <i data-lucide="x" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Contenedor de la Imagen con autoajuste -->
+                <div class="relative bg-slate-950/90 h-[70vh] flex items-center justify-center p-4 overflow-auto">
+                    <img id="imageModalImg" src="" alt="Estudio de Imagen" class="max-h-full max-w-full object-contain rounded-lg shadow-lg">
+                </div>
+
+            </div>
+        </div>
+    </div>
+
     <!-- Inicialización de Scripts & Iconos -->
     <script>
         // Inicializar Iconos Lucide
@@ -178,14 +218,51 @@ declare(strict_types=1);
             }
         }
 
-        // Listeners del modal
+        // Funciones del Modal de Imagen Estándar (JPG/PNG)
+        function openImageModal(url, title = 'Estudio de Imagen', downloadUrl = null) {
+            const modal = document.getElementById('imageModal');
+            const img = document.getElementById('imageModalImg');
+            const modalTitle = document.getElementById('imageModalTitle');
+            const downloadBtn = document.getElementById('imageModalDownloadBtn');
+
+            if (!modal || !img) return;
+
+            modalTitle.innerText = title;
+            img.src = url;
+            downloadBtn.href = downloadUrl || url;
+
+            modal.classList.remove('hidden');
+            document.body.classList.add('overflow-hidden');
+            if (typeof lucide !== 'undefined') lucide.createIcons();
+        }
+
+        function closeImageModal() {
+            const modal = document.getElementById('imageModal');
+            const img = document.getElementById('imageModalImg');
+            if (modal) {
+                modal.classList.add('hidden');
+                document.body.classList.remove('overflow-hidden');
+                if (img) img.src = '';
+            }
+        }
+
+        // Listeners del modal PDF
         const closeBtn = document.getElementById('closeModalBtn');
         const backdrop = document.getElementById('pdfModalBackdrop');
         if (closeBtn) closeBtn.addEventListener('click', closePdfModal);
         if (backdrop) backdrop.addEventListener('click', closePdfModal);
 
+        // Listeners del modal Imagen
+        const closeImgBtn = document.getElementById('closeImageModalBtn');
+        const backdropImg = document.getElementById('imageModalBackdrop');
+        if (closeImgBtn) closeImgBtn.addEventListener('click', closeImageModal);
+        if (backdropImg) backdropImg.addEventListener('click', closeImageModal);
+
         document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') closePdfModal();
+            if (e.key === 'Escape') {
+                closePdfModal();
+                closeImageModal();
+            }
         });
     </script>
 </body>

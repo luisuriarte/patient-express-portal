@@ -1,12 +1,11 @@
 <?php
 /**
- * Destrucción Segura de Sesión y Redirección
- * Patient Express Portal
+ * Cierre de Sesión Seguro - Patient Express Portal
  */
 
 declare(strict_types=1);
 
-require_once dirname(__DIR__) . '/config/database.php';
+require_once dirname(__DIR__) . '/config.php';
 
 $auth = new \App\Auth();
 $auth->logout();
