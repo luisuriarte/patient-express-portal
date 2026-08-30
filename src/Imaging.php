@@ -61,11 +61,14 @@ class Imaging
                             d.foreign_id AS patient_id,
                             c.id AS category_id,
                             c.name AS category_name,
-                            cp.name AS parent_category_name
+                            cp.name AS parent_category_name,
+                            dps.study_instance_uid AS pacs_study_uid,
+                            dps.status AS pacs_status
                         FROM documents d
                         INNER JOIN categories_to_documents ctd ON d.id = ctd.document_id
                         INNER JOIN categories c ON ctd.category_id = c.id
                         LEFT JOIN categories cp ON c.parent = cp.id
+                        LEFT JOIN documents_pacs_sync dps ON d.id = dps.document_id
                         WHERE d.foreign_id = ? 
                           AND (d.deleted = 0 OR d.deleted IS NULL)
                           AND ctd.category_id IN ($placeholders)
@@ -79,10 +82,14 @@ class Imaging
                     $urlLower = strtolower((string)$dRow['url']);
                     $nameLower = strtolower($docName);
 
+                    $hasPacsSync = !empty($dRow['pacs_study_uid']) && ($dRow['pacs_status'] === 'synced');
+                    $pacsStudyUid = $dRow['pacs_study_uid'] ?? null;
+
                     // Determinar si es DICOM, Imagen Estándar (JPG/PNG) o PDF
                     $isDicom = ($mime === 'application/dicom') 
                         || str_ends_with($urlLower, '.dcm') 
-                        || str_ends_with($nameLower, '.dcm');
+                        || str_ends_with($nameLower, '.dcm')
+                        || $hasPacsSync;
 
                     $isImage = str_starts_with($mime, 'image/') 
                         || str_ends_with($urlLower, '.jpg') 
@@ -107,8 +114,10 @@ class Imaging
                     $viewUrl = 'view_document.php?id=' . $dRow['doc_id'];
                     $downloadUrl = 'view_document.php?id=' . $dRow['doc_id'] . '&download=1';
 
-                    if ($isDicom) {
-                        $studyUid = basename((string)$dRow['url'], '.dcm');
+                    if ($isDicom || $hasPacsSync) {
+                        $studyUid = $pacsStudyUid ?: basename((string)$dRow['url'], '.dcm');
+                        $registeredStudyUids[] = $studyUid;
+
                         $studies[] = [
                             'id'                => 'doc_' . $dRow['doc_id'],
                             'report_id'         => null,
@@ -120,13 +129,15 @@ class Imaging
                             'date_raw'          => $docDate,
                             'provider_name'     => 'Servicio de Diagnóstico por Imágenes',
                             'provider_spec'     => $categoryLabel,
-                            'status'            => 'Estudio DICOM Listo',
+                            'status'            => $hasPacsSync ? 'Sincronizado en PACS Orthanc' : 'Estudio DICOM Listo',
                             'has_report'        => false,
                             'accession_number'  => 'DOC-' . $dRow['doc_id'],
                             'study_uid'         => $studyUid,
-                            'format_type'       => 'dicom',
-                            'viewer_type'       => 'ohif',
-                            'viewer_url'        => $this->buildOhifViewerUrl($studyUid),
+                            'format_type'       => $isImage ? 'image' : ($isDicom ? 'dicom' : 'pdf'),
+                            'viewer_type'       => $isImage ? 'inline_image' : 'ohif',
+                            'viewer_url'        => $isImage ? $viewUrl : $this->buildOhifViewerUrl($studyUid),
+                            'ohif_url'          => $this->buildOhifViewerUrl($studyUid),
+                            'has_ohif'          => true,
                             'direct_view_url'   => $viewUrl,
                             'download_url'      => $downloadUrl,
                             'mimetype'          => $mime,
@@ -152,8 +163,10 @@ class Imaging
                             'accession_number'  => 'DOC-' . $dRow['doc_id'],
                             'study_uid'         => null,
                             'format_type'       => $formatType, // 'image' o 'pdf'
-                            'viewer_type'       => $viewerType, // 'inline_image' o 'inline_pdf' (sin OHIF)
+                            'viewer_type'       => $viewerType, // 'inline_image' o 'inline_pdf'
                             'viewer_url'        => $viewUrl,
+                            'ohif_url'          => null,
+                            'has_ohif'          => false,
                             'direct_view_url'   => $viewUrl,
                             'download_url'      => $downloadUrl,
                             'mimetype'          => $mime,

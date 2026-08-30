@@ -388,13 +388,25 @@ require_once dirname(__DIR__) . '/templates/header.php';
                                 </a>
 
                             <?php elseif ($isStandardImg): ?>
-                                <!-- Caso b1) Imagen Estándar (JPG/PNG): Visor directo en portal sin OHIF -->
+                                <!-- Caso b1) Imagen Estándar (JPG/PNG): Visor directo en portal -->
                                 <button type="button" 
                                         onclick="openImageModal('<?= htmlspecialchars($study['viewer_url']) ?>', '<?= htmlspecialchars(addslashes($study['title'])) ?>', '<?= htmlspecialchars($study['download_url'] ?? $study['viewer_url']) ?>')"
                                         class="inline-flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white font-heading font-semibold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-all duration-150 cursor-pointer">
                                     <i data-lucide="eye" class="w-4 h-4"></i>
                                     <span>Ver Imagen</span>
                                 </button>
+
+                                <?php if (!empty($study['has_ohif']) && !empty($study['ohif_url'])): ?>
+                                    <a href="<?= htmlspecialchars($study['ohif_url']) ?>" 
+                                       target="_blank" 
+                                       rel="noopener noreferrer"
+                                       title="Visualizar en Visor Radiológico Avanzado OHIF"
+                                       class="inline-flex items-center space-x-1.5 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 font-heading font-semibold text-xs px-3.5 py-2.5 rounded-xl transition-colors">
+                                        <i data-lucide="monitor" class="w-4 h-4 text-teal-600"></i>
+                                        <span>Visor OHIF</span>
+                                        <i data-lucide="arrow-up-right" class="w-3 h-3 text-teal-500"></i>
+                                    </a>
+                                <?php endif; ?>
 
                                 <a href="<?= htmlspecialchars($study['download_url'] ?? $study['viewer_url']) ?>" 
                                    download
