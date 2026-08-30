@@ -137,6 +137,7 @@ class Imaging
                             'viewer_type'       => $isImage ? 'inline_image' : 'ohif',
                             'viewer_url'        => $isImage ? $viewUrl : $this->buildOhifViewerUrl($studyUid),
                             'ohif_url'          => $this->buildOhifViewerUrl($studyUid),
+                            'stone_url'         => $this->buildStoneViewerUrl($studyUid),
                             'has_ohif'          => true,
                             'direct_view_url'   => $viewUrl,
                             'download_url'      => $downloadUrl,
@@ -252,6 +253,8 @@ class Imaging
                     'format_type'       => 'dicom', // DICOM -> Visor OHIF
                     'viewer_type'       => 'ohif',
                     'viewer_url'        => $this->buildOhifViewerUrl($effectiveUid),
+                    'ohif_url'          => $this->buildOhifViewerUrl($effectiveUid),
+                    'stone_url'         => $this->buildStoneViewerUrl($effectiveUid),
                     'direct_view_url'   => null,
                     'download_url'      => null,
                     'source'            => 'openemr_order'
@@ -406,6 +409,8 @@ class Imaging
                                 'format_type'      => 'dicom', // DICOM -> Visor OHIF
                                 'viewer_type'      => 'ohif',
                                 'viewer_url'       => $this->buildOhifViewerUrl($studyUid),
+                                'ohif_url'         => $this->buildOhifViewerUrl($studyUid),
+                                'stone_url'        => $this->buildStoneViewerUrl($studyUid),
                                 'direct_view_url'  => null,
                                 'download_url'     => null,
                                 'source'           => 'orthanc'
@@ -652,12 +657,78 @@ class Imaging
 
     /**
      * Construye la URL exacta hacia el visor DICOM OHIF:
-     * https://imagenes.origen.ar/viewer?url=https://pacs.origen.ar/dicom-web/studies/{StudyInstanceUID}
+     * Si se pasa un Orthanc UUID interno (con guiones), lo resuelve al StudyInstanceUID real de DICOM.
      */
     public function buildOhifViewerUrl(string $studyUid): string
     {
-        $dicomWebStudyUrl = rtrim($this->orthancWadoUrl, '/') . '/studies/' . $studyUid;
+        $realStudyUid = $this->resolveRealStudyInstanceUid($studyUid);
+        $dicomWebStudyUrl = rtrim($this->orthancWadoUrl, '/') . '/studies/' . $realStudyUid;
+        
+        // Soporta parámetro ?StudyInstanceUIDs=... o ?url=...
+        // Formato estándar OHIF con WADO-RS:
         return rtrim($this->ohifBaseUrl, '/') . '?url=' . urlencode($dicomWebStudyUrl);
+    }
+
+    /**
+     * Construye la URL directa hacia el visor nativo de Orthanc (Stone WebViewer)
+     */
+    public function buildStoneViewerUrl(string $studyUid): string
+    {
+        $realStudyUid = $this->resolveRealStudyInstanceUid($studyUid);
+        $pacsHost = parse_url($this->orthancWadoUrl, PHP_URL_HOST) ?: 'pacs.origen.ar';
+        $pacsScheme = parse_url($this->orthancWadoUrl, PHP_URL_SCHEME) ?: 'https';
+        return "{$pacsScheme}://{$pacsHost}/stone-webviewer/index.html?study=" . urlencode($realStudyUid);
+    }
+
+    /**
+     * Resuelve un UUID interno de Orthanc a su StudyInstanceUID real de DICOM
+     */
+    public function resolveRealStudyInstanceUid(string $uid): string
+    {
+        $uid = trim($uid);
+        
+        // Si ya es un StudyInstanceUID numérico con puntos (ej: 2.16.840...), usarlo directo
+        if (preg_match('/^[0-9]+(\.[0-9]+)+$/', $uid)) {
+            return $uid;
+        }
+
+        // Si tiene formato de UUID de Orthanc con guiones (ej: a2a05afc-3208-4995-a86a-7972256fbad6)
+        if (str_contains($uid, '-')) {
+            // 1. Intentar consultar en documents_pacs_sync si ya está registrado
+            $sqlDps = "SELECT study_instance_uid FROM documents_pacs_sync 
+                       WHERE (orthanc_study_id = ? OR orthanc_instance_id = ?) 
+                         AND study_instance_uid REGEXP '^[0-9]+\\.[0-9]+'
+                       LIMIT 1";
+            $rowDps = sqlQuery($sqlDps, [$uid, $uid]);
+            if ($rowDps && !empty($rowDps['study_instance_uid'])) {
+                return $rowDps['study_instance_uid'];
+            }
+
+            // 2. Consultar directamente a la API REST de Orthanc
+            try {
+                $ch = curl_init(rtrim($this->orthancUrl, '/') . '/studies/' . $uid);
+                curl_setopt_array($ch, [
+                    CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_USERPWD        => "{$this->orthancUser}:{$this->orthancPass}",
+                    CURLOPT_TIMEOUT        => ORTHANC_TIMEOUT,
+                    CURLOPT_CONNECTTIMEOUT => 2
+                ]);
+                $res = curl_exec($ch);
+                $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+                curl_close($ch);
+
+                if ($code === 200 && $res) {
+                    $studyData = json_decode($res, true);
+                    if (!empty($studyData['MainDicomTags']['StudyInstanceUID'])) {
+                        return (string)$studyData['MainDicomTags']['StudyInstanceUID'];
+                    }
+                }
+            } catch (\Throwable $e) {
+                // Silencioso
+            }
+        }
+
+        return $uid;
     }
 
     private function detectModality(string $title): string

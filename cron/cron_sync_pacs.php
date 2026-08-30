@@ -386,11 +386,31 @@ exit(0);
 // ==============================================================================
 
 /**
- * Consulta a Orthanc para extraer el StudyInstanceUID real de la instancia
+ * Consulta a Orthanc para extraer el StudyInstanceUID real de la instancia o estudio
  */
-function fetchStudyInstanceUidFromOrthanc(string $instanceId): ?string
+function fetchStudyInstanceUidFromOrthanc(string $id): ?string
 {
-    $ch = curl_init(rtrim(ORTHANC_URL, '/') . '/instances/' . $instanceId . '/tags?simplify');
+    // 1. Intentar como Study ID
+    $ch = curl_init(rtrim(ORTHANC_URL, '/') . '/studies/' . $id);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_USERPWD        => ORTHANC_USER . ':' . ORTHANC_PASS,
+        CURLOPT_TIMEOUT        => 10,
+        CURLOPT_CONNECTTIMEOUT => 3
+    ]);
+    $res = curl_exec($ch);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($code === 200 && $res) {
+        $studyData = json_decode($res, true);
+        if (!empty($studyData['MainDicomTags']['StudyInstanceUID'])) {
+            return (string)$studyData['MainDicomTags']['StudyInstanceUID'];
+        }
+    }
+
+    // 2. Intentar como Instance ID
+    $ch = curl_init(rtrim(ORTHANC_URL, '/') . '/instances/' . $id . '/tags?simplify');
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_USERPWD        => ORTHANC_USER . ':' . ORTHANC_PASS,

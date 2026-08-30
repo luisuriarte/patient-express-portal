@@ -393,6 +393,17 @@ require_once dirname(__DIR__) . '/templates/header.php';
                                     <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 opacity-80"></i>
                                 </a>
 
+                                <?php if (!empty($study['stone_url'])): ?>
+                                    <a href="<?= htmlspecialchars($study['stone_url']) ?>" 
+                                       target="_blank" 
+                                       rel="noopener noreferrer"
+                                       title="Abrir en Visor Orthanc Stone WebViewer"
+                                       class="inline-flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-heading font-semibold text-xs px-3 py-2.5 rounded-xl transition-colors">
+                                        <i data-lucide="eye" class="w-3.5 h-3.5 text-teal-600"></i>
+                                        <span>Stone Viewer</span>
+                                    </a>
+                                <?php endif; ?>
+
                             <?php elseif ($isStandardImg): ?>
                                 <!-- Caso b1) Imagen Estándar (JPG/PNG): Visor directo en portal -->
                                 <button type="button" 
