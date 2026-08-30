@@ -349,7 +349,7 @@ while ($row = sqlFetchArray($res)) {
         echo "  -> [OK] Sincronizado exitosamente con Orthanc PACS.\n";
         echo "     Orthanc Instance ID: {$orthancInstanceId}\n";
         echo "     StudyInstanceUID:    {$finalStudyUid}\n";
-        echo "     URL OHIF Viewer:     https://imagenes.origen.ar/viewer?url=https://pacs.origen.ar/dicom-web/studies/{$finalStudyUid}\n";
+        echo "     URL OHIF Viewer:     https://imagenes.origen.ar/viewer?StudyInstanceUIDs={$finalStudyUid}\n";
         $successCount++;
     } else {
         echo "  -> [ERROR] Falló la subida a Orthanc. Detalle: " . ($errorMessage ?: 'Respuesta inválida de Orthanc') . "\n";

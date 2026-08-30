@@ -161,6 +161,48 @@ class Laboratory
             $grouped[$encounterKey]['reports'][] = $reportItem;
         }
 
+                // ==========================================================================
+        // Fusionar documentos escaneados de laboratorio (PDF/JPG) con sus encuentros
+        // ==========================================================================
+        $labDocuments = $this->getDocumentLabReports($pid);
+        foreach ($labDocuments as $docReport) {
+            $encId = $docReport['encounter_id'];
+            $encounterKey = $encId > 0 ? (string)$encId : ('doc_' . $docReport['doc_id']);
+
+            if (!isset($grouped[$encounterKey])) {
+                $grouped[$encounterKey] = [
+                    'encounter_key'      => $encounterKey,
+                    'encounter_id'       => $encId,
+                    'encounter_label'    => $encId > 0 ? ('Encuentro #' . $encId) : 'Documento de Laboratorio',
+                    'date_iso'           => $docReport['date_raw'],
+                    'date_formatted'     => date('d/m/Y', strtotime($docReport['date_raw'])),
+                    'date_display'       => $this->formatDateDisplay($docReport['date_raw']),
+                    'total_studies'      => 0,
+                    'total_results'      => 0,
+                    'abnormal_count'     => 0,
+                    'has_abnormals'      => false,
+                    'study_names'        => [],
+                    'providers'          => [],
+                    'specimens'          => [],
+                    'reports'            => [],
+                    'has_documents_only' => true
+                ];
+            } else {
+                // Se está fusionando dentro de un encuentro que ya tiene un panel real
+                $grouped[$encounterKey]['has_documents_only'] = false;
+            }
+
+            $grouped[$encounterKey]['total_studies']++;
+            if (!in_array($docReport['title'], $grouped[$encounterKey]['study_names'], true)) {
+                $grouped[$encounterKey]['study_names'][] = $docReport['title'];
+            }
+            $grouped[$encounterKey]['reports'][] = $docReport;
+        }
+
+        uasort($grouped, function ($a, $b) {
+            return strtotime((string)$b['date_iso']) <=> strtotime((string)$a['date_iso']);
+        });
+
         return array_values($grouped);
     }
 
@@ -483,5 +525,79 @@ class Laboratory
             'F', 'FEMALE', 'FEMENINO' => 'Femenino',
             default => 'Otro / No especificado'
         };
+    }
+
+    /**
+     * IDs de categorías consideradas resultados de laboratorio clínico
+     * (aunque el documento sea PDF/JPG escaneado, no un procedure_order real)
+     */
+    private function getLabDocumentCategoryIds(): array
+    {
+        return [2, 505, 10002, 21001, 20003, 20030, 20031, 20032];
+        // 2=Lab Report, 505=Lab Results (Home-Based Care), 10002=Laboratory Results (Preop),
+        // 21001=Laboratorio (SIP Perinatal), 20003=Dental Laboratory + hijas (Cultivos, Biopsias, Pre-Op Blood Tests)
+    }
+
+    /**
+     * Obtiene documentos (PDF/JPG) subidos en categorías de laboratorio,
+     * que no pasan por procedure_order/procedure_report
+     */
+    public function getDocumentLabReports(int $pid): array
+    {
+        $categoryIds = $this->getLabDocumentCategoryIds();
+        $placeholders = implode(',', array_fill(0, count($categoryIds), '?'));
+        $params = array_merge([$pid], $categoryIds);
+
+        $sql = "SELECT 
+                    d.id AS doc_id,
+                    d.encounter_id,
+                    d.url,
+                    d.mimetype,
+                    d.name AS doc_name,
+                    d.docdate,
+                    d.date AS doc_date,
+                    c.name AS category_name
+                FROM documents d
+                INNER JOIN categories_to_documents ctd ON d.id = ctd.document_id
+                INNER JOIN categories c ON ctd.category_id = c.id
+                WHERE d.foreign_id = ?
+                AND (d.deleted = 0 OR d.deleted IS NULL)
+                AND ctd.category_id IN ($placeholders)
+                ORDER BY COALESCE(d.docdate, d.date) DESC, d.id DESC";
+
+        $res = sqlStatement($sql, $params);
+        $documents = [];
+
+        if ($res) {
+            while ($row = sqlFetchArray($res)) {
+                $docName = !empty($row['doc_name']) ? $row['doc_name'] : basename((string)$row['url']);
+                $mime = strtolower((string)$row['mimetype']);
+                $isPdf = ($mime === 'application/pdf') || str_ends_with(strtolower($docName), '.pdf');
+                $docDate = $row['docdate'] ?: ($row['doc_date'] ? date('Y-m-d', strtotime($row['doc_date'])) : date('Y-m-d'));
+
+                $documents[] = [
+                    'id'             => 'labdoc_' . $row['doc_id'],
+                    'type'           => 'document',
+                    'doc_id'         => (int)$row['doc_id'],
+                    'encounter_id'   => (int)$row['encounter_id'],
+                    'title'          => $row['category_name'] . ' - ' . $docName,
+                    'date_result'    => date('d/m/Y', strtotime($docDate)),
+                    'date_raw'       => $docDate,
+                    'provider_name'  => 'Documento Adjunto',
+                    'provider_spec'  => $row['category_name'],
+                    'status'         => 'Documento Disponible',
+                    'specimen_num'   => 'N/A',
+                    'total_results'  => 0,
+                    'has_abnormals'  => false,
+                    'abnormal_count' => 0,
+                    'notes'          => '',
+                    'format_type'    => $isPdf ? 'pdf' : 'image',
+                    'view_url'       => 'view_document.php?id=' . $row['doc_id'],
+                    'download_url'   => 'view_document.php?id=' . $row['doc_id'] . '&download=1'
+                ];
+            }
+        }
+
+        return $documents;
     }
 }

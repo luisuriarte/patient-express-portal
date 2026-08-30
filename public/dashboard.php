@@ -215,22 +215,24 @@ require_once dirname(__DIR__) . '/templates/header.php';
                             </div>
 
                             <!-- Botones de Acción de Lote Completo -->
-                            <div class="flex items-center space-x-2 self-end sm:self-center">
-                                <button type="button" 
-                                        onclick="openPdfModal('print_pdf.php?type=lab&encounter=<?= urlencode((string)$batch['encounter_key']) ?>', 'Protocolo de Laboratorio - <?= htmlspecialchars(addslashes($batch['encounter_label'])) ?>')"
-                                        class="inline-flex items-center space-x-2 bg-sky-600 hover:bg-sky-700 text-white font-heading font-semibold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-all duration-150 cursor-pointer">
-                                    <i data-lucide="file-text" class="w-4 h-4"></i>
-                                    <span>Ver / Bajar PDF</span>
-                                </button>
+                            <?php if (empty($batch['has_documents_only'])): ?>
+                                <div class="flex items-center space-x-2 self-end sm:self-center">
+                                    <button type="button" 
+                                            onclick="openPdfModal('print_pdf.php?type=lab&encounter=<?= urlencode((string)$batch['encounter_key']) ?>', 'Protocolo de Laboratorio - <?= htmlspecialchars(addslashes($batch['encounter_label'])) ?>')"
+                                            class="inline-flex items-center space-x-2 bg-sky-600 hover:bg-sky-700 text-white font-heading font-semibold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-all duration-150 cursor-pointer">
+                                        <i data-lucide="file-text" class="w-4 h-4"></i>
+                                        <span>Ver / Bajar PDF</span>
+                                    </button>
 
-                                <a href="print_pdf.php?type=lab&encounter=<?= urlencode((string)$batch['encounter_key']) ?>" 
-                                   target="_blank" 
-                                   rel="noopener noreferrer"
-                                   title="Abrir PDF en pestaña independiente"
-                                   class="p-2.5 text-slate-500 hover:text-sky-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">
-                                    <i data-lucide="external-link" class="w-4 h-4"></i>
-                                </a>
-                            </div>
+                                    <a href="print_pdf.php?type=lab&encounter=<?= urlencode((string)$batch['encounter_key']) ?>" 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    title="Abrir PDF en pestaña independiente"
+                                    class="p-2.5 text-slate-500 hover:text-sky-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">
+                                        <i data-lucide="external-link" class="w-4 h-4"></i>
+                                    </a>
+                                </div>
+                            <?php endif; ?>
 
                         </div>
 
@@ -252,9 +254,16 @@ require_once dirname(__DIR__) . '/templates/header.php';
                                                 </span>
                                             </div>
                                         </div>
-                                        <span class="text-[10px] px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-600 flex-shrink-0">
-                                            <?= $report['total_results'] ?> determ.
-                                        </span>
+                                            <?php if (($report['type'] ?? 'procedure') === 'document'): ?>
+                                                <a href="<?= htmlspecialchars($report['view_url']) ?>" target="_blank" rel="noopener noreferrer"
+                                                class="text-[10px] px-2 py-1 rounded bg-rose-50 border border-rose-200 text-rose-700 flex-shrink-0 font-semibold hover:bg-rose-100">
+                                                    Ver Documento
+                                                </a>
+                                            <?php else: ?>
+                                                <span class="text-[10px] px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-600 flex-shrink-0">
+                                                    <?= $report['total_results'] ?> determ.
+                                                </span>
+                                            <?php endif; ?>                                        </span>
                                     </div>
                                 <?php endforeach; ?>
                             </div>

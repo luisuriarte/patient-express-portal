@@ -70,11 +70,15 @@ class Imaging
                         LEFT JOIN categories cp ON c.parent = cp.id
                         LEFT JOIN documents_pacs_sync dps ON d.id = dps.document_id
                         WHERE d.foreign_id = ? 
-                          AND (d.deleted = 0 OR d.deleted IS NULL)
-                          AND ctd.category_id IN ($placeholders)
+                        AND (d.deleted = 0 OR d.deleted IS NULL)
+                        AND ctd.category_id IN ($placeholders)
                         ORDER BY COALESCE(d.docdate, d.date) DESC, d.id DESC";
 
             $resDocs = sqlStatement($sqlDocs, $params);
+
+            // Acumulador de estudios DICOM agrupados por study_instance_uid real de PACS
+            $groupedStudies = [];
+
             if ($resDocs) {
                 while ($dRow = sqlFetchArray($resDocs)) {
                     $docName = !empty($dRow['doc_name']) ? $dRow['doc_name'] : basename((string)$dRow['url']);
@@ -85,7 +89,6 @@ class Imaging
                     $hasPacsSync = !empty($dRow['pacs_study_uid']) && ($dRow['pacs_status'] === 'synced');
                     $pacsStudyUid = $dRow['pacs_study_uid'] ?? null;
 
-                    // Determinar si es DICOM, Imagen Estándar (JPG/PNG) o PDF
                     $isDicom = ($mime === 'application/dicom') 
                         || str_ends_with($urlLower, '.dcm') 
                         || str_ends_with($nameLower, '.dcm')
@@ -115,6 +118,32 @@ class Imaging
                     $downloadUrl = 'view_document.php?id=' . $dRow['doc_id'] . '&download=1';
 
                     if ($isDicom || $hasPacsSync) {
+                        // Si ya está sincronizado y tiene un study_uid real de PACS, agrupamos
+                        // todos los documentos que comparten ese mismo estudio en una sola entrada.
+                        if ($hasPacsSync && !empty($pacsStudyUid)) {
+                            if (!isset($groupedStudies[$pacsStudyUid])) {
+                                $groupedStudies[$pacsStudyUid] = [
+                                    'first_doc_id'   => (int)$dRow['doc_id'],
+                                    'doc_ids'        => [],
+                                    'category_label' => $categoryLabel,
+                                    'date_raw'       => $docDate,
+                                    'formatted_date' => $formattedDate,
+                                ];
+                            }
+                            $groupedStudies[$pacsStudyUid]['doc_ids'][] = (int)$dRow['doc_id'];
+
+                            // Conservamos la fecha más antigua del grupo como fecha del estudio
+                            if (strtotime($docDate) < strtotime($groupedStudies[$pacsStudyUid]['date_raw'])) {
+                                $groupedStudies[$pacsStudyUid]['date_raw'] = $docDate;
+                                $groupedStudies[$pacsStudyUid]['formatted_date'] = $formattedDate;
+                            }
+
+                            $registeredStudyUids[] = $pacsStudyUid;
+                            continue;
+                        }
+
+                        // DICOM aún no sincronizado (pending) o sin study_uid conocido:
+                        // se muestra individualmente, como antes.
                         $studyUid = $pacsStudyUid ?: basename((string)$dRow['url'], '.dcm');
                         $registeredStudyUids[] = $studyUid;
 
@@ -129,7 +158,7 @@ class Imaging
                             'date_raw'          => $docDate,
                             'provider_name'     => 'Servicio de Diagnóstico por Imágenes',
                             'provider_spec'     => $categoryLabel,
-                            'status'            => $hasPacsSync ? 'Sincronizado en PACS Orthanc' : 'Estudio DICOM Listo',
+                            'status'            => 'Estudio DICOM Listo',
                             'has_report'        => false,
                             'accession_number'  => 'DOC-' . $dRow['doc_id'],
                             'study_uid'         => $studyUid,
@@ -163,8 +192,8 @@ class Imaging
                             'has_report'        => false,
                             'accession_number'  => 'DOC-' . $dRow['doc_id'],
                             'study_uid'         => null,
-                            'format_type'       => $formatType, // 'image' o 'pdf'
-                            'viewer_type'       => $viewerType, // 'inline_image' o 'inline_pdf'
+                            'format_type'       => $formatType,
+                            'viewer_type'       => $viewerType,
                             'viewer_url'        => $viewUrl,
                             'ohif_url'          => null,
                             'has_ohif'          => false,
@@ -176,8 +205,41 @@ class Imaging
                     }
                 }
             }
-        }
 
+            // Volcar los estudios agrupados como una sola tarjeta "Estudio" por cada
+            // study_instance_uid distinto, con todas sus series/imágenes adentro.
+            foreach ($groupedStudies as $uid => $group) {
+                $seriesCount = count($group['doc_ids']);
+                $studies[] = [
+                    'id'                => 'study_' . $group['first_doc_id'],
+                    'report_id'         => null,
+                    'order_id'          => 0,
+                    'doc_id'            => $group['first_doc_id'],
+                    'doc_ids'           => $group['doc_ids'],
+                    'title'             => $group['category_label'] . ' (' . $seriesCount . ' ' . ($seriesCount === 1 ? 'imagen' : 'imágenes') . ')',
+                    'modality'          => $this->detectModality($group['category_label']),
+                    'date_study'        => $group['formatted_date'],
+                    'date_raw'          => $group['date_raw'],
+                    'provider_name'     => 'Servicio de Diagnóstico por Imágenes',
+                    'provider_spec'     => $group['category_label'],
+                    'status'            => 'Sincronizado en PACS Orthanc',
+                    'has_report'        => false,
+                    'accession_number'  => 'DOC-' . $group['first_doc_id'],
+                    'study_uid'         => $uid,
+                    'format_type'       => 'dicom',
+                    'viewer_type'       => 'ohif',
+                    'viewer_url'        => $this->buildOhifViewerUrl($uid),
+                    'ohif_url'          => $this->buildOhifViewerUrl($uid),
+                    'stone_url'         => $this->buildStoneViewerUrl($uid),
+                    'has_ohif'          => true,
+                    'direct_view_url'   => null,
+                    'download_url'      => null,
+                    'mimetype'          => null,
+                    'source'            => 'openemr_document',
+                    'series_count'      => $seriesCount,
+                ];
+            }
+        }
         // =========================================================================
         // 3. Consultar Órdenes e Informes Radiológicos en procedure_order
         // =========================================================================
@@ -662,11 +724,11 @@ class Imaging
     public function buildOhifViewerUrl(string $studyUid): string
     {
         $realStudyUid = $this->resolveRealStudyInstanceUid($studyUid);
-        $dicomWebStudyUrl = rtrim($this->orthancWadoUrl, '/') . '/studies/' . $realStudyUid;
-        
-        // Soporta parámetro ?StudyInstanceUIDs=... o ?url=...
-        // Formato estándar OHIF con WADO-RS:
-        return rtrim($this->ohifBaseUrl, '/') . '?url=' . urlencode($dicomWebStudyUrl);
+
+        // OHIF v3 en la ruta /viewer usa el dataSource "dicomweb" ya configurado
+        // en app-config.js (defaultDataSourceName). No acepta un endpoint WADO-RS
+        // arbitrario vía ?url= en esta ruta — eso solo aplica a /viewer/dicomjson.
+        return rtrim($this->ohifBaseUrl, '/') . '?StudyInstanceUIDs=' . urlencode($realStudyUid);
     }
 
     /**
