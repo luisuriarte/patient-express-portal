@@ -166,7 +166,40 @@ class Laboratory
         // ==========================================================================
         $labDocuments = $this->getDocumentLabReports($pid);
         foreach ($labDocuments as $docReport) {
-            $encId = $docReport['encounter_id'];
+            $encId = (int)$docReport['encounter_id'];
+            $encounterDateIso = null; // Fecha oficial del encuentro
+
+            // Si el documento tiene encounter_id, obtener la fecha real del encuentro
+            if ($encId > 0) {
+                $encRow = sqlQuery(
+                    "SELECT encounter, date FROM form_encounter WHERE pid = ? AND encounter = ? LIMIT 1",
+                    [$pid, $encId]
+                );
+                if ($encRow && !empty($encRow['date'])) {
+                    $encounterDateIso = date('Y-m-d', strtotime($encRow['date']));
+                }
+            }
+
+            // Si el documento no tiene encounter_id, buscar el encuentro más cercano por fecha
+            if ($encId === 0 && !empty($docReport['date_raw'])) {
+                $closestEncounter = sqlQuery(
+                    "SELECT encounter, date FROM form_encounter 
+                     WHERE pid = ? 
+                     ORDER BY ABS(DATEDIFF(date, ?)) ASC 
+                     LIMIT 1",
+                    [$pid, $docReport['date_raw']]
+                );
+                if ($closestEncounter && !empty($closestEncounter['encounter'])) {
+                    $encId = (int)$closestEncounter['encounter'];
+                    if (!empty($closestEncounter['date'])) {
+                        $encounterDateIso = date('Y-m-d', strtotime($closestEncounter['date']));
+                    }
+                }
+            }
+
+            // Usar la fecha del encuentro como principal; si no hay, usar la del documento
+            $primaryDateIso = $encounterDateIso ?: $docReport['date_raw'];
+
             $encounterKey = $encId > 0 ? (string)$encId : ('doc_' . $docReport['doc_id']);
 
             if (!isset($grouped[$encounterKey])) {
@@ -174,9 +207,9 @@ class Laboratory
                     'encounter_key'      => $encounterKey,
                     'encounter_id'       => $encId,
                     'encounter_label'    => $encId > 0 ? ('Encuentro #' . $encId) : 'Documento de Laboratorio',
-                    'date_iso'           => $docReport['date_raw'],
-                    'date_formatted'     => date('d/m/Y', strtotime($docReport['date_raw'])),
-                    'date_display'       => $this->formatDateDisplay($docReport['date_raw']),
+                    'date_iso'           => $primaryDateIso,
+                    'date_formatted'     => date('d/m/Y', strtotime($primaryDateIso)),
+                    'date_display'       => $this->formatDateDisplay($primaryDateIso),
                     'total_studies'      => 0,
                     'total_results'      => 0,
                     'abnormal_count'     => 0,
@@ -556,10 +589,12 @@ class Laboratory
                     d.name AS doc_name,
                     d.docdate,
                     d.date AS doc_date,
-                    c.name AS category_name
+                    c.name AS category_name,
+                    fe.date AS encounter_date
                 FROM documents d
                 INNER JOIN categories_to_documents ctd ON d.id = ctd.document_id
                 INNER JOIN categories c ON ctd.category_id = c.id
+                LEFT JOIN form_encounter fe ON fe.encounter = d.encounter_id AND fe.pid = d.foreign_id
                 WHERE d.foreign_id = ?
                 AND (d.deleted = 0 OR d.deleted IS NULL)
                 AND ctd.category_id IN ($placeholders)
@@ -575,11 +610,13 @@ class Laboratory
                 $isPdf = ($mime === 'application/pdf') || str_ends_with(strtolower($docName), '.pdf');
                 $docDate = $row['docdate'] ?: ($row['doc_date'] ? date('Y-m-d', strtotime($row['doc_date'])) : date('Y-m-d'));
 
+                $encounterId = (int)$row['encounter_id'];
+
                 $documents[] = [
                     'id'             => 'labdoc_' . $row['doc_id'],
                     'type'           => 'document',
                     'doc_id'         => (int)$row['doc_id'],
-                    'encounter_id'   => (int)$row['encounter_id'],
+                    'encounter_id'   => $encounterId,
                     'title'          => $row['category_name'] . ' - ' . $docName,
                     'date_result'    => date('d/m/Y', strtotime($docDate)),
                     'date_raw'       => $docDate,
