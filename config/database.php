@@ -45,8 +45,11 @@ define('CLINIC_SUBTITLE', 'Portal Express del Paciente - Diagnóstico y Resultad
 define('CLINIC_ADDRESS', 'Av. Santa Fe 1234, CABA, Argentina');
 define('CLINIC_PHONE', '+54 11 4000-0000 / 0810-333-ORIGEN');
 define('CLINIC_EMAIL', 'contacto@origen.ar');
-define('CLINIC_WEB', 'https://origen.ar');
-define('CLINIC_LOGO_PATH', dirname(__DIR__) . '/assets/img/logo.png');
+$logoFile = dirname(__DIR__) . '/public/assets/img/logo.png';
+if (!file_exists($logoFile)) {
+    $logoFile = dirname(__DIR__) . '/assets/img/logo.png';
+}
+define('CLINIC_LOGO_PATH', $logoFile);
 
 // ==========================================
 // 4. FUNCIÓN HELPER DE CONEXIÓN PDO

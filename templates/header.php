@@ -114,11 +114,11 @@ $pageTitle = $pageTitle ?? 'Portal Express del Paciente | Centro Médico Origen'
                             </div>
                         </div>
 
-                        <!-- Botón Enlace Portal Completo -->
-                        <a href="<?= defined('OPENEMR_PORTAL_URL') ? OPENEMR_PORTAL_URL : 'https://hcd.origen.ar/portal' ?>" 
+                        <!-- Botón Enlace Portal Completo (Auto-Login SSO) -->
+                        <a href="goto_portal.php" 
                            target="_blank" 
                            rel="noopener noreferrer"
-                           title="Ingresar al Portal Completo OpenEMR"
+                           title="Ingresar automáticamente al Portal Completo OpenEMR"
                            class="hidden md:inline-flex items-center space-x-1.5 text-xs font-heading font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 px-3.5 py-2 rounded-xl transition-all">
                             <i data-lucide="external-link" class="w-3.5 h-3.5 text-sky-600"></i>
                             <span>Portal OpenEMR</span>

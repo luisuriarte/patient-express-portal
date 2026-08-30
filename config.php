@@ -85,7 +85,11 @@ if (!defined('CLINIC_WEB')) {
     define('CLINIC_WEB', 'https://www.origen.ar');
 }
 if (!defined('CLINIC_LOGO_PATH')) {
-    define('CLINIC_LOGO_PATH', __DIR__ . '/assets/img/logo.png');
+    $logoFile = __DIR__ . '/public/assets/img/logo.png';
+    if (!file_exists($logoFile)) {
+        $logoFile = __DIR__ . '/assets/img/logo.png';
+    }
+    define('CLINIC_LOGO_PATH', $logoFile);
 }
 
 // 4. Autoloading de Clases

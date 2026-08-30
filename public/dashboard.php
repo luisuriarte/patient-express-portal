@@ -508,11 +508,12 @@ require_once dirname(__DIR__) . '/templates/header.php';
                     <h3 class="font-heading font-bold text-lg text-white">¿Listo para ingresar al Portal Integral?</h3>
                     <p class="text-xs text-slate-300">Se abrirá la plataforma OpenEMR en una nueva pestaña segura.</p>
                 </div>
-                <a href="<?= htmlspecialchars(defined('OPENEMR_PORTAL_URL') ? OPENEMR_PORTAL_URL : 'https://hcd.origen.ar/portal') ?>" 
+                <a href="goto_portal.php" 
                    target="_blank" 
                    rel="noopener noreferrer"
                    class="inline-flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white font-heading font-bold text-xs sm:text-sm px-6 py-3.5 rounded-xl shadow-md transition-all duration-150 whitespace-nowrap cursor-pointer">
-                    <span>Ingresar a OpenEMR Portal</span>
+                    <i data-lucide="sparkles" class="w-4 h-4"></i>
+                    <span>Ingresar Directo a OpenEMR Portal</span>
                     <i data-lucide="arrow-up-right" class="w-4 h-4"></i>
                 </a>
             </div>
