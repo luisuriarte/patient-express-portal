@@ -10,6 +10,19 @@ declare(strict_types=1);
 $ignoreAuth = true;
 $ignoreAuth_onsite_portal = true;
 
+// Configurar entorno CLI para bootstrap de OpenEMR
+if (php_sapi_name() === 'cli' || empty($_SERVER['HTTP_HOST'])) {
+    $_SERVER['HTTP_HOST']   = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    $_SERVER['SERVER_NAME'] = $_SERVER['SERVER_NAME'] ?? 'localhost';
+    $_SERVER['REQUEST_URI'] = $_SERVER['REQUEST_URI'] ?? '/';
+    $_SERVER['REMOTE_ADDR'] = $_SERVER['REMOTE_ADDR'] ?? '127.0.0.1';
+    if (!isset($_SESSION)) {
+        $_SESSION = [];
+    }
+    $_SESSION['site_id']    = $_SESSION['site_id'] ?? 'default';
+    $GLOBALS['oe_site_id']  = 'default';
+}
+
 // 1. Bootstrap Nativo de OpenEMR (Subiendo niveles hasta interface/globals.php)
 $globalsIncluded = false;
 $searchPaths = [

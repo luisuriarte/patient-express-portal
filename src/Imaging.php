@@ -444,25 +444,47 @@ class Imaging
         $filePath = null;
         $fileContent = null;
 
-        // 1. Probar ruta directa en el sistema de archivos
-        if (file_exists($url)) {
+        // 1. Intentar obtención y desencriptado directo con la clase Document de OpenEMR
+        if (class_exists('\Document')) {
+            try {
+                $docObj = new \Document($docId);
+                $decryptedData = $docObj->get_data();
+                if ($decryptedData !== false && $decryptedData !== null && $decryptedData !== '') {
+                    return [
+                        'id'           => (int)$doc['id'],
+                        'pid'          => (int)$doc['foreign_id'],
+                        'name'         => $docObj->get_name() ?: $fileName,
+                        'mimetype'     => $docObj->get_mimetype() ?: $mimeType,
+                        'url'          => $docObj->get_url() ?: $url,
+                        'file_path'    => null,
+                        'file_content' => $decryptedData,
+                        'exists'       => true
+                    ];
+                }
+            } catch (\Throwable $e) {
+                // El archivo físico no existe en disco o está huérfano
+            }
+        }
+
+        // 2. Probar ruta directa o relativa en el sistema de archivos
+        if (file_exists($url) && is_file($url)) {
             $filePath = $url;
-        } elseif (file_exists('/' . $cleanUrl)) {
+        } elseif (file_exists('/' . $cleanUrl) && is_file('/' . $cleanUrl)) {
             $filePath = '/' . $cleanUrl;
-        } elseif (file_exists($cleanUrl)) {
+        } elseif (file_exists($cleanUrl) && is_file($cleanUrl)) {
             $filePath = $cleanUrl;
         } else {
-            // 2. Probar rutas del sitio OpenEMR
             $siteDir = $GLOBALS['OE_SITE_DIR'] ?? null;
             $candidatePaths = [];
 
             if ($siteDir) {
                 $candidatePaths[] = rtrim($siteDir, '/') . '/documents/' . $cleanUrl;
                 $candidatePaths[] = rtrim($siteDir, '/') . '/documents/' . $pid . '/' . basename($cleanUrl);
+                $candidatePaths[] = rtrim($siteDir, '/') . '/documents/' . $pid . '/' . $fileName;
                 $candidatePaths[] = rtrim($siteDir, '/') . '/documents/' . basename($cleanUrl);
+                $candidatePaths[] = rtrim($siteDir, '/') . '/documents/' . $fileName;
             }
 
-            // Rutas estándar adicionales
             $docRoots = [
                 '/var/www/html/origen.ar/hcd/sites/default/documents',
                 '/var/www/html/openemr/sites/default/documents',
@@ -473,7 +495,9 @@ class Imaging
             foreach ($docRoots as $dRoot) {
                 $candidatePaths[] = rtrim($dRoot, '/') . '/' . $cleanUrl;
                 $candidatePaths[] = rtrim($dRoot, '/') . '/' . $pid . '/' . basename($cleanUrl);
+                $candidatePaths[] = rtrim($dRoot, '/') . '/' . $pid . '/' . $fileName;
                 $candidatePaths[] = rtrim($dRoot, '/') . '/' . basename($cleanUrl);
+                $candidatePaths[] = rtrim($dRoot, '/') . '/' . $fileName;
             }
 
             foreach ($candidatePaths as $cPath) {
@@ -484,8 +508,30 @@ class Imaging
             }
         }
 
+        // Si se leyó de disco, verificar si requiere desencriptado
+        if ($filePath && file_exists($filePath)) {
+            $rawContent = file_get_contents($filePath);
+            if (!empty($rawContent)) {
+                if (class_exists('\OpenEMR\BC\ServiceContainer')) {
+                    try {
+                        $crypto = \OpenEMR\BC\ServiceContainer::getCrypto();
+                        $decrypted = $crypto->decryptFromFilesystem($rawContent);
+                        if (!empty($decrypted)) {
+                            $fileContent = $decrypted;
+                        } else {
+                            $fileContent = $rawContent;
+                        }
+                    } catch (\Throwable $e) {
+                        $fileContent = $rawContent;
+                    }
+                } else {
+                    $fileContent = $rawContent;
+                }
+            }
+        }
+
         // 3. Si no se encontró en disco, intentar con la clase nativa C_Document de OpenEMR
-        if ($filePath === null && class_exists('\C_Document')) {
+        if ($fileContent === null && class_exists('\C_Document')) {
             try {
                 $cDoc = new \C_Document();
                 $cDoc->onReturnRetrieveKey();
@@ -499,7 +545,7 @@ class Imaging
         }
 
         // 4. Si es BLOB almacenado directamente en la base de datos
-        if ($filePath === null && $fileContent === null && !empty($doc['document_data'])) {
+        if ($fileContent === null && !empty($doc['document_data'])) {
             $fileContent = $doc['document_data'];
         }
 
