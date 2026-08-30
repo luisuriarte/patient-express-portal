@@ -17,8 +17,8 @@ $pid = $auth->getPatientPid();
 $labService = new \App\Laboratory();
 $imgService = new \App\Imaging();
 
-// 1. Obtener lotes de laboratorio agrupados por fecha
-$labBatches = $labService->getReportsGroupedByDate($pid);
+// 1. Obtener lotes de laboratorio agrupados por Encuentro
+$labBatches = $labService->getReportsGroupedByEncounter($pid);
 $totalLabBatches = count($labBatches);
 $totalIndividualLabs = 0;
 foreach ($labBatches as $b) {
@@ -93,7 +93,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
             <div class="grid grid-cols-2 gap-3 min-w-[240px]">
                 <div class="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-4 text-center">
                     <span class="block text-2xl sm:text-3xl font-extrabold font-heading text-sky-300"><?= $totalLabBatches ?></span>
-                    <span class="text-xs text-slate-300 font-medium">Protocolos Lab</span>
+                    <span class="text-xs text-slate-300 font-medium">Encuentros de Lab</span>
                 </div>
                 <div class="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-4 text-center">
                     <span class="block text-2xl sm:text-3xl font-extrabold font-heading text-teal-300"><?= $totalImages ?></span>
@@ -112,7 +112,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
                 id="btn-tab-laboratories"
                 class="tab-btn flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-xl text-xs sm:text-sm font-heading font-bold transition-all duration-150 bg-sky-600 text-white shadow-sm cursor-pointer">
             <i data-lucide="test-tube" class="w-4 h-4"></i>
-            <span>Protocolos de Laboratorio</span>
+            <span>Resultados de Laboratorio</span>
             <span class="ml-1.5 py-0.5 px-2 rounded-full text-[11px] bg-white/20 text-white"><?= $totalLabBatches ?></span>
         </button>
 
@@ -137,7 +137,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
     </div>
 
     <!-- ========================================================================= -->
-    <!-- TAB 1: RESULTADOS DE LABORATORIO (PDF AGRUPADO POR FECHA) -->
+    <!-- TAB 1: RESULTADOS DE LABORATORIO (AGRUPADO POR ENCUENTRO) -->
     <!-- ========================================================================= -->
     <div id="tab-laboratories" class="tab-pane active space-y-4">
         
@@ -147,11 +147,11 @@ require_once dirname(__DIR__) . '/templates/header.php';
                 <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
                 <input type="text" 
                        id="searchLabInput" 
-                       placeholder="Buscar por fecha, análisis o médico..." 
+                       placeholder="Buscar por encuentro, fecha, análisis o médico..." 
                        class="w-full pl-10 pr-4 py-2 text-xs md:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-sky-500 transition-colors">
             </div>
             <div class="text-xs text-slate-500 font-medium">
-                Mostrando <span id="labCountText" class="font-bold text-slate-800"><?= $totalLabBatches ?></span> fechas de análisis (<?= $totalIndividualLabs ?> estudios en total)
+                Mostrando <span id="labCountText" class="font-bold text-slate-800"><?= $totalLabBatches ?></span> encuentros (<?= $totalIndividualLabs ?> estudios en total)
             </div>
         </div>
 
@@ -164,16 +164,17 @@ require_once dirname(__DIR__) . '/templates/header.php';
                 <div class="space-y-1 max-w-md mx-auto">
                     <h3 class="font-heading font-bold text-lg text-slate-900">No se encontraron análisis de laboratorio</h3>
                     <p class="text-xs text-slate-500 leading-relaxed">
-                        Aún no tienes informes de análisis clínicos registrados en tu historia médica. Cuando el laboratorio procese y valide tus muestras, aparecerán agrupados por fecha en esta sección.
+                        Aún no tienes informes de análisis clínicos registrados bajo procedimientos válidos. Cuando el laboratorio procese y valide tus muestras, aparecerán agrupados por encuentro en esta sección.
                     </p>
                 </div>
             </div>
         <?php else: ?>
-            <!-- Listado de Lotes de Laboratorio Agrupados por Fecha -->
+            <!-- Listado de Lotes de Laboratorio Agrupados por Encuentro -->
             <div class="grid grid-cols-1 gap-4" id="labReportsList">
                 <?php foreach ($labBatches as $batch): ?>
                     <?php 
                         $searchableText = strtolower(
+                            $batch['encounter_label'] . ' ' . 
                             $batch['date_formatted'] . ' ' . 
                             $batch['date_display'] . ' ' . 
                             implode(' ', $batch['study_names']) . ' ' . 
@@ -195,7 +196,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
                                 <div>
                                     <div class="flex flex-wrap items-center gap-2">
                                         <h3 class="font-heading font-bold text-lg text-slate-900">
-                                            Extracción del <?= htmlspecialchars($batch['date_display']) ?>
+                                            <?= htmlspecialchars($batch['encounter_label']) ?> &bull; <?= htmlspecialchars($batch['date_display']) ?>
                                         </h3>
                                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200">
                                             <?= $batch['total_studies'] ?> <?= $batch['total_studies'] === 1 ? 'análisis' : 'análisis agrupados' ?>
@@ -208,7 +209,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
                                         <?php endif; ?>
                                     </div>
                                     <p class="text-xs text-slate-500 mt-0.5">
-                                        Fecha: <strong class="text-slate-700 font-medium"><?= htmlspecialchars($batch['date_formatted']) ?></strong> &bull; Solicitante(s): <?= htmlspecialchars(implode(', ', $batch['providers'])) ?>
+                                        Fecha Resultados: <strong class="text-slate-700 font-medium"><?= htmlspecialchars($batch['date_formatted']) ?></strong> &bull; Solicitante(s): <?= htmlspecialchars(implode(', ', $batch['providers'])) ?>
                                     </p>
                                 </div>
                             </div>
@@ -216,13 +217,13 @@ require_once dirname(__DIR__) . '/templates/header.php';
                             <!-- Botones de Acción de Lote Completo -->
                             <div class="flex items-center space-x-2 self-end sm:self-center">
                                 <button type="button" 
-                                        onclick="openPdfModal('print_pdf.php?type=lab&date=<?= urlencode($batch['date_iso']) ?>', 'Protocolo de Laboratorio - <?= htmlspecialchars(addslashes($batch['date_formatted'])) ?>')"
+                                        onclick="openPdfModal('print_pdf.php?type=lab&encounter=<?= urlencode((string)$batch['encounter_key']) ?>', 'Protocolo de Laboratorio - <?= htmlspecialchars(addslashes($batch['encounter_label'])) ?>')"
                                         class="inline-flex items-center space-x-2 bg-sky-600 hover:bg-sky-700 text-white font-heading font-semibold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-all duration-150 cursor-pointer">
                                     <i data-lucide="file-text" class="w-4 h-4"></i>
                                     <span>Ver / Bajar PDF</span>
                                 </button>
 
-                                <a href="print_pdf.php?type=lab&date=<?= urlencode($batch['date_iso']) ?>" 
+                                <a href="print_pdf.php?type=lab&encounter=<?= urlencode((string)$batch['encounter_key']) ?>" 
                                    target="_blank" 
                                    rel="noopener noreferrer"
                                    title="Abrir PDF en pestaña independiente"
@@ -233,18 +234,23 @@ require_once dirname(__DIR__) . '/templates/header.php';
 
                         </div>
 
-                        <!-- Desglose de Estudios Incluidos en esta Fecha -->
+                        <!-- Desglose de Estudios Incluidos en este Encuentro -->
                         <div class="space-y-2">
-                            <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Estudios incluidos en este protocolo:</span>
+                            <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Estudios incluidos en este encuentro:</span>
                             
                             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
                                 <?php foreach ($batch['reports'] as $report): ?>
                                     <div class="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex items-center justify-between gap-2">
                                         <div class="flex items-center space-x-2 min-w-0">
                                             <i data-lucide="flask-conical" class="w-4 h-4 text-sky-500 flex-shrink-0"></i>
-                                            <span class="text-xs font-semibold text-slate-800 truncate" title="<?= htmlspecialchars($report['title']) ?>">
-                                                <?= htmlspecialchars($report['title']) ?>
-                                            </span>
+                                            <div class="min-w-0">
+                                                <span class="text-xs font-semibold text-slate-800 truncate block" title="<?= htmlspecialchars($report['title']) ?>">
+                                                    <?= htmlspecialchars($report['title']) ?>
+                                                </span>
+                                                <span class="text-[10px] text-slate-400 block">
+                                                    <?= htmlspecialchars($report['date_result']) ?>
+                                                </span>
+                                            </div>
                                         </div>
                                         <span class="text-[10px] px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-600 flex-shrink-0">
                                             <?= $report['total_results'] ?> determ.
@@ -398,13 +404,13 @@ require_once dirname(__DIR__) . '/templates/header.php';
 
                                 <?php if (!empty($study['has_ohif']) && !empty($study['ohif_url'])): ?>
                                     <a href="<?= htmlspecialchars($study['ohif_url']) ?>" 
-                                       target="_blank" 
-                                       rel="noopener noreferrer"
-                                       title="Visualizar en Visor Radiológico Avanzado OHIF"
-                                       class="inline-flex items-center space-x-1.5 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 font-heading font-semibold text-xs px-3.5 py-2.5 rounded-xl transition-colors">
+                                        target="_blank" 
+                                        rel="noopener noreferrer"
+                                        title="Visualizar en Visor Radiológico Avanzado OHIF"
+                                        class="inline-flex items-center space-x-1.5 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 font-heading font-semibold text-xs px-3.5 py-2.5 rounded-xl transition-colors">
                                         <i data-lucide="monitor" class="w-4 h-4 text-teal-600"></i>
                                         <span>Visor OHIF</span>
-                                        <i data-lucide="arrow-up-right" class="w-3 h-3 text-teal-500"></i>
+                                        <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 text-teal-500"></i>
                                     </a>
                                 <?php endif; ?>
 

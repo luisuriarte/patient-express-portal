@@ -73,16 +73,16 @@ if (!defined('CLINIC_SUBTITLE')) {
     define('CLINIC_SUBTITLE', 'Portal Express del Paciente - Diagnóstico y Resultados');
 }
 if (!defined('CLINIC_ADDRESS')) {
-    define('CLINIC_ADDRESS', 'Av. Santa Fe 1234, CABA, Argentina');
+    define('CLINIC_ADDRESS', 'Av. Freyre 2304, Santa Fe, Argentina');
 }
 if (!defined('CLINIC_PHONE')) {
-    define('CLINIC_PHONE', '+54 11 4000-0000 / 0810-333-ORIGEN');
+    define('CLINIC_PHONE', '+54 342 4000-0000 / 0810-333-ORIGEN');
 }
 if (!defined('CLINIC_EMAIL')) {
     define('CLINIC_EMAIL', 'contacto@origen.ar');
 }
 if (!defined('CLINIC_WEB')) {
-    define('CLINIC_WEB', 'https://origen.ar');
+    define('CLINIC_WEB', 'https://www.origen.ar');
 }
 if (!defined('CLINIC_LOGO_PATH')) {
     define('CLINIC_LOGO_PATH', __DIR__ . '/assets/img/logo.png');

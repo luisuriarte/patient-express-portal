@@ -1,7 +1,7 @@
 <?php
 /**
  * Generador y Servidor de Informes Médicos en PDF con Dompdf
- * Patient Express Portal - Agrupación Continua por Fecha de Análisis
+ * Patient Express Portal - Agrupación Continua por Encuentro / Fecha de Análisis
  */
 
 declare(strict_types=1);
@@ -13,6 +13,7 @@ $auth->requireAuth('index.php');
 
 $pid = $auth->getPatientPid();
 $type = $_GET['type'] ?? 'lab';
+$encounter = isset($_GET['encounter']) ? trim((string)$_GET['encounter']) : '';
 $reportId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $reportDate = isset($_GET['date']) ? trim((string)$_GET['date']) : '';
 
@@ -22,7 +23,9 @@ $reportTitle = 'INFORME MÉDICO OFICIAL';
 if ($type === 'lab') {
     $labService = new \App\Laboratory();
     
-    if (!empty($reportDate)) {
+    if (!empty($encounter)) {
+        $data = $labService->getGroupedReportDetailsByEncounter($encounter, $pid);
+    } elseif (!empty($reportDate)) {
         $data = $labService->getGroupedReportDetailsByDate($reportDate, $pid);
     } elseif ($reportId > 0) {
         $data = $labService->getReportDetails($reportId, $pid);
@@ -276,8 +279,8 @@ ob_start();
     <!-- Título del Reporte -->
     <div class="report-header-title">
         <?= htmlspecialchars($reportTitle) ?>
-        <?php if ($type === 'lab' && !empty($data['batch_date_formatted'])): ?>
-            - FECHA DE EXTRACCIÓN: <?= htmlspecialchars($data['batch_date_formatted']) ?>
+        <?php if ($type === 'lab'): ?>
+            - <?= htmlspecialchars($data['encounter_label'] ?? 'ENCUENTRO') ?> (FECHA: <?= htmlspecialchars($data['batch_date_formatted'] ?? '') ?>)
         <?php elseif ($type === 'image' && !empty($data['study_name'])): ?>
             - <?= htmlspecialchars($data['study_name']) ?>
         <?php endif; ?>
@@ -294,14 +297,14 @@ ob_start();
         <tr>
             <td class="label">DNI / Documento:</td>
             <td class="val"><?= htmlspecialchars($data['patient']['dni']) ?></td>
-            <td class="label"><?= $type === 'lab' ? 'Fecha de Muestras:' : 'Fecha de Estudio:' ?></td>
-            <td class="val"><?= htmlspecialchars($type === 'lab' ? ($data['batch_date_formatted'] ?? 'N/A') : ($data['date_report'] ?? 'N/A')) ?></td>
+            <td class="label"><?= $type === 'lab' ? 'Fecha de Resultados:' : 'Fecha de Estudio:' ?></td>
+            <td class="val"><?= htmlspecialchars($type === 'lab' ? ($data['latest_result_date'] ?? $data['batch_date_formatted'] ?? 'N/A') : ($data['date_report'] ?? 'N/A')) ?></td>
         </tr>
         <tr>
             <td class="label">Edad / Sexo:</td>
             <td class="val"><?= htmlspecialchars($data['patient']['age']) ?> / <?= htmlspecialchars($data['patient']['sex']) ?></td>
-            <td class="label"><?= $type === 'lab' ? 'Total de Paneles:' : 'Modalidad:' ?></td>
-            <td class="val"><?= htmlspecialchars($type === 'lab' ? ((string)($data['total_panels'] ?? '1') . ' estudios') : ($data['modality'] ?? 'IMG')) ?></td>
+            <td class="label"><?= $type === 'lab' ? 'Encuentro / Total Paneles:' : 'Modalidad:' ?></td>
+            <td class="val"><?= htmlspecialchars($type === 'lab' ? (($data['encounter_label'] ?? '') . ' (' . (string)($data['total_panels'] ?? '1') . ' estudios)') : ($data['modality'] ?? 'IMG')) ?></td>
         </tr>
         <tr>
             <td class="label">Médico(s) Solicitante(s):</td>
@@ -313,7 +316,7 @@ ob_start();
 
     <?php if ($type === 'lab'): ?>
         <!-- ========================================================================= -->
-        <!-- CUERPO DE LABORATORIO AGRUPADO POR FECHA (LISTADO CONTINUO) -->
+        <!-- CUERPO DE LABORATORIO AGRUPADO POR ENCUENTRO (LISTADO CONTINUO) -->
         <!-- ========================================================================= -->
         <?php if (!empty($data['panels'])): ?>
             <?php foreach ($data['panels'] as $index => $panel): ?>
@@ -332,10 +335,10 @@ ob_start();
                     <table class="results-table">
                         <thead>
                             <tr>
-                                <th style="width: 40%;">Determinación / Analito</th>
-                                <th style="width: 22%;">Resultado</th>
+                                <th style="width: 38%;">Determinación / Analito</th>
+                                <th style="width: 20%;">Resultado</th>
                                 <th style="width: 14%;">Unidades</th>
-                                <th style="width: 24%;">Valores de Referencia</th>
+                                <th style="width: 28%;">Valores de Referencia</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -382,7 +385,7 @@ ob_start();
             <?php endforeach; ?>
         <?php else: ?>
             <div style="text-align: center; padding: 30px; color: #64748b;">
-                No se encontraron análisis registrados en la fecha indicada.
+                No se encontraron análisis registrados para este encuentro.
             </div>
         <?php endif; ?>
 
@@ -416,7 +419,7 @@ ob_start();
             <td class="qr-placeholder">
                 <div style="border: 1px solid #cbd5e1; padding: 5px 8px; border-radius: 4px; display: inline-block;">
                     <strong>VALIDACIÓN ELECTRÓNICA INSTITUCIONAL</strong><br>
-                    <span>ID de Lote: <?= md5(($data['batch_date'] ?? $reportId) . '-' . $pid . '-ORIGEN') ?></span><br>
+                    <span>ID de Lote: <?= md5(($data['encounter_id'] ?? $reportId) . '-' . $pid . '-ORIGEN') ?></span><br>
                     <span>Verifique autenticidad en <?= defined('CLINIC_WEB') ? CLINIC_WEB : 'https://origen.ar' ?></span>
                 </div>
             </td>
@@ -452,8 +455,8 @@ if (class_exists(\Dompdf\Dompdf::class)) {
     $dompdf->setPaper('A4', 'portrait');
     $dompdf->render();
 
-    $dateTag = !empty($data['batch_date']) ? str_replace('-', '', $data['batch_date']) : date('Ymd');
-    $fileName = sprintf('protocolo_%s_%d_%s.pdf', $type, $pid, $dateTag);
+    $encounterTag = !empty($data['encounter_id']) ? ('enc_' . $data['encounter_id']) : date('Ymd');
+    $fileName = sprintf('protocolo_%s_%d_%s.pdf', $type, $pid, $encounterTag);
     
     // Servir inline para visualización directa en navegador o iframe
     $dompdf->stream($fileName, [
