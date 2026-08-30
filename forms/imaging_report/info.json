@@ -1,0 +1,21 @@
+{
+  "name": "Informe de Diagnóstico por Imágenes",
+  "directory": "imaging_report",
+  "version": "1.0.0",
+  "author": "Centro Médico Origen",
+  "license": "GNU General Public License 3",
+  "description": "Formulario clínico institucional para informes de diagnóstico por imágenes (Rayos X, TC, RMN, Ecografía, Mamografía, Densitometría) con generación de PDF y vinculación a documentos del paciente.",
+  "category": "Clinical",
+  "type": "encounter_form",
+  "active": true,
+  "requires": {
+    "php": ">=7.4",
+    "dompdf": "^2.0"
+  },
+  "hooks": {
+    "formSubmit": "save.php",
+    "formCreate": "new.php",
+    "formView": "view.php",
+    "formReport": "report.php"
+  }
+}

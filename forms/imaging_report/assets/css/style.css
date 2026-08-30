@@ -1,0 +1,257 @@
+/**
+ * style.css — Estilos complementarios para el formulario
+ * de Diagnóstico por Imágenes de OpenEMR.
+ * Compatible con el tema OpenEMR Bootstrap 5.
+ */
+
+/* ================================================================
+   Variables y reseteos
+================================================================ */
+:root {
+    --ir-primary:    #0f172a;
+    --ir-accent:     #0ea5e9;
+    --ir-accent-dark:#0284c7;
+    --ir-success:    #10b981;
+    --ir-warning:    #f59e0b;
+    --ir-danger:     #ef4444;
+    --ir-surface:    #f8fafc;
+    --ir-border:     #e2e8f0;
+    --ir-text:       #1e293b;
+    --ir-muted:      #64748b;
+    --ir-radius:     12px;
+    --ir-shadow:     0 1px 3px rgba(0,0,0,.07), 0 1px 2px rgba(0,0,0,.04);
+}
+
+/* ================================================================
+   Contenedor general del formulario
+================================================================ */
+.ir-form-wrapper {
+    font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif;
+    background: var(--ir-surface);
+    min-height: 100vh;
+    padding: 24px 16px;
+}
+
+/* ================================================================
+   Cabecera del formulario
+================================================================ */
+.ir-header {
+    background: linear-gradient(135deg, var(--ir-primary) 0%, #1e3a5f 100%);
+    color: #fff;
+    border-radius: var(--ir-radius);
+    padding: 20px 24px;
+    margin-bottom: 20px;
+    box-shadow: var(--ir-shadow);
+}
+
+.ir-header h1 {
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.3px;
+    margin: 0;
+}
+
+.ir-header p {
+    font-size: 13px;
+    color: #94a3b8;
+    margin-top: 4px;
+}
+
+/* ================================================================
+   Tarjetas de sección
+================================================================ */
+.ir-card {
+    background: #fff;
+    border: 1px solid var(--ir-border);
+    border-radius: var(--ir-radius);
+    padding: 22px 24px;
+    margin-bottom: 18px;
+    box-shadow: var(--ir-shadow);
+}
+
+.ir-section-header {
+    background: var(--ir-primary);
+    color: #fff;
+    border-radius: 8px;
+    padding: 9px 14px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    margin-bottom: 16px;
+}
+
+/* ================================================================
+   Campos del formulario
+================================================================ */
+.ir-label {
+    display: block;
+    font-size: 12px;
+    font-weight: 600;
+    color: #475569;
+    margin-bottom: 5px;
+    letter-spacing: 0.02em;
+}
+
+.ir-input,
+.ir-select,
+.ir-textarea {
+    width: 100%;
+    border: 1px solid var(--ir-border);
+    border-radius: 8px;
+    padding: 9px 12px;
+    font-size: 14px;
+    color: var(--ir-text);
+    background: #fff;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    font-family: inherit;
+}
+
+.ir-input:focus,
+.ir-select:focus,
+.ir-textarea:focus {
+    outline: none;
+    border-color: var(--ir-accent);
+    box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.15);
+}
+
+.ir-textarea {
+    resize: vertical;
+    line-height: 1.65;
+    min-height: 90px;
+}
+
+/* ================================================================
+   Botones de plantilla
+================================================================ */
+.ir-tpl-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 5px 13px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid var(--ir-border);
+    background: #f1f5f9;
+    color: #334155;
+    transition: background 0.15s, border-color 0.15s, transform 0.1s;
+    user-select: none;
+}
+
+.ir-tpl-btn:hover {
+    background: #e2e8f0;
+    border-color: #94a3b8;
+    transform: translateY(-1px);
+}
+
+.ir-tpl-btn:active {
+    transform: translateY(0);
+}
+
+/* ================================================================
+   Botones de acción
+================================================================ */
+.ir-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 10px 20px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border: none;
+    text-decoration: none;
+}
+
+.ir-btn-draft {
+    background: #f1f5f9;
+    color: #334155;
+    border: 1px solid var(--ir-border);
+}
+
+.ir-btn-draft:hover {
+    background: #e2e8f0;
+}
+
+.ir-btn-finalize {
+    background: linear-gradient(135deg, var(--ir-accent), var(--ir-accent-dark));
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(14,165,233,.35);
+}
+
+.ir-btn-finalize:hover {
+    background: linear-gradient(135deg, var(--ir-accent-dark), #0369a1);
+    box-shadow: 0 4px 12px rgba(14,165,233,.4);
+    transform: translateY(-1px);
+}
+
+.ir-btn-cancel {
+    background: transparent;
+    color: var(--ir-muted);
+    border: 1px solid var(--ir-border);
+}
+
+.ir-btn-cancel:hover {
+    background: #f1f5f9;
+    color: var(--ir-text);
+}
+
+/* ================================================================
+   Badges de estado
+================================================================ */
+.ir-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.ir-badge-borrador {
+    background: #fef3c7;
+    color: #92400e;
+    border: 1px solid #fcd34d;
+}
+
+.ir-badge-finalizado {
+    background: #d1fae5;
+    color: #065f46;
+    border: 1px solid #6ee7b7;
+}
+
+/* ================================================================
+   Vista de lectura (view.php)
+================================================================ */
+.ir-field-content {
+    background: #f8fafc;
+    border: 1px solid var(--ir-border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-size: 14px;
+    color: var(--ir-text);
+    line-height: 1.75;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.ir-field-title {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ir-muted);
+    margin-bottom: 6px;
+}
+
+/* ================================================================
+   Responsive
+================================================================ */
+@media (max-width: 640px) {
+    .ir-card { padding: 16px; }
+    .ir-btn  { padding: 9px 16px; font-size: 12px; }
+}
