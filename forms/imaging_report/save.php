@@ -223,7 +223,7 @@ function generateAndStorePdf(int $pid, int $formId, array $fields, $session): ?i
     //    bloquea el guardado del informe.
     if ($documentId) {
         try {
-            $dicom = linkPdfToDicomStudy($pid, $documentId, $formId, $fields['modalidad'] ?? '', $pdfOutput);
+            $dicom = linkPdfToDicomStudy($pid, $documentId, $formId, $fields['modalidad'] ?? '', $pdfOutput, $categoryId);
             if (!empty($dicom['study_uid'])) {
                 sqlStatement(
                     "UPDATE form_imaging_report SET study_instance_uid = ?, accession_number = ? WHERE id = ?",
@@ -248,9 +248,17 @@ function generateAndStorePdf(int $pid, int $formId, array $fields, $session): ?i
  *
  * @return array{study_uid:string, accession:string}
  */
-function linkPdfToDicomStudy(int $pid, int $documentId, int $formId, string $modality, string $pdfContent): array
+function linkPdfToDicomStudy(int $pid, int $documentId, int $formId, string $modality, string $pdfContent, ?int $categoryId = null): array
 {
-    $study = resolveStudyInstanceUid($pid, $modality);
+    // Primero se intenta reutilizar el StudyInstanceUID que el cron ya registró
+    // en documents_pacs_sync para la MISMA carpeta/categoría del mismo paciente
+    // (las imágenes JPG/DICOM que comparten carpeta y encuentro). Es la fuente
+    // más fiable: garantiza que el PDF quede en el MISMO estudio que las imágenes
+    // en OHIF/STONE. Solo si no hay registro conocido se recurre a Orthanc.
+    $study = knownStudyForCategory($pid, $categoryId, modalityToDicom($modality));
+    if (empty($study['study_uid'])) {
+        $study = resolveStudyInstanceUid($pid, $modality);
+    }
     $studyUid = $study['study_uid'] ?? '';
     $accession = $study['accession'] ?? '';
 
@@ -278,6 +286,57 @@ function linkPdfToDicomStudy(int $pid, int $documentId, int $formId, string $mod
     }
 
     return ['study_uid' => $studyUid, 'accession' => $accession];
+}
+
+/**
+ * Recupera el StudyInstanceUID que el cron ya registró para esta carpeta/categoría
+ * y paciente en documents_pacs_sync (las imágenes JPG/DICOM del mismo encuentro).
+ * Es más fiable que adivinar por /tools/find porque garantiza que el informe PDF
+ * quede dentro del MISMO estudio que las imágenes en OHIF/STONE.
+ *
+ * Prioriza un estudio cuya modalidad DICOM coincida con la del informe; si no,
+ * devuelve el más recientemente sincronizado de esa categoría.
+ *
+ * @param int    $pid
+ * @param ?int   $categoryId
+ * @param string $dicomModality  Modalidad DICOM objetivo (ej: 'MR', 'CT', 'BMD')
+ * @return array{study_uid:string, accession:string}
+ */
+function knownStudyForCategory(int $pid, ?int $categoryId, string $dicomModality = ''): array
+{
+    if (empty($categoryId) || $categoryId <= 0) {
+        return ['study_uid' => '', 'accession' => ''];
+    }
+
+    $whereMod = '';
+    $bind = [$pid, $categoryId];
+    if ($dicomModality !== '') {
+        $whereMod = ' AND dps.modality = ?';
+        $bind[] = $dicomModality;
+    }
+
+    $row = sqlQuery(
+        "SELECT dps.study_instance_uid
+           FROM documents_pacs_sync dps
+           JOIN categories_to_documents ctd ON ctd.document_id = dps.document_id
+          WHERE dps.patient_id = ?
+            AND ctd.category_id = ?
+            AND dps.study_instance_uid IS NOT NULL
+            AND dps.study_instance_uid != ''
+            AND dps.status = 'synced'{$whereMod}
+          ORDER BY dps.synced_at DESC
+          LIMIT 1",
+        $bind
+    );
+
+    if (empty($row) || empty($row['study_instance_uid'])) {
+        return ['study_uid' => '', 'accession' => ''];
+    }
+
+    return [
+        'study_uid' => (string)$row['study_instance_uid'],
+        'accession' => '',
+    ];
 }
 
 /**
