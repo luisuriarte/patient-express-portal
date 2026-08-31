@@ -327,29 +327,43 @@ while ($row = sqlFetchArray($res)) {
             $parentStudy = findParentStudyForCategory((int)$pid, (int)$row['category_id'], (int)$docId);
         }
 
-        $pdfPayload = [
-            'Tags' => [
-                'PatientID'        => (string)$pid,
-                'PatientName'      => $patientName,
-                'PatientBirthDate' => $dobFormatted,
-                'PatientSex'       => $patientSex,
-                'StudyDescription' => $categoryName,
-                'StudyDate'        => $studyDate,
-                'Modality'         => 'OT', // Other / Encapsulated PDF
-                'SOPClassUID'      => '1.2.840.10008.5.1.4.1.1.104.1', // Encapsulated PDF Storage
-                'SeriesDescription'=> 'Informe de Diagnóstico por Imágenes',
-                'SeriesNumber'     => '1',
-                'InstitutionName'  => defined('CLINIC_NAME') ? CLINIC_NAME : 'Centro Medico Origen',
-                'AccessionNumber'  => 'DOC-' . $docId,
-                'DocumentTitle'    => 'Informe de Diagnóstico por Imágenes'
-            ],
-            'Content' => 'data:application/pdf;base64,' . base64_encode($pdfBinary)
+        // Tags de nivel serie/instancia (pueden enviarse siempre, ya que el PDF
+        // se crea como una serie NUEVA y no entran en conflicto con el padre).
+        $pdfTags = [
+            'Modality'         => 'OT', // Other / Encapsulated PDF
+            'SOPClassUID'      => '1.2.840.10008.5.1.4.1.1.104.1', // Encapsulated PDF Storage
+            'SeriesDescription'=> 'Informe de Diagnóstico por Imágenes',
+            'SeriesNumber'     => '1',
+            'DocumentTitle'    => 'Informe de Diagnóstico por Imágenes'
         ];
 
         // Si hay un estudio de la misma categoría ya sincronizado, adjuntar el
-        // PDF como nueva serie dentro de ESE estudio. Si no, Orthanc crea uno.
+        // PDF como nueva serie dentro de ESE estudio. En ese caso Orthanc hereda
+        // automáticamente del Parent los tags de paciente (PatientID, PatientName,
+        // PatientBirthDate, PatientSex) y de estudio (StudyDescription,
+        // StudyDate, AccessionNumber, InstitutionName); enviarlos con un valor
+        // distinto dispara el error Orthanc 2020 "Trying to override a value
+        // inherited from a parent module". Por eso con Parent NO se envían, y
+        // solo se agregan cuando no hay Parent (creación de estudio nuevo).
         if ($parentStudy !== '') {
-            $pdfPayload['Parent'] = $parentStudy;
+            $pdfPayload = [
+                'Tags'    => $pdfTags,
+                'Parent'  => $parentStudy,
+                'Content' => 'data:application/pdf;base64,' . base64_encode($pdfBinary)
+            ];
+        } else {
+            $pdfTags['PatientID']        = (string)$pid;
+            $pdfTags['PatientName']      = $patientName;
+            $pdfTags['PatientBirthDate'] = $dobFormatted;
+            $pdfTags['PatientSex']       = $patientSex;
+            $pdfTags['StudyDescription'] = $categoryName;
+            $pdfTags['StudyDate']        = $studyDate;
+            $pdfTags['InstitutionName']  = defined('CLINIC_NAME') ? CLINIC_NAME : 'Centro Medico Origen';
+            $pdfTags['AccessionNumber']  = 'DOC-' . $docId;
+            $pdfPayload = [
+                'Tags'    => $pdfTags,
+                'Content' => 'data:application/pdf;base64,' . base64_encode($pdfBinary)
+            ];
         }
 
         $ch = curl_init(rtrim(ORTHANC_URL, '/') . '/tools/create-dicom');

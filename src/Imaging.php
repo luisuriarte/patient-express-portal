@@ -59,6 +59,7 @@ class Imaging
                             d.mimetype,
                             d.name AS doc_name,
                             d.foreign_id AS patient_id,
+                            d.encounter_id,
                             c.id AS category_id,
                             c.name AS category_name,
                             cp.name AS parent_category_name,
@@ -84,6 +85,13 @@ class Imaging
             // carpeta del mismo encuentro, así que vinculamos cada imagen a su
             // informe por categoría.
             $reportsByCategory = $this->getPatientReportsByCategory($pid);
+
+            // Mapa de informes por ENCUENTRO + CATEGORÍA, construido a partir de los
+            // documentos PDF de informe del formulario de imágenes del paciente.
+            // Se usa para vincular el PDF a la tarjeta de imágenes agrupadas por estudio,
+            // sin depender del estado de sincronización PACS ni del study_instance_uid.
+            $reportPdfByEncCat = $this->buildReportsByEncounterCategory($pid);
+            $consumedPdfDocIds = [];
 
             if ($resDocs) {
                 while ($dRow = sqlFetchArray($resDocs)) {
@@ -132,6 +140,8 @@ class Imaging
                                     'first_doc_id'   => (int)$dRow['doc_id'],
                                     'doc_ids'        => [],
                                     'category_label' => $categoryLabel,
+                                    'encounter_id'   => (int)($dRow['encounter_id'] ?? 0),
+                                    'category_id'    => (int)($dRow['category_id'] ?? 0),
                                     'date_raw'       => $docDate,
                                     'formatted_date' => $formattedDate,
                                     'report_doc_id'  => null,
@@ -139,16 +149,11 @@ class Imaging
                                 ];
                             }
                             $groupedStudies[$pacsStudyUid]['doc_ids'][] = (int)$dRow['doc_id'];
-
-                            // Si el documento es el informe PDF del formulario
-                            // (encapsulated/sync con modalidad OT y nombre de informe),
-                            // lo exponemos como "reporte" del estudio para el botón PDF.
-                            $isReportPdf = ($isPdf || str_starts_with($nameLower, 'informe_imagenes_')
-                                || str_contains($nameLower, 'informe_imagen')
-                                || str_contains($dRow['url'], 'Informe_Imagenes'));
-                            if ($isReportPdf && $groupedStudies[$pacsStudyUid]['report_doc_id'] === null) {
-                                $groupedStudies[$pacsStudyUid]['report_doc_id'] = (int)$dRow['doc_id'];
-                                $groupedStudies[$pacsStudyUid]['report_url'] = 'view_document.php?id=' . $dRow['doc_id'];
+                            if ((int)($dRow['encounter_id'] ?? 0) > 0) {
+                                $groupedStudies[$pacsStudyUid]['encounter_id'] = (int)$dRow['encounter_id'];
+                            }
+                            if ((int)($dRow['category_id'] ?? 0) > 0) {
+                                $groupedStudies[$pacsStudyUid]['category_id'] = (int)$dRow['category_id'];
                             }
 
                             // Conservamos la fecha más antigua del grupo como fecha del estudio
@@ -237,7 +242,24 @@ class Imaging
             // study_instance_uid distinto, con todas sus series/imágenes adentro.
             foreach ($groupedStudies as $uid => $group) {
                 $seriesCount = count($group['doc_ids']);
-                $hasReportPdf = !empty($group['report_doc_id']);
+
+                // Vincular el informe (PDF) a la tarjeta por ENCUENTRO + CATEGORÍA,
+                // en lugar de por nombre/study. Así el informe queda con sus imágenes
+                // del mismo encuentro, aunque aún no esté sincronizado en PACS.
+                $repEnc = (int)($group['encounter_id'] ?? 0);
+                $repCat = (int)($group['category_id'] ?? 0);
+                $report = ($repEnc > 0 && $repCat > 0 && isset($reportPdfByEncCat[$repEnc][$repCat]))
+                    ? $reportPdfByEncCat[$repEnc][$repCat]
+                    : null;
+                $hasReportPdf = false;
+                $reportDocId = null;
+                $reportUrl = null;
+                if ($report && (int)$report['doc_id'] > 0) {
+                    $hasReportPdf = true;
+                    $reportDocId = (int)$report['doc_id'];
+                    $reportUrl = 'view_document.php?id=' . $reportDocId;
+                    $consumedPdfDocIds[$reportDocId] = true;
+                }
                 $studies[] = [
                     'id'                => 'study_' . $group['first_doc_id'],
                     'report_id'         => null,
@@ -252,8 +274,8 @@ class Imaging
                     'provider_spec'     => $group['category_label'],
                     'status'            => 'Sincronizado en PACS Orthanc',
                     'has_report'        => $hasReportPdf,
-                    'report_doc_id'     => $group['report_doc_id'],
-                    'report_pdf_url'    => $group['report_url'],
+                    'report_doc_id'     => $reportDocId,
+                    'report_pdf_url'    => $reportUrl,
                     'accession_number'  => 'DOC-' . $group['first_doc_id'],
                     'study_uid'         => $uid,
                     'format_type'       => 'dicom',
@@ -269,6 +291,16 @@ class Imaging
                     'series_count'      => $seriesCount,
                 ];
             }
+        }
+
+        // Quitar de la lista las filas sueltas de PDFs de informe que ya quedaron
+        // vinculadas a una tarjeta de estudio (para no mostrarlas duplicadas).
+        if (!empty($consumedPdfDocIds)) {
+            $studies = array_values(array_filter($studies, function ($s) use ($consumedPdfDocIds) {
+                $docId = (int)($s['doc_id'] ?? 0);
+                $isPdfSuelto = (($s['format_type'] ?? '') === 'pdf') && empty($s['study_uid']);
+                return !($isPdfSuelto && $docId > 0 && isset($consumedPdfDocIds[$docId]));
+            }));
         }
         // =========================================================================
         // 3. Consultar Órdenes e Informes Radiológicos en procedure_order
@@ -858,6 +890,55 @@ class Imaging
                 'title'  => ($titulo !== '' ? $titulo . ' — ' : '') . 'Informe de Diagnóstico por Imágenes',
                 'date'   => (string)($row['fecha_informe'] ?? ''),
             ];
+        }
+        return $map;
+    }
+
+    /**
+     * Construye un mapa de informes (PDF) por ENCUENTRO + CATEGORÍA a partir del
+     * formulario de imágenes (form_imaging_report.pdf_document_id), usando el
+     * encounter_id del documento y la categoría del PDF. Se usa para vincular el
+     * informe a la tarjeta de imágenes agrupadas por estudio.
+     *
+     * @return array [encounter][category] => ['doc_id'=>int, 'name'=>string]
+     */
+    private function buildReportsByEncounterCategory(int $pid): array
+    {
+        $map = [];
+        $result = sqlStatement(
+            "SELECT fir.pdf_document_id AS doc_id,
+                    d.encounter_id,
+                    c.id AS category_id,
+                    c.name AS category_name,
+                    d.name AS doc_name
+               FROM form_imaging_report fir
+               JOIN documents d ON d.id = fir.pdf_document_id
+               LEFT JOIN categories_to_documents ctd ON ctd.document_id = d.id
+               LEFT JOIN categories c ON ctd.category_id = c.id
+              WHERE fir.pid = ?
+                AND fir.pdf_document_id IS NOT NULL
+                AND fir.pdf_document_id > 0
+                AND (fir.activity = 1 OR fir.activity IS NULL)
+                AND (d.deleted = 0 OR d.deleted IS NULL)
+              ORDER BY fir.id DESC",
+            [$pid]
+        );
+        if (!$result) {
+            return $map;
+        }
+        while ($row = sqlFetchArray($result)) {
+            $docId = (int)($row['doc_id'] ?? 0);
+            $enc = (int)($row['encounter_id'] ?? 0);
+            $cat = (int)($row['category_id'] ?? 0);
+            if ($docId <= 0 || $enc <= 0 || $cat <= 0) {
+                continue;
+            }
+            if (!isset($map[$enc][$cat])) {
+                $map[$enc][$cat] = [
+                    'doc_id' => $docId,
+                    'name'   => (string)($row['doc_name'] ?? ''),
+                ];
+            }
         }
         return $map;
     }
