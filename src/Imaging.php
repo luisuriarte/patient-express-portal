@@ -79,6 +79,12 @@ class Imaging
             // Acumulador de estudios DICOM agrupados por study_instance_uid real de PACS
             $groupedStudies = [];
 
+            // Informes (PDF) del formulario de imágenes por carpeta/categoría.
+            // Las imágenes JPG/PNG/DICOM y el PDF del informe viven en la MISMA
+            // carpeta del mismo encuentro, así que vinculamos cada imagen a su
+            // informe por categoría.
+            $reportsByCategory = $this->getPatientReportsByCategory($pid);
+
             if ($resDocs) {
                 while ($dRow = sqlFetchArray($resDocs)) {
                     $docName = !empty($dRow['doc_name']) ? $dRow['doc_name'] : basename((string)$dRow['url']);
@@ -128,9 +134,22 @@ class Imaging
                                     'category_label' => $categoryLabel,
                                     'date_raw'       => $docDate,
                                     'formatted_date' => $formattedDate,
+                                    'report_doc_id'  => null,
+                                    'report_url'     => null,
                                 ];
                             }
                             $groupedStudies[$pacsStudyUid]['doc_ids'][] = (int)$dRow['doc_id'];
+
+                            // Si el documento es el informe PDF del formulario
+                            // (encapsulated/sync con modalidad OT y nombre de informe),
+                            // lo exponemos como "reporte" del estudio para el botón PDF.
+                            $isReportPdf = ($isPdf || str_starts_with($nameLower, 'informe_imagenes_')
+                                || str_contains($nameLower, 'informe_imagen')
+                                || str_contains($dRow['url'], 'Informe_Imagenes'));
+                            if ($isReportPdf && $groupedStudies[$pacsStudyUid]['report_doc_id'] === null) {
+                                $groupedStudies[$pacsStudyUid]['report_doc_id'] = (int)$dRow['doc_id'];
+                                $groupedStudies[$pacsStudyUid]['report_url'] = 'view_document.php?id=' . $dRow['doc_id'];
+                            }
 
                             // Conservamos la fecha más antigua del grupo como fecha del estudio
                             if (strtotime($docDate) < strtotime($groupedStudies[$pacsStudyUid]['date_raw'])) {
@@ -177,6 +196,12 @@ class Imaging
                         $formatType = $isImage ? 'image' : ($isPdf ? 'pdf' : 'standard_file');
                         $viewerType = $isImage ? 'inline_image' : ($isPdf ? 'inline_pdf' : 'download');
 
+                        // Vincular al informe (PDF) de la MISMA carpeta/categoría:
+                        // imágenes y PDF del informe son del mismo encuentro.
+                        $catId = (int)($dRow['category_id'] ?? 0);
+                        $report = $reportsByCategory[$catId] ?? null;
+                        $isReportDocItself = ($report && (int)$report['doc_id'] === (int)$dRow['doc_id']);
+
                         $studies[] = [
                             'id'                => 'doc_' . $dRow['doc_id'],
                             'report_id'         => null,
@@ -189,7 +214,9 @@ class Imaging
                             'provider_name'     => 'Servicio de Diagnóstico por Imágenes',
                             'provider_spec'     => $categoryLabel,
                             'status'            => 'Imagen Disponible',
-                            'has_report'        => false,
+                            'has_report'        => ($report && !$isReportDocItself),
+                            'report_pdf_url'    => ($report && !$isReportDocItself) ? 'view_document.php?id=' . $report['doc_id'] : null,
+                            'report_title'      => $report ? ($report['title'] ?? 'Informe de Diagnóstico por Imágenes') : null,
                             'accession_number'  => 'DOC-' . $dRow['doc_id'],
                             'study_uid'         => null,
                             'format_type'       => $formatType,
@@ -210,6 +237,7 @@ class Imaging
             // study_instance_uid distinto, con todas sus series/imágenes adentro.
             foreach ($groupedStudies as $uid => $group) {
                 $seriesCount = count($group['doc_ids']);
+                $hasReportPdf = !empty($group['report_doc_id']);
                 $studies[] = [
                     'id'                => 'study_' . $group['first_doc_id'],
                     'report_id'         => null,
@@ -223,7 +251,9 @@ class Imaging
                     'provider_name'     => 'Servicio de Diagnóstico por Imágenes',
                     'provider_spec'     => $group['category_label'],
                     'status'            => 'Sincronizado en PACS Orthanc',
-                    'has_report'        => false,
+                    'has_report'        => $hasReportPdf,
+                    'report_doc_id'     => $group['report_doc_id'],
+                    'report_pdf_url'    => $group['report_url'],
                     'accession_number'  => 'DOC-' . $group['first_doc_id'],
                     'study_uid'         => $uid,
                     'format_type'       => 'dicom',
@@ -791,6 +821,45 @@ class Imaging
         }
 
         return $uid;
+    }
+
+    /**
+     * Devuelve los informes (PDF) del formulario de imágenes del paciente,
+     * indexados por categoría (carpeta) destino, para poder vincular cada
+     * imagen del mismo encuentro con su informe.
+     *
+     * @param int $pid
+     * @return array<int, array{doc_id:int,title:string,date:string}>
+     */
+    private function getPatientReportsByCategory(int $pid): array
+    {
+        $map = [];
+        $result = sqlStatement(
+            "SELECT id, pdf_document_id, pdf_category_id, modalidad, fecha_informe, region_anatomica
+               FROM form_imaging_report
+              WHERE pid = ?
+                AND pdf_document_id IS NOT NULL
+                AND pdf_document_id > 0
+                AND (activity = 1 OR activity IS NULL)
+              ORDER BY id DESC",
+            [$pid]
+        );
+        if (!$result) {
+            return $map;
+        }
+        while ($row = sqlFetchArray($result)) {
+            $cat = (int)($row['pdf_category_id'] ?? 0);
+            if ($cat <= 0) {
+                continue;
+            }
+            $titulo = trim((string)($row['region_anatomica'] ?? ''));
+            $map[$cat] = [
+                'doc_id' => (int)$row['pdf_document_id'],
+                'title'  => ($titulo !== '' ? $titulo . ' — ' : '') . 'Informe de Diagnóstico por Imágenes',
+                'date'   => (string)($row['fecha_informe'] ?? ''),
+            ];
+        }
+        return $map;
     }
 
     private function detectModality(string $title): string

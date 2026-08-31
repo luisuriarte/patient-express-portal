@@ -20,10 +20,12 @@ use OpenEMR\Core\OEGlobalsBag;
 
 $srcdir  = OEGlobalsBag::getInstance()->getSrcDir();
 $rootdir = OEGlobalsBag::getInstance()->getString('rootdir');
+$webroot = OEGlobalsBag::getInstance()->getWebRoot();
 $session = SessionWrapperFactory::getInstance()->getActiveSession();
 $pid     = PatientSessionUtil::getPid();
 
 require_once("$srcdir/api.inc.php");
+require_once(__DIR__ . '/category_functions.php');
 
 formHeader("Informe de Diagnóstico por Imágenes — Vista");
 
@@ -152,7 +154,18 @@ $modalidadLabel = $modalidadLabels[$obj['modalidad'] ?? ''] ?? ($obj['modalidad'
     <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm flex flex-wrap gap-3 justify-end">
 
         <?php if (!empty($obj['pdf_document_id'])): ?>
-            <a href="<?= attr($rootdir) ?>/controller.php?document&retrieve&patient_id=<?= attr_url($pid) ?>&document_id=<?= attr_url($obj['pdf_document_id']) ?>"
+            <span class="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm text-slate-600 bg-slate-50 border border-slate-200">
+                <?php if (!empty($obj['pdf_category_id'])): ?>
+                    <?php
+                    $catTree = imaging_get_category_tree();
+                    $catName = imaging_category_name($catTree, (int)$obj['pdf_category_id']);
+                    ?>
+                    📂 Carpeta: <?= $catName !== '' ? text($catName) : '—' ?>
+                <?php else: ?>
+                    📂 Carpeta: automática
+                <?php endif; ?>
+            </span>
+            <a href="<?= attr($webroot) ?>/controller.php?document&retrieve&patient_id=<?= attr_url($pid) ?>&document_id=<?= attr_url($obj['pdf_document_id']) ?>"
                target="_blank"
                class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-teal-600 hover:bg-teal-700 text-white transition-colors shadow-sm">
                 📄 Ver PDF

@@ -303,6 +303,80 @@ while ($row = sqlFetchArray($res)) {
         } else {
             $errorMessage = "Orthanc HTTP {$httpCode}: " . ($curlErr ?: $response);
         }
+    }
+    // ==========================================================================
+    // CASO C: PDF / Informe (Encapsulated PDF) -> subir como DICOM modality OT
+    // ==========================================================================
+    elseif ($ext === 'pdf' || $mimeType === 'application/pdf') {
+        echo "  -> Tipo detectado: PDF Informe (Encapsulated PDF)\n";
+
+        $pdfBinary = $fileContent ?: ($filePath ? file_get_contents($filePath) : null);
+        if (empty($pdfBinary)) {
+            echo "  -> [ERROR] No se pudo leer el contenido del PDF.\n";
+            $failedCount++;
+            continue;
+        }
+
+        // Reusar el StudyInstanceUID de otro documento (imagen/DICOM) ya
+        // sincronizado en la MISMA carpeta/categoría del mismo paciente, para
+        // que el informe quede dentro del mismo estudio que las imágenes.
+        $sharedStudyUid = '';
+        if (!empty($row['category_id'])) {
+            $sharedStudyUid = findSharedStudyUidForCategory((int)$pid, (int)$row['category_id'], (int)$docId);
+        }
+
+        $pdfPayload = [
+            'Tags' => [
+                'PatientID'        => (string)$pid,
+                'PatientName'      => $patientName,
+                'PatientBirthDate' => $dobFormatted,
+                'PatientSex'       => $patientSex,
+                'StudyDescription' => $categoryName,
+                'StudyDate'        => $studyDate,
+                'Modality'         => 'OT', // Other / Encapsulated PDF
+                'InstitutionName'  => defined('CLINIC_NAME') ? CLINIC_NAME : 'Centro Medico Origen',
+                'AccessionNumber'  => 'DOC-' . $docId,
+                'DocumentTitle'    => 'Informe de Diagnóstico por Imágenes'
+            ],
+            'Content' => 'data:application/pdf;base64,' . base64_encode($pdfBinary)
+        ];
+
+        // Solo fijar StudyInstanceUID si pudimos reusar uno de las imágenes;
+        // si no, Orthanc genera uno nuevo automáticamente.
+        if ($sharedStudyUid !== '') {
+            $pdfPayload['Tags']['StudyInstanceUID'] = $sharedStudyUid;
+        }
+
+        $ch = curl_init(rtrim(ORTHANC_URL, '/') . '/tools/create-dicom');
+        curl_setopt_array($ch, [
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => json_encode($pdfPayload),
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+            CURLOPT_USERPWD        => ORTHANC_USER . ':' . ORTHANC_PASS,
+            CURLOPT_TIMEOUT        => 45,
+            CURLOPT_CONNECTTIMEOUT => 5
+        ]);
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $curlErr = curl_error($ch);
+        curl_close($ch);
+
+        if ($httpCode === 200 && $response) {
+            $responseData = json_decode($response, true);
+            $orthancInstanceId = $responseData['ID'] ?? null;
+            $orthancStudyId = $responseData['ParentStudy'] ?? null;
+            $orthancSeriesId = $responseData['ParentSeries'] ?? null;
+
+            if ($orthancInstanceId) {
+                $studyInstanceUid = $sharedStudyUid ?: fetchStudyInstanceUidFromOrthanc($orthancInstanceId);
+            } elseif ($sharedStudyUid) {
+                $studyInstanceUid = $sharedStudyUid;
+            }
+        } else {
+            $errorMessage = "Orthanc HTTP {$httpCode}: " . ($curlErr ?: $response);
+        }
     } else {
         echo "  -> [SKIP] El formato ({$ext} / {$mimeType}) no es una imagen ni archivo DICOM.\n";
         
@@ -430,6 +504,37 @@ function fetchStudyInstanceUidFromOrthanc(string $id): ?string
     }
 
     return null;
+}
+
+/**
+ * Busca un StudyInstanceUID ya usado por otro documento (imagen/DICOM) del
+ * MISMO paciente y la MISMA carpeta/categoría para que el informe PDF quede
+ * dentro del mismo estudio que las imágenes.
+ */
+function findSharedStudyUidForCategory(int $pid, int $categoryId, ?int $excludeDocId = null): string
+{
+    $bind = [$pid, $categoryId];
+    $exclude = '';
+    if ($excludeDocId) {
+        $exclude = ' AND dps.document_id != ?';
+        $bind[] = $excludeDocId;
+    }
+
+    $row = sqlQuery(
+        "SELECT dps.study_instance_uid
+           FROM documents_pacs_sync dps
+           JOIN categories_to_documents ctd ON ctd.document_id = dps.document_id
+          WHERE dps.patient_id = ?
+            AND ctd.category_id = ?
+            AND dps.study_instance_uid IS NOT NULL
+            AND dps.study_instance_uid != ''
+            AND dps.status = 'synced'{$exclude}
+          ORDER BY dps.synced_at DESC
+          LIMIT 1",
+        $bind
+    );
+
+    return $row ? (string)$row['study_instance_uid'] : '';
 }
 
 /**

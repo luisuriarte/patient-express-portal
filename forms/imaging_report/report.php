@@ -95,8 +95,10 @@ function imaging_report_report(int $pid, int $encounter, int $cols, int $id): vo
 
     // Enlace al PDF si existe
     if (!empty($data['pdf_document_id'])) {
-        $rootdir = OEGlobalsBag::getInstance()->getString('rootdir');
-        $pdfUrl  = attr($rootdir . '/controller.php?document&retrieve&patient_id=' . $pid . '&document_id=' . $data['pdf_document_id']);
+        // OJO: controller.php está en la raíz del sitio, NO en /interface.
+        // Por eso se usa getWebRoot() (web root), no rootdir (que incluye /interface).
+        $webroot = OEGlobalsBag::getInstance()->getWebRoot();
+        $pdfUrl  = attr($webroot . '/controller.php?document&retrieve&patient_id=' . $pid . '&document_id=' . $data['pdf_document_id']);
         echo '<tr>';
         echo '<td colspan="4" style="padding:8px 10px;">';
         echo '<a href="' . $pdfUrl . '" target="_blank" style="color:#0ea5e9;font-weight:600;font-size:12px;">📄 Ver Informe PDF Completo</a>';

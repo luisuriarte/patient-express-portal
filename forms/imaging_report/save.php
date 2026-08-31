@@ -26,6 +26,7 @@ $userauthorized = PatientSessionUtil::getUserAuthorized();
 
 require_once("$srcdir/api.inc.php");
 require_once("$srcdir/forms.inc.php");
+require_once(__DIR__ . '/category_functions.php');
 
 // Verificación CSRF
 CsrfUtils::checkCsrfInput(INPUT_POST, dieOnFail: true);
@@ -49,6 +50,7 @@ $fields = [
     'observaciones'        => trim((string)($_POST['observaciones'] ?? '')),
     'estado'               => ($accion === 'finalizar') ? 'finalizado' : 'borrador',
     'fecha_informe'        => $_POST['fecha_informe'] ?: date('Y-m-d'),
+    'pdf_category_id'      => ((int)($_POST['category_id'] ?? 0)) ?: null,
 ];
 
 // ============================================================
@@ -189,7 +191,10 @@ function generateAndStorePdf(int $pid, int $formId, array $fields, $session): ?i
     //    CouchDB o almacenamiento remoto según la configuración), encriptarlo si
     //    corresponde, generar hash/uuid, e indexarlo en `documents` y
     //    `categories_to_documents`. Devuelve '' en caso de éxito.
-    $categoryId = resolveImagingCategoryId();
+    //    La carpeta destino la eligió el técnico en el formulario (category_id);
+    //    si no es válida o falta, se usa la automática según modalidad.
+    $userCategoryId = (int)($fields['pdf_category_id'] ?? 0);
+    $categoryId = imaging_resolve_category_id($userCategoryId, $fields['modalidad'] ?? '');
 
     $pdfFileName = 'Informe_Imagenes_' . $formId . '_' . date('Ymd_His') . '.pdf';
 
@@ -208,28 +213,209 @@ function generateAndStorePdf(int $pid, int $formId, array $fields, $session): ?i
         throw new \RuntimeException('Error guardando el documento: ' . $ret);
     }
 
-    return (int)$doc->get_id() ?: null;
+    $documentId = (int)$doc->get_id();
+
+    // 4. Vincular el informe al estudio DICOM del flujo previo de la orden:
+    //    se resuelve el StudyInstanceUID del paciente en Orthanc (según modalidad)
+    //    y se guarda en el formulario. Además se sube el PDF como "Encapsulated
+    //    PDF" al mismo estudio para que el médico lo vea junto a las series en
+    //    OHIF / Workstation. Todo es opcional: si Orthanc no responde no se
+    //    bloquea el guardado del informe.
+    if ($documentId) {
+        try {
+            $dicom = linkPdfToDicomStudy($pid, $documentId, $formId, $fields['modalidad'] ?? '', $pdfOutput);
+            if (!empty($dicom['study_uid'])) {
+                sqlStatement(
+                    "UPDATE form_imaging_report SET study_instance_uid = ?, accession_number = ? WHERE id = ?",
+                    [$dicom['study_uid'], $dicom['accession'] ?: null, $formId]
+                );
+            }
+        } catch (\Throwable $e) {
+            error_log("[imaging_report/save.php] Error vinculando a DICOM/Orthanc: " . $e->getMessage());
+        }
+    }
+
+    return $documentId ?: null;
 }
 
 /**
- * Encuentra la categoría de "Imaging" / "Diagnóstico por Imágenes",
- * creándola como nodo hijo de la raíz si no existe (manteniendo el
- * árbol MPTT de OpenEMR). Devuelve el id de categoría.
+ * Resuelve el StudyInstanceUID del estudio del paciente desde Orthanc y, si hay
+ * contenido PDF, lo sube como Encapsulated PDF al mismo estudio.
+ *
+ * La vinculación se hace con el "flujo previo de la orden": se listan los
+ * estudios del paciente en Orthanc y se elige el más reciente, priorizando el
+ * que coincida con la modalidad del informe.
+ *
+ * @return array{study_uid:string, accession:string}
  */
-function resolveImagingCategoryId(): int
+function linkPdfToDicomStudy(int $pid, int $documentId, int $formId, string $modality, string $pdfContent): array
 {
-    $cat = sqlQuery(
-        "SELECT id FROM categories WHERE name = ? OR name LIKE '%Imag%' OR name LIKE '%Radiolog%' ORDER BY id LIMIT 1",
-        ['Diagnóstico por Imágenes']
-    );
-    if (!empty($cat['id'])) {
-        return (int)$cat['id'];
+    $study = resolveStudyInstanceUid($pid, $modality);
+    $studyUid = $study['study_uid'] ?? '';
+    $accession = $study['accession'] ?? '';
+
+    if ($studyUid !== '') {
+        // Registrar el mapeo en documents_pacs_sync para que el portal/OHIF
+        // conozcan el estudio del PDF. Se marca como 'synced' (el PDF ya está
+        // en OpenEMR; el vínculo es de referencia del estudio DICOM).
+        try {
+            sqlStatement(
+                "INSERT INTO documents_pacs_sync
+                    (document_id, patient_id, study_instance_uid, modality, status, synced_at)
+                 VALUES (?, ?, ?, ?, 'synced', NOW())
+                 ON DUPLICATE KEY UPDATE study_instance_uid = VALUES(study_instance_uid),
+                    modality = VALUES(modality), status = 'synced'",
+                [$documentId, $pid, $studyUid, modalityToDicom($modality)]
+            );
+        } catch (\Throwable $e) {
+            error_log("[imaging_report/save.php] No se pudo registrar documents_pacs_sync: " . $e->getMessage());
+        }
+
+        // Subir el PDF a Orthanc como Encapsulated PDF asociado al estudio.
+        if (!empty($pdfContent)) {
+            uploadEncapsulatedPdfToOrthanc($pdfContent, $pid, $studyUid, $modality, (string)$formId);
+        }
     }
 
-    // Crear la categoría bajo la raíz (id = 1 "Categories") usando la clase
-    // CategoryTree, que mantiene correctamente los valores lft/rght (MPTT).
-    $categoryTree = new \CategoryTree(1);
-    $newId = $categoryTree->add_node(1, 'Diagnóstico por Imágenes', 'imaging', 'patients|docs', '');
-
-    return (int)$newId;
+    return ['study_uid' => $studyUid, 'accession' => $accession];
 }
+
+/**
+ * Lista los estudios de un paciente en Orthanc vía REST (/tools/find) y elige
+ * el más reciente, priorizando el que coincida con la modalidad.
+ */
+function resolveStudyInstanceUid(int $pid, string $modality): array
+{
+    $orthancUrl  = getenv('ORTHANC_URL') ?: 'http://127.0.0.1:8042';
+    $orthancUser = getenv('ORTHANC_USER') ?: 'orthanc';
+    $orthancPass = getenv('ORTHANC_PASS') ?: 'orthanc';
+    $dicomModality = modalityToDicom($modality);
+
+    $pidStr = (string)$pid;
+    $idsToSearch = array_unique([
+        $pidStr,
+        (string)ltrim($pidStr, '0'),
+        (string)str_pad($pidStr, 4, '0', STR_PAD_LEFT),
+        (string)str_pad($pidStr, 6, '0', STR_PAD_LEFT),
+        (string)str_pad($pidStr, 8, '0', STR_PAD_LEFT)
+    ]);
+
+    $found = [];
+    foreach ($idsToSearch as $idVal) {
+        try {
+            $ch = curl_init(rtrim($orthancUrl, '/') . '/tools/find');
+            curl_setopt_array($ch, [
+                CURLOPT_URL            => rtrim($orthancUrl, '/') . '/tools/find',
+                CURLOPT_POST           => true,
+                CURLOPT_POSTFIELDS     => json_encode([
+                    'Level'  => 'Study',
+                    'Query'  => ['PatientID' => (string)$idVal],
+                    'Expand' => true
+                ]),
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+                CURLOPT_USERPWD        => "{$orthancUser}:{$orthancPass}",
+                CURLOPT_TIMEOUT        => 5,
+                CURLOPT_CONNECTTIMEOUT => 2
+            ]);
+            $response = curl_exec($ch);
+            $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+            curl_close($ch);
+
+            if ($httpCode !== 200 || empty($response)) {
+                continue;
+            }
+            foreach ((json_decode($response, true) ?: []) as $study) {
+                $tags = $study['MainDicomTags'] ?? [];
+                $mods = $tags['ModalitiesInStudy'] ?? ($tags['Modality'] ?? '');
+                $found[] = [
+                    'uid'       => (string)($tags['StudyInstanceUID'] ?? ''),
+                    'accession' => (string)($tags['AccessionNumber'] ?? ''),
+                    'modality'  => is_array($mods) ? implode(',', array_map('strval', $mods)) : (string)$mods,
+                    'date'      => substr((string)($tags['StudyDate'] ?? ''), 0, 8),
+                ];
+            }
+        } catch (\Throwable $e) {
+            error_log("[imaging_report/save.php] Aviso Orthanc (find): " . $e->getMessage());
+        }
+    }
+
+    if (empty($found)) {
+        return ['study_uid' => '', 'accession' => ''];
+    }
+
+    // Priorizar estudio que coincida con la modalidad del informe.
+    if ($dicomModality !== '') {
+        foreach ($found as $s) {
+            if (stripos($s['modality'], $dicomModality) !== false) {
+                return ['study_uid' => $s['uid'], 'accession' => $s['accession']];
+            }
+        }
+    }
+
+    // Fallback: el más reciente.
+    usort($found, function ($a, $b) {
+        return strcmp((string)($b['date'] ?? ''), (string)($a['date'] ?? ''));
+    });
+    $best = $found[0];
+    return ['study_uid' => $best['uid'], 'accession' => $best['accession']];
+}
+
+/**
+ * Sube un PDF a Orthanc como "Encapsulated PDF" (modality OT) dentro del estudio
+ * indicado, vía el endpoint REST /tools/create-dicom.
+ */
+function uploadEncapsulatedPdfToOrthanc(string $pdfContent, int $pid, string $studyUid, string $modality, string $refId): bool
+{
+    $orthancUrl  = getenv('ORTHANC_URL') ?: 'http://127.0.0.1:8042';
+    $orthancUser = getenv('ORTHANC_USER') ?: 'orthanc';
+    $orthancPass = getenv('ORTHANC_PASS') ?: 'orthanc';
+
+    $payload = json_encode([
+        'Tags' => [
+            'PatientID'         => (string)$pid,
+            'StudyInstanceUID'  => $studyUid,
+            'Modality'          => 'OT', // Other / Encapsulated PDF
+            'DocumentTitle'     => 'Informe de Diagnóstico por Imágenes (# ' . $refId . ')',
+        ],
+        'Content' => 'data:application/pdf;base64,' . base64_encode($pdfContent)
+    ]);
+
+    $ch = curl_init(rtrim($orthancUrl, '/') . '/tools/create-dicom');
+    curl_setopt_array($ch, [
+        CURLOPT_POST           => true,
+        CURLOPT_POSTFIELDS     => $payload,
+        CURLOPT_RETURNTRANSFER => true,
+        CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
+        CURLOPT_USERPWD        => "{$orthancUser}:{$orthancPass}",
+        CURLOPT_TIMEOUT        => 15,
+        CURLOPT_CONNECTTIMEOUT => 5
+    ]);
+    $response = curl_exec($ch);
+    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    if ($httpCode >= 200 && $httpCode < 300) {
+        return true;
+    }
+    error_log("[imaging_report/save.php] Orthanc create-dicom falló (HTTP $httpCode): " . substr((string)$response, 0, 300));
+    return false;
+}
+
+/**
+ * Traduce la modalidad del formulario a modalidad DICOM (para match y tags).
+ */
+function modalityToDicom(string $modalidad): string
+{
+    return match ($modalidad) {
+        'RX'   => 'DX',
+        'TC'   => 'CT',
+        'RMN'  => 'MR',
+        'US'   => 'US',
+        'MG'   => 'MG',
+        'DEXA' => 'BMD',
+        'OT'   => 'OT',
+        default => 'OT',
+    };
+}
+

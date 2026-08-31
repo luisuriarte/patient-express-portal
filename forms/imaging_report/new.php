@@ -61,6 +61,15 @@ $modalidades = [
     'DEXA' => 'Densitometría Ósea (DEXA)',
     'OT'  => 'Otro / No especificado',
 ];
+
+// Árbol de categorías de documentos de pacientes (selector de carpeta destino)
+require_once(__DIR__ . '/category_functions.php');
+$categoryTree = imaging_get_category_tree();
+$selectedCategoryId = (int)($obj['pdf_category_id'] ?? 0);
+if ($selectedCategoryId <= 0) {
+    $selectedCategoryId = imaging_default_category_id($obj['modalidad'] ?? '');
+}
+$categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategoryId, $selectedCategoryId);
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -87,6 +96,19 @@ $modalidades = [
         .btn-finalize:hover { background: linear-gradient(135deg, #0284c7, #0369a1); }
         .badge-borrador { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
         .badge-finalizado { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+        /* ---- Árbol de categorías ---- */
+        .imr-tree-container { border: 1px solid #dbe2ec; border-radius: 10px; max-height: 320px; overflow-y: auto; background: #fff; }
+        .imr-tree-empty { padding: 16px; color: #64748b; font-size: 13px; }
+        .imr-tree-node { display: flex; align-items: center; gap: 6px; padding: 7px 12px; cursor: pointer; border-bottom: 1px solid #f1f5f9; transition: background 0.15s; font-size: 13px; color: #334155; }
+        .imr-tree-node:hover { background: #f8fafc; }
+        .imr-tree-node.imr-selected { background: #eff6ff; color: #1d4ed8; font-weight: 600; border-left: 3px solid #3b82f6; }
+        .imr-tree-toggle { width: 14px; color: #94a3b8; font-size: 11px; display: inline-flex; transition: transform 0.15s; }
+        .imr-tree-toggle.imr-collapsed { transform: rotate(-90deg); }
+        .imr-tree-toggle.imr-hidden-toggle { visibility: hidden; }
+        .imr-tree-icon { color: #f59e0b; width: 16px; text-align: center; }
+        .imr-tree-children.imr-hidden { display: none; }
+        .imr-selection-display { margin-top: 10px; padding: 8px 12px; border-radius: 8px; border: 1px dashed #cbd5e1; font-size: 13px; min-height: 38px; display: flex; align-items: center; color: #64748b; }
+        .imr-selection-display.imr-has-selection { border-color: #3b82f6; background: #f0f7ff; color: #1e40af; font-weight: 500; }
     </style>
 </head>
 <body>
@@ -127,6 +149,7 @@ $modalidades = [
 
         <input type="hidden" name="csrf_token_form" value="<?= CsrfUtils::collectCsrfToken(session: $session) ?>">
         <input type="hidden" name="accion" value="borrador" id="input_accion">
+        <input type="hidden" name="category_id" id="input_category_id" value="<?= attr($selectedCategoryId) ?>">
 
         <!-- Sección 1: Datos del Estudio -->
         <div class="bg-white rounded-2xl border border-slate-200 p-6 mb-5 shadow-sm">
@@ -214,6 +237,19 @@ $modalidades = [
                       placeholder="Recomendaciones de seguimiento, correlación clínica, estudios adicionales..."><?= text($obj['observaciones'] ?? '') ?></textarea>
         </div>
 
+        <!-- Sección 6: Carpeta destino del PDF -->
+        <div class="bg-white rounded-2xl border border-slate-200 p-6 mb-5 shadow-sm">
+            <div class="section-header">📂 Carpeta Destino del PDF</div>
+            <label class="form-label">Seleccioná la carpeta donde se guardará el PDF en el legajo (Documentos del paciente)</label>
+            <div class="imr-tree-container" id="categoryTree">
+                <?= $categoryTreeHtml ?>
+            </div>
+            <div class="imr-selection-display<?= $selectedCategoryId > 0 ? ' imr-has-selection' : '' ?>" id="selectionDisplay">
+                <?= $selectedCategoryId > 0 ? '📁 ' . text(imaging_category_name($categoryTree, $selectedCategoryId)) : '— No se seleccionó carpeta (se usará la automática) —' ?>
+            </div>
+            <p class="text-xs text-slate-400 mt-2"><?= text('Si no se elige carpeta, se usará la categoría automática según la modalidad (ej: RMN → Resonancia Magnética).') ?></p>
+        </div>
+
         <!-- Botones de acción -->
         <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
             <button type="button" class="btn-cancel inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-colors">
@@ -234,7 +270,7 @@ $modalidades = [
     </form>
 </div>
 
-<script src="assets/js/templates.js"></script>
+<script src="<?= attr($rootdir) ?>/forms/imaging_report/assets/js/templates.js"></script>
 <script>
 // ============================================================
 // Botones de acción
@@ -270,23 +306,77 @@ document.querySelector('.btn-cancel').addEventListener('click', function() {
 // ============================================================
 // Botones de plantilla rápida
 // ============================================================
-document.querySelectorAll('.template-btn').forEach(function(btn) {
-    btn.addEventListener('click', function() {
-        const tpl = this.getAttribute('data-tpl');
-        if (typeof IMAGING_TEMPLATES !== 'undefined' && IMAGING_TEMPLATES[tpl]) {
-            const t = IMAGING_TEMPLATES[tpl];
+function applyImagingTemplate(tpl) {
+    if (typeof IMAGING_TEMPLATES === 'undefined' || !IMAGING_TEMPLATES[tpl]) {
+        console.warn('[imaging_report] Plantilla no disponible:', tpl);
+        return;
+    }
+    const t = IMAGING_TEMPLATES[tpl];
 
-            // Seleccionar la modalidad correspondiente
-            const modalidadSelect = document.getElementById('modalidad');
-            modalidadSelect.value = tpl;
+    // Seleccionar la modalidad correspondiente
+    const modalidadSelect = document.getElementById('modalidad');
+    if (modalidadSelect) modalidadSelect.value = tpl;
 
-            if (t.metodologia) document.getElementById('metodologia').value = t.metodologia;
-            if (t.interpretacion) document.getElementById('interpretacion').value = t.interpretacion;
-            if (t.conclusion) document.getElementById('conclusion').value = t.conclusion;
-            if (t.observaciones) document.getElementById('observaciones').value = t.observaciones;
+    if (t.metodologia)  document.getElementById('metodologia').value  = t.metodologia;
+    if (t.interpretacion) document.getElementById('interpretacion').value = t.interpretacion;
+    if (t.conclusion)   document.getElementById('conclusion').value   = t.conclusion;
+    if (t.observaciones) document.getElementById('observaciones').value = t.observaciones;
+}
+
+// Delegación de eventos: funciona aunque los botones se re-rendericen
+document.addEventListener('click', function (e) {
+    const btn = e.target.closest('.template-btn');
+    if (!btn) return;
+    applyImagingTemplate(btn.getAttribute('data-tpl'));
+});
+
+// ============================================================
+// Selector de carpeta (árbol de categorías)
+// ============================================================
+(function () {
+    const tree = document.getElementById('categoryTree');
+    const hidden = document.getElementById('input_category_id');
+    const display = document.getElementById('selectionDisplay');
+
+    function setSelection(id, name) {
+        hidden.value = id;
+        display.textContent = '📁 ' + name;
+        display.classList.add('imr-has-selection');
+        tree.querySelectorAll('.imr-tree-node.imr-selected').forEach(function (n) {
+            n.classList.remove('imr-selected');
+        });
+        const node = tree.querySelector('.imr-tree-node[data-id="' + id + '"]');
+        if (node) node.classList.add('imr-selected');
+    }
+
+    tree.addEventListener('click', function (e) {
+        const node = e.target.closest('.imr-tree-node');
+        if (!node) return;
+        const id = Number(node.getAttribute('data-id'));
+        const name = node.getAttribute('data-name');
+        const hasChildren = node.classList.contains('imr-has-children');
+
+        if (hasChildren) {
+            const children = document.getElementById('imr-children-' + id);
+            const toggle = node.querySelector('.imr-tree-toggle');
+            if (children) {
+                const hiddenNow = children.classList.toggle('imr-hidden');
+                toggle && toggle.classList.toggle('imr-collapsed', hiddenNow);
+            }
+        }
+
+        // Una carpeta con hijos también puede ser el destino seleccionado.
+        setSelection(id, name);
+    });
+
+    // Accesibilidad: permitir seleccionar con Enter/Espacio.
+    tree.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+            const node = e.target.closest('.imr-tree-node');
+            if (node) { e.preventDefault(); node.click(); }
         }
     });
-});
+})();
 </script>
 </body>
 </html>
