@@ -261,6 +261,7 @@ function linkPdfToDicomStudy(int $pid, int $documentId, int $formId, string $mod
     }
     $studyUid = $study['study_uid'] ?? '';
     $accession = $study['accession'] ?? '';
+    $parentStudy = (string)($study['orthanc_study_id'] ?? '');
 
     if ($studyUid !== '') {
         // Registrar el mapeo en documents_pacs_sync para que el portal/OHIF
@@ -281,7 +282,7 @@ function linkPdfToDicomStudy(int $pid, int $documentId, int $formId, string $mod
 
         // Subir el PDF a Orthanc como Encapsulated PDF asociado al estudio.
         if (!empty($pdfContent)) {
-            uploadEncapsulatedPdfToOrthanc($pdfContent, $pid, $studyUid, $modality, (string)$formId);
+            uploadEncapsulatedPdfToOrthanc($pdfContent, $pid, $parentStudy, $modality, (string)$formId);
         }
     }
 
@@ -316,7 +317,7 @@ function knownStudyForCategory(int $pid, ?int $categoryId, string $dicomModality
     }
 
     $row = sqlQuery(
-        "SELECT dps.study_instance_uid
+        "SELECT dps.study_instance_uid, dps.orthanc_study_id
            FROM documents_pacs_sync dps
            JOIN categories_to_documents ctd ON ctd.document_id = dps.document_id
           WHERE dps.patient_id = ?
@@ -330,12 +331,13 @@ function knownStudyForCategory(int $pid, ?int $categoryId, string $dicomModality
     );
 
     if (empty($row) || empty($row['study_instance_uid'])) {
-        return ['study_uid' => '', 'accession' => ''];
+        return ['study_uid' => '', 'accession' => '', 'orthanc_study_id' => ''];
     }
 
     return [
-        'study_uid' => (string)$row['study_instance_uid'],
-        'accession' => '',
+        'study_uid'        => (string)$row['study_instance_uid'],
+        'accession'        => '',
+        'orthanc_study_id' => (string)($row['orthanc_study_id'] ?? ''),
     ];
 }
 
@@ -423,22 +425,36 @@ function resolveStudyInstanceUid(int $pid, string $modality): array
 /**
  * Sube un PDF a Orthanc como "Encapsulated PDF" (modality OT) dentro del estudio
  * indicado, vía el endpoint REST /tools/create-dicom.
+ *
+ * Para adjuntarlo a un estudio EXISTENTE se usa el campo "Parent" con el
+ * orthanc_study_id (id interno), NO StudyInstanceUID, que dispara el error
+ * Orthanc 2020 "Trying to override a value inherited from a parent module".
+ * Si $parentStudy es vacío, Orthanc crea un estudio nuevo.
  */
-function uploadEncapsulatedPdfToOrthanc(string $pdfContent, int $pid, string $studyUid, string $modality, string $refId): bool
+function uploadEncapsulatedPdfToOrthanc(string $pdfContent, int $pid, string $parentStudy, string $modality, string $refId): bool
 {
     $orthancUrl  = getenv('ORTHANC_URL') ?: 'http://127.0.0.1:8042';
     $orthancUser = getenv('ORTHANC_USER') ?: 'orthanc';
     $orthancPass = getenv('ORTHANC_PASS') ?: 'orthanc';
 
-    $payload = json_encode([
-        'Tags' => [
-            'PatientID'         => (string)$pid,
-            'StudyInstanceUID'  => $studyUid,
-            'Modality'          => 'OT', // Other / Encapsulated PDF
-            'DocumentTitle'     => 'Informe de Diagnóstico por Imágenes (# ' . $refId . ')',
-        ],
+    $tags = [
+        'PatientID'        => (string)$pid,
+        'Modality'         => 'OT', // Other / Encapsulated PDF
+        'SOPClassUID'      => '1.2.840.10008.5.1.4.1.1.104.1', // Encapsulated PDF Storage
+        'SeriesDescription'=> 'Informe de Diagnóstico por Imágenes',
+        'SeriesNumber'     => '1',
+        'DocumentTitle'    => 'Informe de Diagnóstico por Imágenes (# ' . $refId . ')',
+        'AccessionNumber'  => 'DOC-' . $refId,
+    ];
+
+    $payloadArr = [
+        'Tags'    => $tags,
         'Content' => 'data:application/pdf;base64,' . base64_encode($pdfContent)
-    ]);
+    ];
+    if ($parentStudy !== '') {
+        $payloadArr['Parent'] = $parentStudy;
+    }
+    $payload = json_encode($payloadArr);
 
     $ch = curl_init(rtrim($orthancUrl, '/') . '/tools/create-dicom');
     curl_setopt_array($ch, [

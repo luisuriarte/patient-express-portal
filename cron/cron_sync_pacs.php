@@ -317,12 +317,14 @@ while ($row = sqlFetchArray($res)) {
             continue;
         }
 
-        // Reusar el StudyInstanceUID de otro documento (imagen/DICOM) ya
-        // sincronizado en la MISMA carpeta/categoría del mismo paciente, para
-        // que el informe quede dentro del mismo estudio que las imágenes.
-        $sharedStudyUid = '';
+        // Adjuntar el informe PDF como Encapsulated PDF al MISMO estudio que las
+        // imágenes de la MISMA carpeta/categoría del mismo paciente. Para eso se
+        // usa el "Parent" (orthanc_study_id interno), NO StudyInstanceUID, que
+        // dispara el error Orthanc 2020 "Trying to override a value inherited
+        // from a parent module".
+        $parentStudy = '';
         if (!empty($row['category_id'])) {
-            $sharedStudyUid = findSharedStudyUidForCategory((int)$pid, (int)$row['category_id'], (int)$docId);
+            $parentStudy = findParentStudyForCategory((int)$pid, (int)$row['category_id'], (int)$docId);
         }
 
         $pdfPayload = [
@@ -334,6 +336,9 @@ while ($row = sqlFetchArray($res)) {
                 'StudyDescription' => $categoryName,
                 'StudyDate'        => $studyDate,
                 'Modality'         => 'OT', // Other / Encapsulated PDF
+                'SOPClassUID'      => '1.2.840.10008.5.1.4.1.1.104.1', // Encapsulated PDF Storage
+                'SeriesDescription'=> 'Informe de Diagnóstico por Imágenes',
+                'SeriesNumber'     => '1',
                 'InstitutionName'  => defined('CLINIC_NAME') ? CLINIC_NAME : 'Centro Medico Origen',
                 'AccessionNumber'  => 'DOC-' . $docId,
                 'DocumentTitle'    => 'Informe de Diagnóstico por Imágenes'
@@ -341,10 +346,10 @@ while ($row = sqlFetchArray($res)) {
             'Content' => 'data:application/pdf;base64,' . base64_encode($pdfBinary)
         ];
 
-        // Solo fijar StudyInstanceUID si pudimos reusar uno de las imágenes;
-        // si no, Orthanc genera uno nuevo automáticamente.
-        if ($sharedStudyUid !== '') {
-            $pdfPayload['Tags']['StudyInstanceUID'] = $sharedStudyUid;
+        // Si hay un estudio de la misma categoría ya sincronizado, adjuntar el
+        // PDF como nueva serie dentro de ESE estudio. Si no, Orthanc crea uno.
+        if ($parentStudy !== '') {
+            $pdfPayload['Parent'] = $parentStudy;
         }
 
         $ch = curl_init(rtrim(ORTHANC_URL, '/') . '/tools/create-dicom');
@@ -370,9 +375,7 @@ while ($row = sqlFetchArray($res)) {
             $orthancSeriesId = $responseData['ParentSeries'] ?? null;
 
             if ($orthancInstanceId) {
-                $studyInstanceUid = $sharedStudyUid ?: fetchStudyInstanceUidFromOrthanc($orthancInstanceId);
-            } elseif ($sharedStudyUid) {
-                $studyInstanceUid = $sharedStudyUid;
+                $studyInstanceUid = fetchStudyInstanceUidFromOrthanc($orthancInstanceId);
             }
         } else {
             $errorMessage = "Orthanc HTTP {$httpCode}: " . ($curlErr ?: $response);
@@ -507,11 +510,15 @@ function fetchStudyInstanceUidFromOrthanc(string $id): ?string
 }
 
 /**
- * Busca un StudyInstanceUID ya usado por otro documento (imagen/DICOM) del
- * MISMO paciente y la MISMA carpeta/categoría para que el informe PDF quede
- * dentro del mismo estudio que las imágenes.
+ * Busca el identificador interno de Orthanc (orthanc_study_id) de un estudio ya
+ * sincronizado por otro documento (imagen/DICOM) del MISMO paciente y la MISMA
+ * carpeta/categoría. Se usa como "Parent" en /tools/create-dicom para que el
+ * informe PDF quede DENTRO del mismo estudio que las imágenes en OHIF/STONE
+ * (passing StudyInstanceUID directamente provoca el error Orthanc 2020).
+ *
+ * @return string Orthanc study ID, o '' si no hay ninguno sincronizado aún.
  */
-function findSharedStudyUidForCategory(int $pid, int $categoryId, ?int $excludeDocId = null): string
+function findParentStudyForCategory(int $pid, int $categoryId, ?int $excludeDocId = null): string
 {
     $bind = [$pid, $categoryId];
     $exclude = '';
@@ -521,20 +528,20 @@ function findSharedStudyUidForCategory(int $pid, int $categoryId, ?int $excludeD
     }
 
     $row = sqlQuery(
-        "SELECT dps.study_instance_uid
+        "SELECT dps.orthanc_study_id
            FROM documents_pacs_sync dps
            JOIN categories_to_documents ctd ON ctd.document_id = dps.document_id
           WHERE dps.patient_id = ?
             AND ctd.category_id = ?
-            AND dps.study_instance_uid IS NOT NULL
-            AND dps.study_instance_uid != ''
+            AND dps.orthanc_study_id IS NOT NULL
+            AND dps.orthanc_study_id != ''
             AND dps.status = 'synced'{$exclude}
           ORDER BY dps.synced_at DESC
           LIMIT 1",
         $bind
     );
 
-    return $row ? (string)$row['study_instance_uid'] : '';
+    return $row ? (string)$row['orthanc_study_id'] : '';
 }
 
 /**
