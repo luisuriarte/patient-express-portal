@@ -60,6 +60,7 @@ class Imaging
                             d.name AS doc_name,
                             d.foreign_id AS patient_id,
                             d.encounter_id,
+                            fe.date AS encounter_date,
                             c.id AS category_id,
                             c.name AS category_name,
                             cp.name AS parent_category_name,
@@ -70,6 +71,7 @@ class Imaging
                         INNER JOIN categories c ON ctd.category_id = c.id
                         LEFT JOIN categories cp ON c.parent = cp.id
                         LEFT JOIN documents_pacs_sync dps ON d.id = dps.document_id
+                        LEFT JOIN form_encounter fe ON fe.pid = d.foreign_id AND fe.encounter = d.encounter_id
                         WHERE d.foreign_id = ? 
                         AND (d.deleted = 0 OR d.deleted IS NULL)
                         AND ctd.category_id IN ($placeholders)
@@ -128,6 +130,14 @@ class Imaging
                     $docDate = $dRow['docdate'] ?: ($dRow['doc_date'] ? date('Y-m-d', strtotime($dRow['doc_date'])) : date('Y-m-d'));
                     $formattedDate = date('d/m/Y', strtotime($docDate));
 
+                    // Encuentro del documento y fecha del encuentro (para mostrarlo
+                    // en el listado de forma similar a los resultados de laboratorio)
+                    $encId = (int)($dRow['encounter_id'] ?? 0);
+                    $encDateDisplay = '';
+                    if (!empty($dRow['encounter_date']) && $dRow['encounter_date'] !== '0000-00-00') {
+                        $encDateDisplay = date('d/m/Y', strtotime((string)$dRow['encounter_date']));
+                    }
+
                     $viewUrl = 'view_document.php?id=' . $dRow['doc_id'];
                     $downloadUrl = 'view_document.php?id=' . $dRow['doc_id'] . '&download=1';
 
@@ -141,6 +151,7 @@ class Imaging
                                     'doc_ids'        => [],
                                     'category_label' => $categoryLabel,
                                     'encounter_id'   => (int)($dRow['encounter_id'] ?? 0),
+                                    'encounter_date' => $encDateDisplay,
                                     'category_id'    => (int)($dRow['category_id'] ?? 0),
                                     'date_raw'       => $docDate,
                                     'formatted_date' => $formattedDate,
@@ -151,6 +162,9 @@ class Imaging
                             $groupedStudies[$pacsStudyUid]['doc_ids'][] = (int)$dRow['doc_id'];
                             if ((int)($dRow['encounter_id'] ?? 0) > 0) {
                                 $groupedStudies[$pacsStudyUid]['encounter_id'] = (int)$dRow['encounter_id'];
+                                if ($encDateDisplay !== '') {
+                                    $groupedStudies[$pacsStudyUid]['encounter_date'] = $encDateDisplay;
+                                }
                             }
                             if ((int)($dRow['category_id'] ?? 0) > 0) {
                                 $groupedStudies[$pacsStudyUid]['category_id'] = (int)$dRow['category_id'];
@@ -180,6 +194,8 @@ class Imaging
                             'modality'          => $modality,
                             'date_study'        => $formattedDate,
                             'date_raw'          => $docDate,
+                            'encounter_id'      => $encId,
+                            'encounter_date'    => $encDateDisplay,
                             'provider_name'     => 'Servicio de Diagnóstico por Imágenes',
                             'provider_spec'     => $categoryLabel,
                             'status'            => 'Estudio DICOM Listo',
@@ -216,6 +232,8 @@ class Imaging
                             'modality'          => $modality,
                             'date_study'        => $formattedDate,
                             'date_raw'          => $docDate,
+                            'encounter_id'      => $encId,
+                            'encounter_date'    => $encDateDisplay,
                             'provider_name'     => 'Servicio de Diagnóstico por Imágenes',
                             'provider_spec'     => $categoryLabel,
                             'status'            => 'Imagen Disponible',
@@ -270,6 +288,8 @@ class Imaging
                     'modality'          => $this->detectModality($group['category_label']),
                     'date_study'        => $group['formatted_date'],
                     'date_raw'          => $group['date_raw'],
+                    'encounter_id'      => (int)($group['encounter_id'] ?? 0),
+                    'encounter_date'    => $group['encounter_date'] ?? '',
                     'provider_name'     => 'Servicio de Diagnóstico por Imágenes',
                     'provider_spec'     => $group['category_label'],
                     'status'            => 'Sincronizado en PACS Orthanc',

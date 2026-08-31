@@ -62,6 +62,46 @@ $modalidades = [
     'OT'  => 'Otro / No especificado',
 ];
 
+// Listado de Servicios Solicitantes (dropdown normalizado desde list_options)
+$servicios = [];
+$resServicios = sqlStatement(
+    "SELECT option_id, title FROM list_options
+      WHERE list_id = 'imaging_report_services' AND activity = 1
+      ORDER BY seq ASC, title ASC"
+);
+while ($svc = sqlFetchArray($resServicios)) {
+    $servicios[$svc['option_id']] = $svc['title'];
+}
+
+// Listado de Región / Área Anatómica (dropdown normalizado desde list_options)
+$regionesAnatomicas = [];
+$resRegiones = sqlStatement(
+    "SELECT option_id, title FROM list_options
+      WHERE list_id = 'imaging_report_anatomy' AND activity = 1
+      ORDER BY seq ASC, title ASC"
+);
+while ($reg = sqlFetchArray($resRegiones)) {
+    $regionesAnatomicas[$reg['option_id']] = $reg['title'];
+}
+
+// Médico Solicitante: médicos de OpenEMR habilitados para autorizar (authorized=1)
+$medicosOpenEMR = [];
+$resMedicos = sqlStatement(
+    "SELECT id, CONCAT_WS(' ', lname, fname) AS nombre
+       FROM users
+      WHERE authorized = 1 AND active = 1
+      ORDER BY lname ASC, fname ASC"
+);
+while ($med = sqlFetchArray($resMedicos)) {
+    $medicosOpenEMR[$med['id']] = trim((string)$med['nombre']);
+}
+
+// Normaliza el valor del médico: si coincide con un médico de OpenEMR, se usa el
+// nombre completo; en caso contrario (médico externo escrito a mano) se conserva tal cual.
+$valorMedicoSolicitante = trim((string)($obj['medico_solicitante'] ?? ''));
+$keyMedicoSolicitante = array_search($valorMedicoSolicitante, $medicosOpenEMR, true);
+$esMedicoOpenEMR = ($keyMedicoSolicitante !== false);
+
 // Árbol de categorías de documentos de pacientes (selector de carpeta destino)
 require_once(__DIR__ . '/category_functions.php');
 $categoryTree = imaging_get_category_tree();
@@ -170,27 +210,58 @@ $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategor
 
                 <div>
                     <label class="form-label" for="region_anatomica">Región / Área Anatómica *</label>
-                    <input type="text" name="region_anatomica" id="region_anatomica"
-                           class="form-control"
-                           placeholder="Ej: Columna Lumbar, Tórax, Abdomen"
-                           value="<?= attr($obj['region_anatomica'] ?? '') ?>"
-                           required>
+                    <select name="region_anatomica" id="region_anatomica" class="form-control" required>
+                        <option value="">-- Seleccione Región... --</option>
+                        <?php foreach ($regionesAnatomicas as $k => $titulo): ?>
+                            <option value="<?= attr($titulo) ?>"
+                                <?= (($obj['region_anatomica'] ?? '') === $titulo) ? 'selected' : '' ?>>
+                                <?= text($titulo) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <?php if (!isset($obj['region_anatomica']) || trim($obj['region_anatomica'] ?? '') === ''): ?>
+                    <?php elseif (!in_array($obj['region_anatomica'], array_values($regionesAnatomicas), true)): ?>
+                        <p class="text-xs text-amber-600 mt-1">Valor existente no está en la lista: "<?= text($obj['region_anatomica']) ?>"</p>
+                    <?php endif; ?>
                 </div>
 
                 <div>
                     <label class="form-label" for="servicio_solicitante">Servicio / Solicitante</label>
-                    <input type="text" name="servicio_solicitante" id="servicio_solicitante"
-                           class="form-control"
-                           placeholder="Ej: Clínica Médica, Guardia"
-                           value="<?= attr($obj['servicio_solicitante'] ?? '') ?>">
+                    <select name="servicio_solicitante" id="servicio_solicitante" class="form-control">
+                        <option value="">-- Seleccione Servicio... --</option>
+                        <?php foreach ($servicios as $k => $titulo): ?>
+                            <option value="<?= attr($titulo) ?>"
+                                <?= (($obj['servicio_solicitante'] ?? '') === $titulo) ? 'selected' : '' ?>>
+                                <?= text($titulo) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
                 </div>
 
                 <div>
                     <label class="form-label" for="medico_solicitante">Médico Solicitante</label>
-                    <input type="text" name="medico_solicitante" id="medico_solicitante"
-                           class="form-control"
-                           placeholder="Nombre del médico solicitante"
+                    <select name="medico_solicitante_custom" id="medico_solicitante_select" class="form-control">
+                        <option value="" <?= !$esMedicoOpenEMR && $valorMedicoSolicitante === '' ? 'selected' : '' ?>>
+                            -- Nuevo Médico del centro u Otro lugar... --
+                        </option>
+                        <option value="__otro__"
+                            <?= ($keyMedicoSolicitante === false && $valorMedicoSolicitante !== '') ? 'selected' : '' ?>>
+                            Otro médico (escribir nombre)
+                        </option>
+                        <?php foreach ($medicosOpenEMR as $mid => $nombre): ?>
+                            <option value="<?= attr('med_' . $mid) ?>"
+                                <?= ($keyMedicoSolicitante === (string)$mid || $keyMedicoSolicitante === $mid) ? 'selected' : '' ?>>
+                                <?= text($nombre) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <input type="hidden" name="medico_solicitante" id="medico_solicitante"
                            value="<?= attr($obj['medico_solicitante'] ?? '') ?>">
+                    <div id="medico_otro_container" class="mt-2 <?= ($keyMedicoSolicitante === false && $valorMedicoSolicitante !== '') ? '' : ' hidden' ?>">
+                        <input type="text" id="medico_otro_input" class="form-control"
+                               placeholder="Nombre del médico solicitante"
+                               value="<?= attr($valorMedicoSolicitante) ?>">
+                    </div>
                 </div>
 
                 <div>
@@ -302,6 +373,40 @@ document.getElementById('btn-finalize').addEventListener('click', function() {
 document.querySelector('.btn-cancel').addEventListener('click', function() {
     parent.closeTab(window.name, false);
 });
+
+// ============================================================
+// Médico Solicitante: sincronizar dropdown + campo "otro" + hidden
+// ============================================================
+(function () {
+    const select = document.getElementById('medico_solicitante_select');
+    const hidden = document.getElementById('medico_solicitante');
+    const otroContainer = document.getElementById('medico_otro_container');
+    const otroInput = document.getElementById('medico_otro_input');
+
+    function updateMedico() {
+        const val = select.value;
+        if (val === '__otro__') {
+            otroContainer.classList.remove('hidden');
+            const nombre = (otroInput.value || '').trim();
+            hidden.value = nombre;
+            otroInput.focus();
+        } else if (val === '') {
+            otroContainer.classList.add('hidden');
+            hidden.value = '';
+        } else if (val.startsWith('med_')) {
+            otroContainer.classList.add('hidden');
+            const label = select.options[select.selectedIndex].textContent.trim();
+            hidden.value = label;
+        }
+    }
+
+    otroInput.addEventListener('input', function () {
+        hidden.value = otroInput.value.trim();
+    });
+
+    select.addEventListener('change', updateMedico);
+    updateMedico();
+})();
 
 // ============================================================
 // Botones de plantilla rápida

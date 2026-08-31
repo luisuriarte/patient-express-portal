@@ -345,11 +345,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
                                     </span>
 
                                     <!-- Badge de Tipo de Archivo -->
-                                    <?php if ($isDicom): ?>
-                                        <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                            DICOM PACS
-                                        </span>
-                                    <?php elseif ($isStandardImg): ?>
+                                    <?php if ($isStandardImg): ?>
                                         <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
                                             IMAGEN (JPG/PNG)
                                         </span>
@@ -365,6 +361,15 @@ require_once dirname(__DIR__) . '/templates/header.php';
                                         <i data-lucide="calendar" class="w-3.5 h-3.5 text-slate-400"></i>
                                         Fecha: <strong class="text-slate-700 font-medium"><?= htmlspecialchars($study['date_study']) ?></strong>
                                     </span>
+                                    <?php if (!empty($study['encounter_id'])): ?>
+                                        <span class="flex items-center gap-1.5">
+                                            <i data-lucide="hash" class="w-3.5 h-3.5 text-slate-400"></i>
+                                            Encuentro: <strong class="text-slate-700 font-medium">#<?= (int)$study['encounter_id'] ?></strong>
+                                            <?php if (!empty($study['encounter_date'])): ?>
+                                                <span class="text-slate-400">&bull;</span> <span class="text-slate-600"><?= htmlspecialchars($study['encounter_date']) ?></span>
+                                            <?php endif; ?>
+                                        </span>
+                                    <?php endif; ?>
                                     <span class="flex items-center gap-1.5">
                                         <i data-lucide="user" class="w-3.5 h-3.5 text-slate-400"></i>
                                         Médico: <span class="text-slate-700 font-medium"><?= htmlspecialchars($study['provider_name']) ?></span>
