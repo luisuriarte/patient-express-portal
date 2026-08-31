@@ -81,6 +81,52 @@ $clinicPhone = trim($facilityRow['phone'] ?? '');
 // Identificador de reporte
 $reportCode = 'IMG-' . str_pad($formId, 6, '0', STR_PAD_LEFT);
 $validacionId = md5($formId . '-' . $pid . '-ORIGEN' . '-IMG');
+
+/**
+ * Normaliza el texto libre del informe para el PDF:
+ *  - Unifica fin de línea (CRLF -> LF).
+ *  - Elimina la sangría común (espacios/tabs iniciales) que el textarea del
+ *    formulario agrega a cada línea, alineando los ítems al margen.
+ *  - Conserva los saltos de línea reales y el sangrado relativo entre líneas.
+ */
+function img_norm_texto(?string $t): string
+{
+    if ($t === null || $t === '') {
+        return '';
+    }
+    // Unificar fin de línea
+    $t = str_replace(["\r\n", "\r"], "\n", $t);
+    // Separar en líneas
+    $lineas = explode("\n", $t);
+    // Calcular la menor sangría (contando sólo espacios/tabs) entre líneas con contenido
+    $minIndent = null;
+    foreach ($lineas as $linea) {
+        if (trim($linea) === '') {
+            continue;
+        }
+        $len = strlen($linea) - strlen(ltrim($linea, " \t"));
+        if ($minIndent === null || $len < $minIndent) {
+            $minIndent = $len;
+        }
+    }
+    if ($minIndent === null) {
+        $minIndent = 0;
+    }
+    // Quitar esa sangría común a cada línea con contenido
+    $out = [];
+    foreach ($lineas as $linea) {
+        if (trim($linea) === '') {
+            $out[] = '';
+        } else {
+            $out[] = substr($linea, $minIndent);
+        }
+    }
+    // Eliminar líneas vacías repetidas al fondo (trailing blank lines)
+    while (($out[count($out) - 1] ?? '') === '') {
+        array_pop($out);
+    }
+    return implode("\n", $out);
+}
 ?><!DOCTYPE html>
 <html lang="es">
 <head>
@@ -367,27 +413,27 @@ $validacionId = md5($formId . '-' . $pid . '-ORIGEN' . '-IMG');
     <!-- ================================================================= -->
     <?php if (!empty($fields['metodologia'])): ?>
         <div class="section-title">Técnica / Metodología (Secuencias)</div>
-        <div class="report-text"><?= htmlspecialchars($fields['metodologia']) ?></div>
+        <div class="report-text"><?= htmlspecialchars(img_norm_texto($fields['metodologia'])) ?></div>
     <?php endif; ?>
 
     <!-- ================================================================= -->
     <!-- INTERPRETACIÓN / HALLAZGOS                                         -->
     <!-- ================================================================= -->
     <div class="section-title">Interpretación / Hallazgos Descriptivos</div>
-    <div class="report-text"><?= htmlspecialchars($fields['interpretacion'] ?? '—') ?></div>
+    <div class="report-text"><?= htmlspecialchars(img_norm_texto($fields['interpretacion'] ?? '—')) ?></div>
 
     <!-- ================================================================= -->
     <!-- CONCLUSIÓN / IMPRESIÓN DIAGNÓSTICA                                 -->
     <!-- ================================================================= -->
     <div class="section-title">Conclusión / Impresión Diagnóstica</div>
-    <div class="report-text report-text-conclusion"><?= htmlspecialchars($fields['conclusion'] ?? '—') ?></div>
+    <div class="report-text report-text-conclusion"><?= htmlspecialchars(img_norm_texto($fields['conclusion'] ?? '—')) ?></div>
 
     <!-- ================================================================= -->
     <!-- OBSERVACIONES                                                      -->
     <!-- ================================================================= -->
     <?php if (!empty($fields['observaciones'])): ?>
         <div class="section-title">Observaciones y Sugerencias</div>
-        <div class="report-text"><?= htmlspecialchars($fields['observaciones']) ?></div>
+        <div class="report-text"><?= htmlspecialchars(img_norm_texto($fields['observaciones'])) ?></div>
     <?php endif; ?>
 
     <!-- ================================================================= -->
