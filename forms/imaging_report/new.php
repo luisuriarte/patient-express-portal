@@ -127,6 +127,8 @@ $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategor
         .form-control { width: 100%; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 12px; font-size: 14px; color: #1e293b; background: #fff; transition: border-color 0.15s, box-shadow 0.15s; }
         .form-control:focus { outline: none; border-color: #0ea5e9; box-shadow: 0 0 0 3px rgba(14,165,233,0.15); }
         textarea.form-control { resize: vertical; line-height: 1.6; }
+        select.form-control { height: 40px; padding: 8px 12px; line-height: 1.5; }
+        input[type="text"].form-control { line-height: 1.5; height: 40px; }
         .section-header { background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%); color: white; padding: 10px 16px; border-radius: 10px; font-weight: 700; font-size: 14px; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 14px; }
         .template-btn { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 8px; font-size: 12px; font-weight: 600; cursor: pointer; border: 1px solid #cbd5e1; background: #f1f5f9; color: #334155; transition: all 0.15s; }
         .template-btn:hover { background: #e2e8f0; border-color: #94a3b8; }
