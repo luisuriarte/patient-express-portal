@@ -18,7 +18,7 @@ declare(strict_types=1);
                         <div class="w-7 h-7 rounded-lg bg-sky-500 flex items-center justify-center text-white">
                             <i data-lucide="activity" class="w-4 h-4"></i>
                         </div>
-                        <span class="font-heading font-bold text-base tracking-tight"><?= defined('CLINIC_NAME') ? CLINIC_NAME : 'Centro Médico Origen' ?></span>
+                        <span class="font-heading font-bold text-base tracking-tight"><?= defined('CLINIC_NAME') ? CLINIC_NAME : '' ?></span>
                     </div>
                     <p class="text-xs text-slate-400 leading-relaxed">
                         Comprometidos con la excelencia diagnóstica, innovación médica y la confidencialidad en el cuidado de su salud.
@@ -26,15 +26,15 @@ declare(strict_types=1);
                     <div class="text-xs space-y-1 pt-1 text-slate-400">
                         <p class="flex items-center space-x-2">
                             <i data-lucide="map-pin" class="w-3.5 h-3.5 text-sky-400 flex-shrink-0"></i>
-                            <span><?= defined('CLINIC_ADDRESS') ? CLINIC_ADDRESS : 'Av. Santa Fe 1234, CABA' ?></span>
+                            <span><?= defined('CLINIC_ADDRESS') ? CLINIC_ADDRESS : '' ?></span>
                         </p>
                         <p class="flex items-center space-x-2">
                             <i data-lucide="phone" class="w-3.5 h-3.5 text-teal-400 flex-shrink-0"></i>
-                            <span><?= defined('CLINIC_PHONE') ? CLINIC_PHONE : '0810-333-ORIGEN' ?></span>
+                            <span><?= defined('CLINIC_PHONE') ? CLINIC_PHONE : '' ?></span>
                         </p>
                         <p class="flex items-center space-x-2">
                             <i data-lucide="mail" class="w-3.5 h-3.5 text-indigo-400 flex-shrink-0"></i>
-                            <span><?= defined('CLINIC_EMAIL') ? CLINIC_EMAIL : 'contacto@origen.ar' ?></span>
+                            <span><?= defined('CLINIC_EMAIL') ? CLINIC_EMAIL : '' ?></span>
                         </p>
                     </div>
                 </div>
@@ -50,7 +50,7 @@ declare(strict_types=1);
                             </a>
                         </li>
                         <li>
-                            <a href="<?= defined('CLINIC_WEB') ? CLINIC_WEB : 'https://origen.ar' ?>" target="_blank" rel="noopener noreferrer" class="hover:text-sky-400 transition-colors flex items-center space-x-1.5">
+                            <a href="<?= defined('CLINIC_WEB') ? CLINIC_WEB : '' ?>" target="_blank" rel="noopener noreferrer" class="hover:text-sky-400 transition-colors flex items-center space-x-1.5">
                                 <i data-lucide="globe" class="w-3 h-3 text-teal-500"></i>
                                 <span>Sitio Web Institucional</span>
                             </a>
@@ -79,7 +79,7 @@ declare(strict_types=1);
 
             <!-- Línea inferior -->
             <div class="mt-8 pt-6 border-t border-slate-800/80 flex flex-col sm:flex-row justify-between items-center text-xs text-slate-500 gap-4">
-                <p>&copy; <?= date('Y') ?> <?= defined('CLINIC_NAME') ? CLINIC_NAME : 'Centro Médico Origen' ?>. Todos los derechos reservados.</p>
+                <p>&copy; <?= date('Y') ?> <?= defined('CLINIC_NAME') ? CLINIC_NAME : '' ?>. Todos los derechos reservados.</p>
                 <p class="flex items-center space-x-1">
                     <span>Patient Express Portal v1.2</span>
                     <span>&bull;</span>

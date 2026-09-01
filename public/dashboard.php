@@ -41,7 +41,7 @@ if (!empty($patient['dob']) && $patient['dob'] !== '0000-00-00') {
     }
 }
 
-$pageTitle = 'Mis Estudios y Resultados | Portal Express Centro Médico Origen';
+$pageTitle = 'Mis Estudios y Resultados | ' . (defined('CLINIC_NAME') && CLINIC_NAME ? CLINIC_NAME : 'Portal Express del Paciente');
 require_once dirname(__DIR__) . '/templates/header.php';
 ?>
 

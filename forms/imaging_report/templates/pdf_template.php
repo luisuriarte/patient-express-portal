@@ -68,7 +68,7 @@ if (empty($logoBase64)) {
 
 // Datos institucionales desde la facility configurada en OpenEMR
 $facilityRow = $facilityRow ?? [];
-$clinicName  = trim($facilityRow['name'] ?? '') ?: 'CENTRO MÉDICO ORIGEN';
+$clinicName  = trim($facilityRow['name'] ?? '') ?: 'CENTRO DE SALUD';
 $clinicAddr  = trim(
     ($facilityRow['street'] ?? '') . ' ' .
     ($facilityRow['city'] ?? '') . ' ' .
@@ -446,7 +446,7 @@ function img_norm_texto(?string $t): string
                     <strong>VALIDACIÓN ELECTRÓNICA INSTITUCIONAL</strong><br>
                     <span>ID de Informe: <?= htmlspecialchars($validacionId) ?></span><br>
                     <span>Informe Nro: <?= htmlspecialchars($reportCode) ?></span><br>
-                    <span>Verifique autenticidad en https://origen.ar</span>
+                    <span>Verifique autenticidad en <?= (defined('CLINIC_WEB') && CLINIC_WEB) ? htmlspecialchars(CLINIC_WEB) : '' ?></span>
                 </div>
             </td>
             <td style="width: 10%;"></td>

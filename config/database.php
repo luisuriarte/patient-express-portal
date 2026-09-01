@@ -39,12 +39,16 @@ define('OPENEMR_PORTAL_URL', getenv('OPENEMR_PORTAL_URL') ?: 'https://hcd.origen
 
 // ==========================================
 // 3. DATOS INSTITUCIONALES (Para encabezados y PDFs)
+//    En este despliegue standalone no se exponen datos del centro en código:
+//    se usan valores neutros. En el despliegue nativo (config.php) estos datos
+//    se cargan automáticamente desde la tabla `facility` de OpenEMR.
 // ==========================================
-define('CLINIC_NAME', 'Centro Médico Origen');
-define('CLINIC_SUBTITLE', 'Portal Express del Paciente - Diagnóstico y Resultados');
-define('CLINIC_ADDRESS', 'Av. Santa Fe 1234, CABA, Argentina');
-define('CLINIC_PHONE', '+54 11 4000-0000 / 0810-333-ORIGEN');
-define('CLINIC_EMAIL', 'contacto@origen.ar');
+define('CLINIC_NAME',     'Centro de Salud');
+define('CLINIC_SUBTITLE', 'Portal del Paciente');
+define('CLINIC_ADDRESS', '');
+define('CLINIC_PHONE', '');
+define('CLINIC_EMAIL', '');
+define('CLINIC_WEB', '');
 $logoFile = dirname(__DIR__) . '/public/assets/img/logo.png';
 if (!file_exists($logoFile)) {
     $logoFile = dirname(__DIR__) . '/assets/img/logo.png';

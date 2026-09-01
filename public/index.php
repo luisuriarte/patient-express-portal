@@ -44,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$pageTitle = 'Ingreso de Pacientes | Portal Express Centro Médico Origen';
+$pageTitle = 'Ingreso de Pacientes | ' . (defined('CLINIC_NAME') && CLINIC_NAME ? CLINIC_NAME : 'Portal Express del Paciente');
 require_once dirname(__DIR__) . '/templates/header.php';
 ?>
 

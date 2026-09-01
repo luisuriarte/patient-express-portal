@@ -264,9 +264,9 @@ ob_start();
     <table class="header-table">
         <tr>
             <td style="width: 60%; vertical-align: middle;">
-                <div class="clinic-name"><?= defined('CLINIC_NAME') ? CLINIC_NAME : 'Centro Médico Origen' ?></div>
-                <div class="clinic-sub"><?= defined('CLINIC_ADDRESS') ? CLINIC_ADDRESS : 'Av. Santa Fe 1234, CABA' ?> | Tel: <?= defined('CLINIC_PHONE') ? CLINIC_PHONE : '0810-333-ORIGEN' ?></div>
-                <div class="clinic-sub">Email: <?= defined('CLINIC_EMAIL') ? CLINIC_EMAIL : 'contacto@origen.ar' ?> | Web: <?= defined('CLINIC_WEB') ? CLINIC_WEB : 'https://origen.ar' ?></div>
+                <div class="clinic-name"><?= defined('CLINIC_NAME') ? CLINIC_NAME : '' ?></div>
+                <div class="clinic-sub"><?= defined('CLINIC_ADDRESS') ? CLINIC_ADDRESS : '' ?><?= defined('CLINIC_PHONE') && CLINIC_PHONE ? ' | Tel: ' . CLINIC_PHONE : '' ?></div>
+                <div class="clinic-sub"><?= defined('CLINIC_EMAIL') && CLINIC_EMAIL ? 'Email: ' . CLINIC_EMAIL : '' ?><?= defined('CLINIC_WEB') && CLINIC_WEB ? ' | Web: ' . CLINIC_WEB : '' ?></div>
             </td>
             <td style="width: 40%; text-align: right; vertical-align: middle;">
                 <div style="font-size: 10.5px; font-weight: bold; color: #0284c7;">SERVICIO DE BIOQUÍMICA & DIAGNÓSTICO</div>
@@ -420,13 +420,13 @@ ob_start();
                 <div style="border: 1px solid #cbd5e1; padding: 5px 8px; border-radius: 4px; display: inline-block;">
                     <strong>VALIDACIÓN ELECTRÓNICA INSTITUCIONAL</strong><br>
                     <span>ID de Lote: <?= md5(($data['encounter_id'] ?? $reportId) . '-' . $pid . '-ORIGEN') ?></span><br>
-                    <span>Verifique autenticidad en <?= defined('CLINIC_WEB') ? CLINIC_WEB : 'https://origen.ar' ?></span>
+                    <span>Verifique autenticidad en <?= defined('CLINIC_WEB') ? CLINIC_WEB : '' ?></span>
                 </div>
             </td>
             <td style="width: 10%;"></td>
             <td class="sig-box">
                 <strong>Servicio de Bioquímica y Diagnóstico Clínico</strong><br>
-                <span>Centro Médico Origen</span><br>
+                <span><?= defined('CLINIC_NAME') ? CLINIC_NAME : '' ?></span><br>
                 <span>Validación Bioquímica Registrada</span><br>
                 <span style="font-size: 8px; color: #0284c7; font-weight: bold;">Documento Firmado Digitalmente</span>
             </td>
@@ -435,7 +435,7 @@ ob_start();
 
     <!-- Pie de página fijo -->
     <div class="footer-disclaimer">
-        Este documento es un protocolo médico oficial emitido por <?= defined('CLINIC_NAME') ? CLINIC_NAME : 'Centro Médico Origen' ?>. Su validez y confidencialidad están protegidas por las normativas de salud vigentes (Ley 25.326 / HIPAA).
+        Este documento es un protocolo médico oficial emitido por <?= defined('CLINIC_NAME') ? CLINIC_NAME : '' ?>. Su validez y confidencialidad están protegidas por las normativas de salud vigentes (Ley 25.326 / HIPAA).
     </div>
 
 </body>

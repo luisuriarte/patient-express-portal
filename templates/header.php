@@ -11,7 +11,7 @@ if (!isset($auth)) {
 
 $isLoggedIn = $auth->isAuthenticated();
 $currentPatient = $isLoggedIn ? $auth->getCurrentPatient() : null;
-$pageTitle = $pageTitle ?? 'Portal Express del Paciente | Centro Médico Origen';
+$pageTitle = $pageTitle ?? ('Portal Express del Paciente' . (defined('CLINIC_NAME') && CLINIC_NAME ? ' | ' . CLINIC_NAME : ''));
 ?>
 <!DOCTYPE html>
 <html lang="es" class="h-full bg-slate-50">

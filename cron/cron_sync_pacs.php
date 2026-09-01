@@ -268,7 +268,7 @@ while ($row = sqlFetchArray($res)) {
                 'SeriesDescription'       => $docName,
                 'StudyDate'               => $studyDate,
                 'Modality'                => $modality,
-                'InstitutionName'         => defined('CLINIC_NAME') ? CLINIC_NAME : 'Centro Medico Origen',
+                'InstitutionName'         => defined('CLINIC_NAME') ? CLINIC_NAME : 'Centro de Salud',
                 'AccessionNumber'         => 'DOC-' . $docId,
                 'ReferringPhysicianName'  => 'Servicio de Diagnostico'
             ],
@@ -358,7 +358,7 @@ while ($row = sqlFetchArray($res)) {
             $pdfTags['PatientSex']       = $patientSex;
             $pdfTags['StudyDescription'] = $categoryName;
             $pdfTags['StudyDate']        = $studyDate;
-            $pdfTags['InstitutionName']  = defined('CLINIC_NAME') ? CLINIC_NAME : 'Centro Medico Origen';
+            $pdfTags['InstitutionName']  = defined('CLINIC_NAME') ? CLINIC_NAME : 'Centro de Salud';
             $pdfTags['AccessionNumber']  = 'DOC-' . $docId;
             $pdfPayload = [
                 'Tags'    => $pdfTags,

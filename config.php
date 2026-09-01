@@ -66,24 +66,42 @@ if (!defined('OPENEMR_PORTAL_URL')) {
 }
 
 // 3. Datos Institucionales
-if (!defined('CLINIC_NAME')) {
-    define('CLINIC_NAME', 'Centro Médico Origen');
+//    Se cargan dinámicamente desde la tabla `facility` de OpenEMR (facility
+//    de facturación/billing principal) para NO exponer datos del centro en
+//    código. El logo sí se mantiene como recurso estático local.
+$facility = [];
+if ($globalsIncluded && function_exists('sqlQuery')) {
+    try {
+        $facility = sqlQuery(
+            "SELECT name, phone, fax, street, city, state, postal_code, country_code, website, email
+               FROM facility
+              WHERE billing_location = 1
+                AND inactive = 0
+              ORDER BY id LIMIT 1"
+        ) ?: [];
+    } catch (\Throwable $e) {
+        $facility = [];
+    }
 }
-if (!defined('CLINIC_SUBTITLE')) {
-    define('CLINIC_SUBTITLE', 'Portal Express del Paciente - Diagnóstico y Resultados');
-}
-if (!defined('CLINIC_ADDRESS')) {
-    define('CLINIC_ADDRESS', 'Av. Freyre 2304, Santa Fe, Argentina');
-}
-if (!defined('CLINIC_PHONE')) {
-    define('CLINIC_PHONE', '+54 342 4000-0000 / 0810-333-ORIGEN');
-}
-if (!defined('CLINIC_EMAIL')) {
-    define('CLINIC_EMAIL', 'contacto@origen.ar');
-}
-if (!defined('CLINIC_WEB')) {
-    define('CLINIC_WEB', 'https://www.origen.ar');
-}
+
+$facName   = trim((string)($facility['name'] ?? ''));
+$facPhone  = trim((string)($facility['phone'] ?? ''));
+$facEmail  = trim((string)($facility['email'] ?? ''));
+$facWeb    = trim((string)($facility['website'] ?? ''));
+$addressParts = array_filter([
+    trim((string)($facility['street'] ?? '')),
+    trim((string)($facility['city'] ?? '')),
+    trim((string)($facility['state'] ?? '')),
+    trim((string)($facility['postal_code'] ?? '')),
+]);
+$facAddress = implode(', ', $addressParts);
+
+if (!defined('CLINIC_NAME'))     define('CLINIC_NAME',     $facName ?: 'Centro de Salud');
+if (!defined('CLINIC_SUBTITLE')) define('CLINIC_SUBTITLE', 'Portal del Paciente');
+if (!defined('CLINIC_ADDRESS'))  define('CLINIC_ADDRESS',  $facAddress);
+if (!defined('CLINIC_PHONE'))    define('CLINIC_PHONE',    $facPhone);
+if (!defined('CLINIC_EMAIL'))    define('CLINIC_EMAIL',    $facEmail);
+if (!defined('CLINIC_WEB'))      define('CLINIC_WEB',      $facWeb);
 if (!defined('CLINIC_LOGO_PATH')) {
     $logoFile = __DIR__ . '/public/assets/img/logo.png';
     if (!file_exists($logoFile)) {
