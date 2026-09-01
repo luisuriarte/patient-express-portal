@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 540 130" width="100%" height="100%">
+  <defs>
+    <linearGradient id="origenGradExpanded" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0E2A47" />
+      <stop offset="50%" stop-color="#06B6D4" />
+      <stop offset="100%" stop-color="#10B981" />
+    </linearGradient>
+  </defs>
+
+  <!-- ISOTIPO -->
+  <g transform="translate(15, 15)">
+    <path d="M 50 10 A 40 40 0 1 0 90 50 A 40 40 0 0 0 50 10 Z" fill="none" stroke="url(#origenGradExpanded)" stroke-width="9" stroke-linecap="round"/>
+    <circle cx="40" cy="50" r="7" fill="#06B6D4"/>
+    <circle cx="60" cy="50" r="9" fill="#10B981"/>
+    <path d="M 40 50 Q 50 35 60 50 Q 50 65 40 50 Z" fill="url(#origenGradExpanded)" opacity="0.3"/>
+  </g>
+
+  <!-- TEXTO PRINCIPAL CON ESPACIADO EXPANDIDO (letter-spacing="9") -->
+  <text x="130" y="62" font-family="'Montserrat', 'Helvetica Neue', sans-serif" font-weight="800" font-size="38" fill="#0E2A47" letter-spacing="9">ORIGEN</text>
+
+  <!-- SUBTÍTULO ALINEADO -->
+  <text x="132" y="82" font-family="'Inter', Arial, sans-serif" font-weight="600" font-size="11" fill="#06B6D4" letter-spacing="3">CENTRO MÉDICO &amp; DIAGNÓSTICO</text>
+
+  <!-- SLOGAN -->
+  <text x="132" y="102" font-family="'Inter', Arial, sans-serif" font-weight="400" font-size="13" fill="#475569" letter-spacing="0.5">Conectados por tu salud</text>
+</svg>

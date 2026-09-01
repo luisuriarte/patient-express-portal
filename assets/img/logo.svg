@@ -1,26 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 80" width="320" height="80" fill="none">
-    <defs>
-        <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stop-color="#0284c7" />
-            <stop offset="100%" stop-color="#0d9488" />
-        </linearGradient>
-        <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
-            <feDropShadow dx="0" dy="2" stdDeviation="3" flood-color="#0284c7" flood-opacity="0.25"/>
-        </filter>
-    </defs>
-    <!-- Icon Symbol -->
-    <g filter="url(#shadow)">
-        <rect x="10" y="15" width="50" height="50" rx="14" fill="url(#grad1)" />
-        <!-- Medical Cross -->
-        <rect x="30" y="25" width="10" height="30" rx="2" fill="#ffffff" />
-        <rect x="20" y="35" width="30" height="10" rx="2" fill="#ffffff" />
-        <circle cx="50" cy="25" r="4" fill="#38bdf8" />
-    </g>
-    <!-- Brand Typography -->
-    <text x="75" y="38" font-family="'Plus Jakarta Sans', 'Inter', system-ui, sans-serif" font-size="20" font-weight="800" fill="#0f172a" letter-spacing="-0.5">
-        CENTRO MÉDICO <tspan fill="#0284c7">ORIGEN</tspan>
-    </text>
-    <text x="76" y="55" font-family="'Inter', system-ui, sans-serif" font-size="11.5" font-weight="600" fill="#64748b" letter-spacing="0.5">
-        PORTAL EXPRESS DEL PACIENTE
-    </text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%">
+  <!-- Fondo Redondeado en Azul Premium -->
+  <rect width="400" height="400" rx="80" fill="#0E2A47"/>
+  
+  <g transform="translate(50, 50)">
+    <!-- Anillo Símbolo Gradiente Blanco / Turquesa -->
+    <circle cx="150" cy="150" r="110" fill="none" stroke="#06B6D4" stroke-width="22"/>
+    
+    <!-- Figuras Familia / Cuidado interior -->
+    <circle cx="120" cy="150" r="22" fill="#FFFFFF"/>
+    <circle cx="180" cy="150" r="28" fill="#10B981"/>
+    <path d="M 120 150 Q 150 110 180 150 Q 150 190 120 150 Z" fill="#FFFFFF" opacity="0.4"/>
+  </g>
 </svg>

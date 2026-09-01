@@ -1,0 +1,27 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 450 70" width="100%" height="100%">
+  <defs>
+    <linearGradient id="portalHeaderGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0E2A47" />
+      <stop offset="50%" stop-color="#06B6D4" />
+      <stop offset="100%" stop-color="#10B981" />
+    </linearGradient>
+  </defs>
+
+  <!-- ISOTIPO COMPACTO (Alineado a la izquierda) -->
+  <g transform="translate(5, 5)">
+    <circle cx="30" cy="30" r="25" fill="none" stroke="url(#portalHeaderGrad)" stroke-width="6"/>
+    <circle cx="22" cy="30" r="4.5" fill="#06B6D4"/>
+    <circle cx="38" cy="30" r="6" fill="#10B981"/>
+    <path d="M 22 30 Q 30 20 38 30 Q 30 40 22 30 Z" fill="url(#portalHeaderGrad)" opacity="0.3"/>
+  </g>
+
+  <!-- MARCA "O R I G E N" -->
+  <text x="75" y="38" font-family="'Montserrat', 'Helvetica Neue', Arial, sans-serif" font-weight="800" font-size="28" fill="#0E2A47" letter-spacing="7">ORIGEN</text>
+
+  <!-- INSIGNIA DISTINCTIVA "PORTAL PACIENTES" -->
+  <rect x="75" y="46" width="135" height="18" rx="4" fill="#06B6D4" fill-opacity="0.12"/>
+  <text x="81" y="59" font-family="'Inter', Arial, sans-serif" font-weight="700" font-size="9.5" fill="#06B6D4" letter-spacing="1.5">PORTAL PACIENTES</text>
+
+  <!-- SLOGAN / COMPLEMENTO (Opcional, visible en pantallas medianas y grandes) -->
+  <text x="222" y="59" font-family="'Inter', Arial, sans-serif" font-weight="400" font-size="10.5" fill="#64748B" letter-spacing="0.3">|   Conectados por tu salud</text>
+</svg>

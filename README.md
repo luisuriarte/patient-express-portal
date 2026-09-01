@@ -149,8 +149,11 @@ Cada documento queda registrado en la tabla `documents_pacs_sync` con su estado 
 
 - Instancia de **OpenEMR** (con `interface/globals.php` accesible).
 - **PHP ≥ 8.1** con extensiones `curl`, `mbstring` y las que requiera OpenEMR.
+- Extensión **GD** de PHP (opcional, requerida para generar el **código QR** hacia el visor DICOM en el PDF del informe. OpenEMR la suele incluir).
 - **MySQL/MariaDB**.
 - **Orthanc** accesible por REST HTTP.
+
+> El código QR del informe usa la librería **`bacon/bacon-qr-code`** que ya forma parte del `vendor/` de OpenEMR (no hace falta instalar nada extra). Si no hay GD disponible, el QR simplemente no se dibuja pero el informe se genera igual.
 
 ### 4.2 Pasos
 
@@ -290,6 +293,8 @@ Esta sección es para el personal que genera informes de diagnóstico por imáge
 6. Guardá de una de estas dos formas:
    - **Guardar Borrador**: guarda sin generar el PDF, queda editable.
    - **Guardar y Generar PDF**: finaliza el informe, genera el PDF institucional, lo guarda en los documentos del paciente y lo vincula al estudio DICOM en Orthanc.
+
+> **Código QR:** el PDF finalizado incluye, en la zona de validación, un **código QR**. Al escanearlo con el celular se abre el visor DICOM (OHIF) del estudio en `imagenes.origen.ar`. Solo se imprime cuando el estudio ya tiene su `StudyInstanceUID` sincronizado en el PACS.
 
 ### 6.2 Editar un informe
 

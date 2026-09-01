@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   viewBox="0 0 500 231.72244"
+   width="500"
+   height="231.72244"
+   version="1.1"
+   id="svg5"
+   sodipodi:docname="logo-gral.svg"
+   inkscape:version="1.4.4 (dcaf3e7, 2026-05-05)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns:xlink="http://www.w3.org/1999/xlink"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview5"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="1.614"
+     inkscape:cx="249.69021"
+     inkscape:cy="166.97646"
+     inkscape:window-width="1920"
+     inkscape:window-height="1009"
+     inkscape:window-x="-8"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg5" />
+  <!-- Fondo Azul Oscuro Sólido (Llenado completo de seguridad) -->
+  <rect
+     width="500"
+     height="231.72244"
+     fill="#0e2a47"
+     id="rect1"
+     x="0"
+     y="0"
+     style="stroke-width:0.680768" />
+  <!-- GRADIENTES INTEGRADOS -->
+  <defs
+     id="defs2">
+    <linearGradient
+       id="waGrad"
+       x1="0"
+       y1="0"
+       x2="1"
+       y2="1">
+      <stop
+         offset="0%"
+         stop-color="#06B6D4"
+         id="stop1" />
+      <stop
+         offset="100%"
+         stop-color="#10B981"
+         id="stop2" />
+    </linearGradient>
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#waGrad"
+       id="linearGradient5"
+       x1="8"
+       y1="8"
+       x2="132"
+       y2="132"
+       gradientUnits="userSpaceOnUse" />
+    <linearGradient
+       inkscape:collect="always"
+       xlink:href="#waGrad"
+       id="linearGradient6"
+       x1="19.288867"
+       y1="846.49867"
+       x2="51.846508"
+       y2="879.05631"
+       gradientTransform="scale(8.1394103,0.12285902)"
+       gradientUnits="userSpaceOnUse" />
+  </defs>
+  <!-- BLOQUE HORIZONTAL CENTRADO (Símbolo + Texto) -->
+  <g
+     transform="translate(35,42.410156)"
+     id="g5">
+    <!-- ISOTIPO (Símbolo Turquesa/Verde) -->
+    <g
+       id="g4">
+      <circle
+         cx="70"
+         cy="70"
+         r="55"
+         fill="none"
+         stroke="url(#waGrad)"
+         stroke-width="14"
+         id="circle2"
+         style="stroke:url(#linearGradient5)" />
+      <circle
+         cx="55"
+         cy="70"
+         r="10"
+         fill="#ffffff"
+         id="circle3" />
+      <circle
+         cx="85"
+         cy="70"
+         r="14"
+         fill="#10b981"
+         id="circle4" />
+      <path
+         d="M 55,70 Q 70,50 85,70 70,90 55,70 Z"
+         fill="#ffffff"
+         opacity="0.3"
+         id="path4" />
+    </g>
+    <!-- TEXTO O R I G E N EXPANDIDO Y HORIZONTAL -->
+    <!-- Utiliza blanco puro para destacar sobre el fondo oscuro en la pantalla del celular -->
+    <text
+       x="155"
+       y="86"
+       font-family="Montserrat, 'Helvetica Neue', Arial, sans-serif"
+       font-weight="800"
+       font-size="44px"
+       fill="#ffffff"
+       letter-spacing="10"
+       id="text4">ORIGEN</text>
+    <!-- LÍNEA ACENTO INFERIOR (Refuerza el ancho horizontal) -->
+    <rect
+       x="157"
+       y="104"
+       width="265"
+       height="4"
+       rx="2"
+       fill="url(#waGrad)"
+       id="rect4"
+       style="fill:url(#linearGradient6)" />
+  </g>
+</svg>

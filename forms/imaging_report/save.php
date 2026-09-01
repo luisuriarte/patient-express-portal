@@ -141,6 +141,30 @@ function generateAndStorePdf(int $pid, int $formId, array $fields, $session): ?i
         }
     }
 
+    // 0. Carpeta destino + UID del estudio DICOM: se resuelven ANTES de renderizar
+    //    la plantilla para poder mostrar el StudyInstanceUID y generar el QR hacia
+    //    el visor OHIF dentro del PDF. Primero se intenta reutilizar el estudio que
+    //    el cron ya registró para la MISMA carpeta/categoría del paciente; si no se
+    //    encuentra (p.ej. carpeta distinta), se consulta Orthanc directamente por
+    //    PatientID priorizando la modalidad del informe.
+    $userCategoryId = (int)($fields['pdf_category_id'] ?? 0);
+    $categoryId = imaging_resolve_category_id($userCategoryId, $fields['modalidad'] ?? '');
+    $fields['pdf_category_id'] = $categoryId;
+    $dcmModality = modalityToDicom($fields['modalidad'] ?? '');
+    $study = knownStudyForCategory($pid, $categoryId, $dcmModality);
+    if (empty($study['study_uid'])) {
+        $study = resolveStudyInstanceUid($pid, $fields['modalidad'] ?? '');
+    }
+    $fields['study_instance_uid'] = $study['study_uid'] ?? '';
+    $studyOhifUrl = '';
+    if (!empty($fields['study_instance_uid'])) {
+        $ohifBase = defined('OHIF_VIEWER_BASE_URL') ? rtrim(OHIF_VIEWER_BASE_URL, '/') : '';
+        if ($ohifBase !== '') {
+            $studyOhifUrl = $ohifBase . '?StudyInstanceUIDs=' . urlencode($fields['study_instance_uid']);
+        }
+    }
+    $fields['study_ohif_url'] = $studyOhifUrl;
+
     // 1. Renderizar la plantilla HTML del PDF
     ob_start();
     require __DIR__ . '/templates/pdf_template.php';
@@ -193,8 +217,6 @@ function generateAndStorePdf(int $pid, int $formId, array $fields, $session): ?i
     //    `categories_to_documents`. Devuelve '' en caso de éxito.
     //    La carpeta destino la eligió el técnico en el formulario (category_id);
     //    si no es válida o falta, se usa la automática según modalidad.
-    $userCategoryId = (int)($fields['pdf_category_id'] ?? 0);
-    $categoryId = imaging_resolve_category_id($userCategoryId, $fields['modalidad'] ?? '');
 
     $pdfFileName = 'Informe_Imagenes_' . $formId . '_' . date('Ymd_His') . '.pdf';
 

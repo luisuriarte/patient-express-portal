@@ -372,7 +372,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
                                     <?php endif; ?>
                                     <span class="flex items-center gap-1.5">
                                         <i data-lucide="user" class="w-3.5 h-3.5 text-slate-400"></i>
-                                        Médico: <span class="text-slate-700 font-medium"><?= htmlspecialchars($study['provider_name']) ?></span>
+                                        Médico solicitante: <span class="text-slate-700 font-medium"><?= htmlspecialchars($study['provider_name']) ?></span>
                                     </span>
                                     <?php if (!empty($study['accession_number'])): ?>
                                         <span class="flex items-center gap-1.5">
@@ -397,17 +397,6 @@ require_once dirname(__DIR__) . '/templates/header.php';
                                     <span>Ver Imagen DICOM (OHIF)</span>
                                     <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 opacity-80"></i>
                                 </a>
-
-                                <?php if (!empty($study['stone_url'])): ?>
-                                    <a href="<?= htmlspecialchars($study['stone_url']) ?>" 
-                                       target="_blank" 
-                                       rel="noopener noreferrer"
-                                       title="Abrir en Visor Orthanc Stone WebViewer"
-                                       class="inline-flex items-center space-x-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-heading font-semibold text-xs px-3 py-2.5 rounded-xl transition-colors">
-                                        <i data-lucide="eye" class="w-3.5 h-3.5 text-teal-600"></i>
-                                        <span>Stone Viewer</span>
-                                    </a>
-                                <?php endif; ?>
 
                                 <?php if ($study['has_report'] && !empty($study['report_pdf_url'])): ?>
                                     <a href="<?= htmlspecialchars($study['report_pdf_url']) ?>" 

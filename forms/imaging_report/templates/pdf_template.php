@@ -82,6 +82,35 @@ $clinicPhone = trim($facilityRow['phone'] ?? '');
 $reportCode = 'IMG-' . str_pad($formId, 6, '0', STR_PAD_LEFT);
 $validacionId = md5($formId . '-' . $pid . '-ORIGEN' . '-IMG');
 
+// Código QR hacia el visor OHIF del estudio (si hay StudyInstanceUID y la
+// librería BaconQrCode está disponible en el vendor de OpenEMR). El QR apunta
+// directamente a imagenes.origen.ar/viewer?StudyInstanceUIDs=<uid>.
+$qrDataUri = '';
+$qrTarget  = trim((string)($fields['study_ohif_url'] ?? ''));
+if ($qrTarget === '' && !empty($fields['study_instance_uid'])) {
+    $ohifBase = defined('OHIF_VIEWER_BASE_URL') ? rtrim(OHIF_VIEWER_BASE_URL, '/') : '';
+    if ($ohifBase !== '') {
+        $qrTarget = $ohifBase . '?StudyInstanceUIDs=' . urlencode($fields['study_instance_uid']);
+    }
+}
+if ($qrTarget !== '') {
+    if (class_exists('BaconQrCode\Writer') && extension_loaded('gd')) {
+        try {
+            $renderer = new \BaconQrCode\Renderer\GDLibRenderer(480, 4, 'png', 9);
+            $writer   = new \BaconQrCode\Writer($renderer);
+            $qrPng    = $writer->writeString($qrTarget);
+            $qrDataUri = 'data:image/png;base64,' . base64_encode($qrPng);
+        } catch (\Throwable $e) {
+            error_log("[imaging_report/pdf] QR falló: " . $e->getMessage());
+            $qrDataUri = '';
+        }
+    } else {
+        error_log("[imaging_report/pdf] QR no generado. BaconQrCode: " . (class_exists('BaconQrCode\Writer') ? 'ok' : 'NO') . " | GD: " . (extension_loaded('gd') ? 'ok' : 'NO'));
+    }
+} else {
+    error_log("[imaging_report/pdf] QR sin destino (study_instance_uid vacío)");
+}
+
 /**
  * Normaliza el texto libre del informe para el PDF:
  *  - Unifica fin de línea (CRLF -> LF).
@@ -231,7 +260,7 @@ function img_norm_texto(?string $t): string
             font-size: 9.5px;
             color: #334155;
             line-height: 1.5;
-            text-align: justify;
+            text-align: left;
             background-color: #ffffff;
             padding: 6px 8px;
             border: 1px solid #f1f5f9;
@@ -441,6 +470,13 @@ function img_norm_texto(?string $t): string
     <!-- ================================================================= -->
     <table class="signature-table">
         <tr>
+            <td class="sig-box">
+                <strong><?= htmlspecialchars($medNombre ?: 'Médico Informante') ?></strong><br>
+                <span><?= htmlspecialchars($medEspecialidad) ?></span><br>
+                <?php if ($medNpi): ?><span>M.P. / NPI: <?= htmlspecialchars($medNpi) ?></span><br><?php endif; ?>
+                <span style="font-size: 8px; color: #0284c7; font-weight: bold;">Documento Firmado Digitalmente</span>
+            </td>
+            <td style="width: 10%;"></td>
             <td class="qr-placeholder">
                 <div class="val-box">
                     <strong>VALIDACIÓN ELECTRÓNICA INSTITUCIONAL</strong><br>
@@ -449,14 +485,17 @@ function img_norm_texto(?string $t): string
                     <span>Verifique autenticidad en <?= (defined('CLINIC_WEB') && CLINIC_WEB) ? htmlspecialchars(CLINIC_WEB) : '' ?></span>
                 </div>
             </td>
-            <td style="width: 10%;"></td>
-            <td class="sig-box">
-                <strong><?= htmlspecialchars($medNombre ?: 'Médico Informante') ?></strong><br>
-                <span><?= htmlspecialchars($medEspecialidad) ?></span><br>
-                <?php if ($medNpi): ?><span>M.P. / NPI: <?= htmlspecialchars($medNpi) ?></span><br><?php endif; ?>
-                <span style="font-size: 8px; color: #0284c7; font-weight: bold;">Documento Firmado Digitalmente</span>
+        </tr>
+        <?php if ($qrDataUri): ?>
+        <tr>
+            <td colspan="3" style="text-align: center; padding-top: 16px;">
+                <img src="<?= $qrDataUri ?>" alt="QR Estudio" style="width: 120px; height: 120px; display: inline-block;">
+                <div style="font-size: 8px; color: #64748b; margin-top: 3px;">
+                    Escaneá para ver el estudio en el visor DICOM (OHIF)
+                </div>
             </td>
         </tr>
+        <?php endif; ?>
     </table>
 
     <!-- ================================================================= -->

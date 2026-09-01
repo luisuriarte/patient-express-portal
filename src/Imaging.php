@@ -222,6 +222,10 @@ class Imaging
                         $catId = (int)($dRow['category_id'] ?? 0);
                         $report = $reportsByCategory[$catId] ?? null;
                         $isReportDocItself = ($report && (int)$report['doc_id'] === (int)$dRow['doc_id']);
+                        $providerName = 'Servicio de Diagnóstico por Imágenes';
+                        if ($report && !empty($report['medico_solicitante'])) {
+                            $providerName = $report['medico_solicitante'];
+                        }
 
                         $studies[] = [
                             'id'                => 'doc_' . $dRow['doc_id'],
@@ -234,7 +238,7 @@ class Imaging
                             'date_raw'          => $docDate,
                             'encounter_id'      => $encId,
                             'encounter_date'    => $encDateDisplay,
-                            'provider_name'     => 'Servicio de Diagnóstico por Imágenes',
+                            'provider_name'     => $providerName,
                             'provider_spec'     => $categoryLabel,
                             'status'            => 'Imagen Disponible',
                             'has_report'        => ($report && !$isReportDocItself),
@@ -278,6 +282,10 @@ class Imaging
                     $reportUrl = 'view_document.php?id=' . $reportDocId;
                     $consumedPdfDocIds[$reportDocId] = true;
                 }
+                $providerName = 'Servicio de Diagnóstico por Imágenes';
+                if ($report && !empty($report['medico_solicitante'])) {
+                    $providerName = $report['medico_solicitante'];
+                }
                 $studies[] = [
                     'id'                => 'study_' . $group['first_doc_id'],
                     'report_id'         => null,
@@ -290,7 +298,7 @@ class Imaging
                     'date_raw'          => $group['date_raw'],
                     'encounter_id'      => (int)($group['encounter_id'] ?? 0),
                     'encounter_date'    => $group['encounter_date'] ?? '',
-                    'provider_name'     => 'Servicio de Diagnóstico por Imágenes',
+                    'provider_name'     => $providerName,
                     'provider_spec'     => $group['category_label'],
                     'status'            => 'Sincronizado en PACS Orthanc',
                     'has_report'        => $hasReportPdf,
@@ -887,7 +895,8 @@ class Imaging
     {
         $map = [];
         $result = sqlStatement(
-            "SELECT id, pdf_document_id, pdf_category_id, modalidad, fecha_informe, region_anatomica
+            "SELECT id, pdf_document_id, pdf_category_id, modalidad, fecha_informe, region_anatomica,
+                    medico_solicitante, medico_informante
                FROM form_imaging_report
               WHERE pid = ?
                 AND pdf_document_id IS NOT NULL
@@ -906,9 +915,11 @@ class Imaging
             }
             $titulo = trim((string)($row['region_anatomica'] ?? ''));
             $map[$cat] = [
-                'doc_id' => (int)$row['pdf_document_id'],
-                'title'  => ($titulo !== '' ? $titulo . ' — ' : '') . 'Informe de Diagnóstico por Imágenes',
-                'date'   => (string)($row['fecha_informe'] ?? ''),
+                'doc_id'           => (int)$row['pdf_document_id'],
+                'title'            => ($titulo !== '' ? $titulo . ' — ' : '') . 'Informe de Diagnóstico por Imágenes',
+                'date'             => (string)($row['fecha_informe'] ?? ''),
+                'medico_solicitante' => trim((string)($row['medico_solicitante'] ?? '')),
+                'medico_informante'  => trim((string)($row['medico_informante'] ?? '')),
             ];
         }
         return $map;
@@ -930,7 +941,9 @@ class Imaging
                     d.encounter_id,
                     c.id AS category_id,
                     c.name AS category_name,
-                    d.name AS doc_name
+                    d.name AS doc_name,
+                    fir.medico_solicitante,
+                    fir.medico_informante
                FROM form_imaging_report fir
                JOIN documents d ON d.id = fir.pdf_document_id
                LEFT JOIN categories_to_documents ctd ON ctd.document_id = d.id
@@ -955,8 +968,10 @@ class Imaging
             }
             if (!isset($map[$enc][$cat])) {
                 $map[$enc][$cat] = [
-                    'doc_id' => $docId,
-                    'name'   => (string)($row['doc_name'] ?? ''),
+                    'doc_id'           => $docId,
+                    'name'             => (string)($row['doc_name'] ?? ''),
+                    'medico_solicitante' => trim((string)($row['medico_solicitante'] ?? '')),
+                    'medico_informante'  => trim((string)($row['medico_informante'] ?? '')),
                 ];
             }
         }

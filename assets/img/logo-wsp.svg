@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 500" width="100%" height="100%">
+  <!-- Fondo Azul Oscuro Sólido (Llena todo el espacio) -->
+  <rect width="500" height="500" fill="#0E2A47"/>
+
+  <!-- SÍMBOLO CENTRAL AUMENTADO PARA MÁXIMA VISIBILIDAD EN PANTALLAS PEQUEÑAS -->
+  <g transform="translate(100, 100)">
+    <!-- Anillo exterior Turquesa Neón / Blanco -->
+    <circle cx="150" cy="150" r="110" fill="none" stroke="#06B6D4" stroke-width="24"/>
+    
+    <!-- Nodos interiores de la Familia (Blanco y Verde brillante) -->
+    <circle cx="120" cy="150" r="22" fill="#FFFFFF"/>
+    <circle cx="180" cy="150" r="28" fill="#10B981"/>
+    
+    <!-- Curva de Conexión -->
+    <path d="M 120 150 Q 150 110 180 150 Q 150 190 120 150 Z" fill="#FFFFFF" opacity="0.35"/>
+  </g>
+</svg>
