@@ -1,0 +1,57 @@
+diff --git "a/..\\openemr-8.2.0\\templates\\documents\\general_upload.html" "b/patch\\openemr\\templates\\documents\\general_upload.html"
+index 3d797a2..a8e03d7 100644
+--- "a/..\\openemr-8.2.0\\templates\\documents\\general_upload.html"
++++ "b/patch\\openemr\\templates\\documents\\general_upload.html"
+@@ -50,6 +50,24 @@
+             <div>
+                 <input type="submit" class="btn btn-primary" value="{xla t='Upload'}" />
+             </div>
++            {if $encounters}
++            <div class="form-group">
++                <label for="encounter_id" class="font-weight-bold">{xlt t="Vincular a Encuentro / Orden"} (opcional):</label>
++                <select name="encounter_id" id="encounter_id" class="form-control">
++                    <option value="">{xlt t="-- Sin vincular --"}</option>
++                    {foreach from=$encounters item=enc}
++                    <option value="{$enc.encounter|attr}">
++                        {if $enc.procedure_order_id}
++                        {xlt t="Enc"} #{$enc.encounter} - {$enc.date|date_format:"%d/%m/%Y"} - {xlt t="Orden"} #{$enc.procedure_order_id}: {$enc.procedure_name|text}
++                        {else}
++                        {xlt t="Enc"} #{$enc.encounter} - {$enc.date|date_format:"%d/%m/%Y"}
++                        {/if}
++                    </option>
++                    {/foreach}
++                </select>
++                <small class="form-text text-muted">{xlt t="Los estudios subidos (incluidos los ZIP) se vincularán al encuentro/orden elegido."}</small>
++            </div>
++            {/if}
+         </div>
+         <input type="hidden" name="patient_id" value="{$patient_id|attr}" />
+         <input type="hidden" name="category_id" value="{$category_id|attr}" />
+@@ -108,4 +126,27 @@
+             </div>
+         </div>
+     </form>
++    <script>
++        (function () {
++            // Sincroniza el encuentro seleccionado con el subidor drag & drop (dropzone),
++            // agregándolo como parámetro de su action para que viaje en la subida AJAX.
++            var sel = document.getElementById('encounter_id');
++            var dzForm = document.querySelector('form.dropzone');
++            if (!sel || !dzForm) {
++                return;
++            }
++            var syncDropzone = function () {
++                var v = sel.value;
++                var url = new URL(dzForm.getAttribute('action'), window.location.href);
++                if (v) {
++                    url.searchParams.set('encounter_id', v);
++                } else {
++                    url.searchParams.delete('encounter_id');
++                }
++                dzForm.setAttribute('action', url.pathname + url.search);
++            };
++            sel.addEventListener('change', syncDropzone);
++            syncDropzone();
++        })();
++    </script>
+ </div>

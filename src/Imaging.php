@@ -61,6 +61,9 @@ class Imaging
                             d.foreign_id AS patient_id,
                             d.encounter_id,
                             fe.date AS encounter_date,
+                            fe.provider_id AS enc_provider_id,
+                            up.fname AS enc_provider_fname,
+                            up.lname AS enc_provider_lname,
                             c.id AS category_id,
                             c.name AS category_name,
                             cp.name AS parent_category_name,
@@ -72,6 +75,7 @@ class Imaging
                         LEFT JOIN categories cp ON c.parent = cp.id
                         LEFT JOIN documents_pacs_sync dps ON d.id = dps.document_id
                         LEFT JOIN form_encounter fe ON fe.pid = d.foreign_id AND fe.encounter = d.encounter_id
+                        LEFT JOIN users up ON up.id = fe.provider_id
                         WHERE d.foreign_id = ? 
                         AND (d.deleted = 0 OR d.deleted IS NULL)
                         AND ctd.category_id IN ($placeholders)
@@ -137,6 +141,7 @@ class Imaging
                     if (!empty($dRow['encounter_date']) && $dRow['encounter_date'] !== '0000-00-00') {
                         $encDateDisplay = date('d/m/Y', strtotime((string)$dRow['encounter_date']));
                     }
+                    $encProviderName = trim(($dRow['enc_provider_fname'] ?? '') . ' ' . ($dRow['enc_provider_lname'] ?? ''));
 
                     $viewUrl = 'view_document.php?id=' . $dRow['doc_id'];
                     $downloadUrl = 'view_document.php?id=' . $dRow['doc_id'] . '&download=1';
@@ -152,6 +157,7 @@ class Imaging
                                     'category_label' => $categoryLabel,
                                     'encounter_id'   => (int)($dRow['encounter_id'] ?? 0),
                                     'encounter_date' => $encDateDisplay,
+                                    'enc_provider_name' => $encProviderName,
                                     'category_id'    => (int)($dRow['category_id'] ?? 0),
                                     'date_raw'       => $docDate,
                                     'formatted_date' => $formattedDate,
@@ -164,6 +170,9 @@ class Imaging
                                 $groupedStudies[$pacsStudyUid]['encounter_id'] = (int)$dRow['encounter_id'];
                                 if ($encDateDisplay !== '') {
                                     $groupedStudies[$pacsStudyUid]['encounter_date'] = $encDateDisplay;
+                                }
+                                if ($encProviderName !== '' && empty($groupedStudies[$pacsStudyUid]['enc_provider_name'])) {
+                                    $groupedStudies[$pacsStudyUid]['enc_provider_name'] = $encProviderName;
                                 }
                             }
                             if ((int)($dRow['category_id'] ?? 0) > 0) {
@@ -196,7 +205,7 @@ class Imaging
                             'date_raw'          => $docDate,
                             'encounter_id'      => $encId,
                             'encounter_date'    => $encDateDisplay,
-                            'provider_name'     => 'Servicio de Diagnóstico por Imágenes',
+                            'provider_name'     => $encProviderName ?: 'Servicio de Diagnóstico por Imágenes',
                             'provider_spec'     => $categoryLabel,
                             'status'            => 'Estudio DICOM Listo',
                             'has_report'        => false,
@@ -222,7 +231,7 @@ class Imaging
                         $catId = (int)($dRow['category_id'] ?? 0);
                         $report = $reportsByCategory[$catId] ?? null;
                         $isReportDocItself = ($report && (int)$report['doc_id'] === (int)$dRow['doc_id']);
-                        $providerName = 'Servicio de Diagnóstico por Imágenes';
+                        $providerName = $encProviderName ?: 'Servicio de Diagnóstico por Imágenes';
                         if ($report && !empty($report['medico_solicitante'])) {
                             $providerName = $report['medico_solicitante'];
                         }
@@ -282,7 +291,9 @@ class Imaging
                     $reportUrl = 'view_document.php?id=' . $reportDocId;
                     $consumedPdfDocIds[$reportDocId] = true;
                 }
-                $providerName = 'Servicio de Diagnóstico por Imágenes';
+                $providerName = (!empty($group['enc_provider_name']))
+                    ? $group['enc_provider_name']
+                    : 'Servicio de Diagnóstico por Imágenes';
                 if ($report && !empty($report['medico_solicitante'])) {
                     $providerName = $report['medico_solicitante'];
                 }

@@ -1,0 +1,129 @@
+diff --git "a/..\\openemr-8.2.0\\controllers\\C_Document.class.php" "b/patch\\openemr\\controllers\\C_Document.class.php"
+index 633238b..f26c12a 100644
+--- "a/..\\openemr-8.2.0\\controllers\\C_Document.class.php"
++++ "b/patch\\openemr\\controllers\\C_Document.class.php"
+@@ -94,6 +94,25 @@ class C_Document extends Controller
+         $this->assign("hide_encryption", OEGlobalsBag::getInstance()->getBoolean('hide_document_encryption'));
+         $this->assign("patient_id", $patient_id);
+ 
++        // Encuestos del paciente + órdenes asociadas, para el selector
++        // "Vincular a Encuentro / Orden" de la vista de subida.
++        $encounters = [];
++        if ($patient_id > 0) {
++            $sqlEnc = "SELECT fe.encounter, fe.date, " .
++                "po.procedure_order_id, po.order_status, po.procedure_order_type, " .
++                "poc.procedure_name, po.date_ordered " .
++                "FROM form_encounter fe " .
++                "LEFT JOIN procedure_order po ON po.patient_id = fe.pid AND po.encounter_id = fe.encounter AND po.activity = 1 " .
++                "LEFT JOIN procedure_order_code poc ON poc.procedure_order_id = po.procedure_order_id " .
++                "WHERE fe.pid = ? " .
++                "ORDER BY fe.date DESC, fe.encounter DESC";
++            $encRes = sqlStatement($sqlEnc, [$patient_id]);
++            while ($encRow = sqlFetchArray($encRes)) {
++                $encounters[] = $encRow;
++            }
++        }
++        $this->assign("encounters", $encounters);
++
+         // Added by Rod to support document template download from general_upload.html.
+         // Cloned from similar stuff in manage_document_templates.php.
+         $templatedir = OEGlobalsBag::getInstance()->get('OE_SITE_DIR') . '/documents/doctemplates';
+@@ -198,6 +217,12 @@ class C_Document extends Controller
+             $patient_id = $_POST['patient_id'];
+         }
+ 
++        // Encuentro seleccionado en la vista de subida (vinculación a Orden/Encuentro).
++        $encounter_id = 0;
++        if (is_numeric($_POST['encounter_id'] ?? '')) {
++            $encounter_id = (int) $_POST['encounter_id'];
++        }
++
+         // ensure user has access to the category that is being uploaded to
+         $skipUpload = false;
+         if (!$this->isSkipAclCheck()) {
+@@ -240,7 +265,7 @@ class C_Document extends Controller
+                     if ($_FILES['file']['size'][$key] == 0) {
+                         $error .= xl("The system does not permit uploading files of with size 0.") . "\n";
+                     }
+-                } elseif (OEGlobalsBag::getInstance()->getBoolean('secure_upload') && !isWhiteFile($_FILES['file']['tmp_name'][$key])) {
++                } elseif (OEGlobalsBag::getInstance()->getBoolean('secure_upload') && stripos((string) $_FILES['file']['type'][$key], 'zip') === false && !isWhiteFile($_FILES['file']['tmp_name'][$key])) {
+                     $error = xl("The system does not permit uploading files with MIME content type") . " - " . mime_content_type($_FILES['file']['tmp_name'][$key]) . ".\n";
+                 } else {
+                     // Test for a zip of DICOM images
+@@ -279,6 +304,65 @@ class C_Document extends Controller
+                             }
+                         }
+                     }
++                    // ===== PATCH: extraer archivos de un ZIP y registrarlos individualmente =====
++                    // Cuando la subida es un zip (imágenes/DICOM comprimidos), se descomprime y cada
++                    // archivo se registra como documento propio vinculado al encuentro seleccionado.
++                    if (isset($mimetype) && ($mimetype === 'application/zip' || $mimetype === 'application/dicom+zip')) {
++                        $za = new ZipArchive();
++                        if ($za->open($_FILES['file']['tmp_name'][$key]) === true) {
++                            for ($zii = 0; $zii < $za->numFiles; $zii++) {
++                                $zstat = $za->statIndex($zii);
++                                $zname = (string) ($zstat['name'] ?? '');
++                                if (($zstat['size'] ?? 0) == 0 || $zname === '' || $zname === '.' || $zname === '..') {
++                                    continue; // directorios / entradas vacías
++                                }
++                                // Strip directory components to prevent path traversal.
++                                $zname = basename($zname);
++                                if ($zname === '' || $zname === '.' || $zname === '..') {
++                                    continue;
++                                }
++                                $zdata = $za->getFromIndex($zii);
++                                if ($zdata === false || $zdata === '') {
++                                    continue;
++                                }
++                                $zext = strtolower(pathinfo($zname, PATHINFO_EXTENSION));
++                                if (str_contains($zdata, 'DICM') || $zext === 'dcm') {
++                                    $zmime = 'application/dicom';
++                                    if ($zext === '') {
++                                        $zname .= '.dcm';
++                                    }
++                                } else {
++                                    $zipMimeMap = [
++                                        'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png',
++                                        'gif' => 'image/gif', 'webp' => 'image/webp', 'bmp' => 'image/bmp',
++                                        'pdf' => 'application/pdf', 'txt' => 'text/plain',
++                                    ];
++                                    $zmime = $zipMimeMap[$zext] ?? 'application/octet-stream';
++                                }
++                                $zDoc = new Document();
++                                $zRc = $zDoc->createDocument(
++                                    $patient_id,
++                                    $category_id,
++                                    $zname,
++                                    $zmime,
++                                    $zdata,
++                                    empty($_GET['higher_level_path']) ? '' : $_GET['higher_level_path'],
++                                    empty($_POST['path_depth']) ? 1 : $_POST['path_depth'],
++                                    $non_HTTP_owner,
++                                    null, null, null, null,
++                                    $encounter_id
++                                );
++                                if ($zRc) {
++                                    $error .= $zRc . "\n";
++                                }
++                                $sentUploadStatus[] = $zDoc;
++                                $this->assign("file", $sentUploadStatus);
++                            }
++                            $za->close();
++                        }
++                        // El zip se extrae; no se guarda como documento único.
++                        continue;
++                    }
+                     $tmpfile = fopen($_FILES['file']['tmp_name'][$key], "r");
+                     $filetext = fread($tmpfile, $_FILES['file']['size'][$key]);
+                     fclose($tmpfile);
+@@ -322,7 +406,9 @@ class C_Document extends Controller
+                         empty($_GET['higher_level_path']) ? '' : $_GET['higher_level_path'],
+                         empty($_POST['path_depth']) ? 1 : $_POST['path_depth'],
+                         $non_HTTP_owner,
+-                        $_FILES['file']['tmp_name'][$key]
++                        $_FILES['file']['tmp_name'][$key],
++                        null, null, null,
++                        $encounter_id
+                     );
+                     if ($rc) {
+                         $error .= $rc . "\n";

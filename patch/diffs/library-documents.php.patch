@@ -1,0 +1,22 @@
+diff --git "a/..\\openemr-8.2.0\\library\\documents.php" "b/patch\\openemr\\library\\documents.php"
+index 843b152..b1fede7 100644
+--- "a/..\\openemr-8.2.0\\library\\documents.php"
++++ "b/patch\\openemr\\library\\documents.php"
+@@ -51,7 +51,8 @@ function addNewDocument(
+     $category_id = '1',
+     $higher_level_path = '',
+     $path_depth = '1',
+-    $skip_acl_check = false
++    $skip_acl_check = false,
++    $encounter_id = 0
+ ) {
+ 
+     if (empty($owner)) {
+@@ -77,6 +78,7 @@ function addNewDocument(
+     $_POST['patient_id'] = (is_numeric($patient_id_or_simple_directory) && $patient_id_or_simple_directory > 0) ? $patient_id_or_simple_directory : "00";
+     $_POST['category_id'] = $category_id;
+     $_POST['process'] = 'true';
++    $_POST['encounter_id'] = $encounter_id;
+ 
+     // Add the Document and return the newly added document id
+     $cd = new C_Document();

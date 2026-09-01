@@ -1,0 +1,87 @@
+diff --git "a/..\\openemr-8.2.0\\interface\\orders\\find_order_popup.php" "b/patch\\openemr\\interface\\orders\\find_order_popup.php"
+index 267c3fb..540c52c 100644
+--- "a/..\\openemr-8.2.0\\interface\\orders\\find_order_popup.php"
++++ "b/patch\\openemr\\interface\\orders\\find_order_popup.php"
+@@ -19,6 +19,9 @@ use OpenEMR\Core\Header;
+ 
+ $order = (int) ($_GET['order'] ?? null);
+ $labid = (int) ($_GET['labid'] ?? null);
++// Tipo de orden (imaging, laboratory_test, etc.) enviado desde el formulario.
++// Cuando es 'imaging', el buscador solo muestra el subárbol DIAGNÓSTICO POR IMÁGENES.
++$otype = trim((string) ($_REQUEST['otype'] ?? ''));
+ 
+ //////////////////////////////////////////////////////////////////////
+ // The form was submitted with the selected code type.
+@@ -114,7 +117,8 @@ if (isset($_GET['typeid'])) {
+             <?php
+             echo "const params = new URLSearchParams({";
+             echo "order: " . js_escape($order) . ", ";
+-            echo "labid: " . js_escape($labid);
++            echo "labid: " . js_escape($labid) . ", ";
++            echo "otype: " . js_escape($otype);
+             if (isset($_GET['addfav'])) {
+                 echo ", addfav: " . js_escape($_GET['addfav']);
+             }
+@@ -137,7 +141,7 @@ if (isset($_GET['typeid'])) {
+ <body>
+ <div class="container">
+     <div class="row">
+-        <form class="form-inline" method='post' name='theform' action='find_order_popup.php<?php echo "?order=" . attr_url($order) . "&labid=" . attr_url($labid);
++        <form class="form-inline" method='post' name='theform' action='find_order_popup.php<?php echo "?order=" . attr_url($order) . "&labid=" . attr_url($labid) . "&otype=" . attr_url($otype);
+         if (isset($_GET['formid'])) {
+             echo '&formid=' . attr_url($_GET['formid']);
+         }
+@@ -177,14 +181,45 @@ if (isset($_GET['typeid'])) {
+                         $sub = "OR procedure_type LIKE 'pro'";
+                     }
+                     $search_term = '%' . $_REQUEST['search_term'] . '%';
+-                    $query = "SELECT procedure_type_id, procedure_code, procedure_type, name " .
+-                        "FROM procedure_type WHERE " .
+-                        "lab_id = ? AND " .
+-                        "(procedure_type LIKE ? $sub) AND " .
+-                        "activity = 1 AND " .
+-                        "(procedure_code LIKE ? OR name LIKE ?) " .
+-                        "ORDER BY seq, procedure_code";
+-                    $res = sqlStatement($query, [$labid, $ord, $search_term, $search_term]);
++                    // El buscador filtra el catálogo según el tipo de orden seleccionado
++                    // (procedure_type_names = procedure_type.procedure_type_name):
++                    //   - 'imaging'          -> estudios de imágenes (subárbol DIAGNÓSTICO POR IMÁGENES)
++                    //   - 'laboratory_test'  -> análisis de laboratorio
++                    //   - 'procedure' y demás -> los procedimientos de ese tipo
++                    // Los ítems legacy SIN procedure_type_name cargado se siguen mostrando
++                    // con el filtro clásico por laboratorio (lab_id), para no perder nada.
++                    // Los favoritos (fgp) se dejan sin filtrar para no romper grupos personalizados.
++                    if ($otype !== '' && $ord === 'ord') {
++                        $extraSql = " AND (pt.procedure_type_name = ? OR ((pt.procedure_type_name IS NULL OR pt.procedure_type_name = '') AND pt.lab_id = ?))";
++                        $extraParams = [$otype, $labid];
++                        if ($otype === 'imaging') {
++                            $imageRoot = sqlQuery(
++                                "SELECT procedure_type_id FROM procedure_type " .
++                                "WHERE parent = 0 AND procedure_type = 'grp' AND name = ? AND activity = 1 LIMIT 1",
++                                ['DIAGNÓSTICO POR IMÁGENES']
++                            );
++                            $imageRootId = (int) ($imageRoot['procedure_type_id'] ?? 0);
++                            if ($imageRootId > 0) {
++                                $extraSql .= " OR pt.parent IN (SELECT procedure_type_id FROM procedure_type WHERE parent = ? AND activity = 1)";
++                                $extraParams[] = $imageRootId;
++                            }
++                        }
++                        $query = "SELECT pt.procedure_type_id, pt.procedure_code, pt.procedure_type, pt.name " .
++                            "FROM procedure_type pt WHERE " .
++                            "(pt.procedure_type LIKE ? $sub) AND pt.activity = 1 $extraSql AND " .
++                            "(pt.procedure_code LIKE ? OR pt.name LIKE ?) " .
++                            "ORDER BY pt.seq, pt.procedure_code";
++                        $res = sqlStatement($query, array_merge([$ord], $extraParams, [$search_term, $search_term]));
++                    } else {
++                        $query = "SELECT procedure_type_id, procedure_code, procedure_type, name " .
++                            "FROM procedure_type WHERE " .
++                            "lab_id = ? AND " .
++                            "(procedure_type LIKE ? $sub) AND " .
++                            "activity = 1 AND " .
++                            "(procedure_code LIKE ? OR name LIKE ?) " .
++                            "ORDER BY seq, procedure_code";
++                        $res = sqlStatement($query, [$labid, $ord, $search_term, $search_term]);
++                    }
+ 
+                     while ($row = sqlFetchArray($res)) {
+                         $itertypeid = $row['procedure_type_id'];
