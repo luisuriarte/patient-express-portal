@@ -58,11 +58,12 @@ $fechaInforme    = !empty($fields['fecha_informe'])
     : date('d/m/Y');
 $fechaImpresion  = date('d/m/Y H:i:s');
 
-// Logo institucional en Base64
+// Logo institucional en Base64 (PNG o SVG; Dompdf 3.x renderiza SVG)
 if (empty($logoBase64)) {
     $logoBase64 = '';
     if (!empty($logoPath) && file_exists($logoPath)) {
-        $logoBase64 = 'data:image/png;base64,' . base64_encode(file_get_contents($logoPath));
+        $mime = (strtolower(pathinfo($logoPath, PATHINFO_EXTENSION)) === 'svg') ? 'image/svg+xml' : 'image/png';
+        $logoBase64 = 'data:' . $mime . ';base64,' . base64_encode(file_get_contents($logoPath));
     }
 }
 
@@ -181,8 +182,12 @@ function img_norm_texto(?string $t): string
             margin-bottom: 12px;
         }
         .header-logo-cell {
-            width: 92px;
+            width: 240px;
             vertical-align: middle;
+        }
+        .header-logo-img {
+            max-height: 52px;
+            max-width: 230px;
         }
         .clinic-name {
             font-size: 15px;
@@ -364,7 +369,7 @@ function img_norm_texto(?string $t): string
         <tr>
             <td class="header-logo-cell">
                 <?php if ($logoBase64): ?>
-                    <img src="<?= $logoBase64 ?>" style="max-height:52px;max-width:82px;" alt="Logo">
+                    <img src="<?= $logoBase64 ?>" class="header-logo-img" alt="Logo">
                 <?php endif; ?>
             </td>
             <td style="vertical-align: middle;">

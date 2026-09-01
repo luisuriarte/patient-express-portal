@@ -49,9 +49,9 @@ define('CLINIC_ADDRESS', '');
 define('CLINIC_PHONE', '');
 define('CLINIC_EMAIL', '');
 define('CLINIC_WEB', '');
-$logoFile = dirname(__DIR__) . '/public/assets/img/logo.png';
+$logoFile = dirname(__DIR__) . '/assets/img/logo-banner.svg';
 if (!file_exists($logoFile)) {
-    $logoFile = dirname(__DIR__) . '/assets/img/logo.png';
+    $logoFile = dirname(__DIR__) . '/public/assets/img/logo-banner.svg';
 }
 define('CLINIC_LOGO_PATH', $logoFile);
 

@@ -49,13 +49,14 @@ if (!$data) {
     die('Error: Informe no encontrado o no tiene permisos para acceder al documento solicitado.');
 }
 
-// Cargar Logo en base64 para Dompdf
+// Cargar Logo en base64 para Dompdf (soporta SVG y PNG)
 $logoBase64 = '';
-$logoPathPng = defined('CLINIC_LOGO_PATH') ? CLINIC_LOGO_PATH : (dirname(__DIR__) . '/assets/img/logo.png');
-if (file_exists($logoPathPng)) {
-    $typeImg = pathinfo($logoPathPng, PATHINFO_EXTENSION);
-    $imgData = file_get_contents($logoPathPng);
-    $logoBase64 = 'data:image/' . $typeImg . ';base64,' . base64_encode($imgData);
+$logoPathFile = defined('CLINIC_LOGO_PATH') ? CLINIC_LOGO_PATH : (dirname(__DIR__) . '/assets/img/logo-banner.svg');
+if (file_exists($logoPathFile)) {
+    $ext = strtolower(pathinfo($logoPathFile, PATHINFO_EXTENSION));
+    $mime = ($ext === 'svg') ? 'image/svg+xml' : 'image/' . $ext;
+    $imgData = file_get_contents($logoPathFile);
+    $logoBase64 = 'data:' . $mime . ';base64,' . base64_encode($imgData);
 }
 
 // Estructurar el HTML para la plantilla A4

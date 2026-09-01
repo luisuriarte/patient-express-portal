@@ -26,8 +26,7 @@ $pageTitle = $pageTitle ?? ('Portal Express del Paciente' . (defined('CLINIC_NAM
     <meta name="robots" content="noindex, nofollow">
     
     <!-- Favicon -->
-    <link rel="icon" type="image/svg+xml" href="assets/img/logo.svg">
-    <link rel="alternate icon" type="image/png" href="assets/img/logo.png">
+    <link rel="icon" type="image/svg+xml" href="assets/img/favicon.svg">
 
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -80,18 +79,10 @@ $pageTitle = $pageTitle ?? ('Portal Express del Paciente' . (defined('CLINIC_NAM
                 
                 <!-- Logo e Identidad -->
                 <div class="flex items-center space-x-3">
-                    <a href="dashboard.php" class="flex items-center space-x-3 group">
-                        <div class="w-10 h-10 md:w-11 md:h-11 rounded-xl bg-gradient-to-br from-sky-600 to-teal-600 flex items-center justify-center text-white shadow-md shadow-sky-500/20 group-hover:scale-105 transition-transform duration-200">
-                            <i data-lucide="activity" class="w-6 h-6"></i>
-                        </div>
-                        <div class="flex flex-col">
-                            <span class="font-heading font-extrabold text-base md:text-lg tracking-tight text-slate-900 leading-tight">
-                                CENTRO MÉDICO <span class="text-sky-600">ORIGEN</span>
-                            </span>
-                            <span class="text-[10px] md:text-xs font-semibold text-slate-500 tracking-wider uppercase">
-                                Portal Express del Paciente
-                            </span>
-                        </div>
+                    <a href="dashboard.php" class="flex items-center group">
+                        <img src="assets/img/logo-portal-pacientes.svg"
+                             alt="Portal Express del Paciente"
+                             class="h-12 md:h-14 w-auto transition-transform duration-200 group-hover:scale-105">
                     </a>
                 </div>
 

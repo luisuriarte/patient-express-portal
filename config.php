@@ -103,9 +103,9 @@ if (!defined('CLINIC_PHONE'))    define('CLINIC_PHONE',    $facPhone);
 if (!defined('CLINIC_EMAIL'))    define('CLINIC_EMAIL',    $facEmail);
 if (!defined('CLINIC_WEB'))      define('CLINIC_WEB',      $facWeb);
 if (!defined('CLINIC_LOGO_PATH')) {
-    $logoFile = __DIR__ . '/public/assets/img/logo.png';
+    $logoFile = __DIR__ . '/assets/img/logo-banner.svg';
     if (!file_exists($logoFile)) {
-        $logoFile = __DIR__ . '/assets/img/logo.png';
+        $logoFile = __DIR__ . '/public/assets/img/logo-banner.svg';
     }
     define('CLINIC_LOGO_PATH', $logoFile);
 }

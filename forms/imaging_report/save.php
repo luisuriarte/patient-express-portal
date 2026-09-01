@@ -119,19 +119,19 @@ function generateAndStorePdf(int $pid, int $formId, array $fields, $session): ?i
     ) ?: [];
 
     // Logo institucional: prioriza la configuración de OpenEMR si existe,
-    // con fallback a la ruta local del formulario.
+    // con fallback a la ruta local del formulario (logo-banner.svg).
     $logoPath = null;
     if (!empty($GLOBALS['images_static_absolute'])) {
-        $candidate = rtrim((string)$GLOBALS['images_static_absolute'], '/') . '/logo.png';
+        $candidate = rtrim((string)$GLOBALS['images_static_absolute'], '/') . '/logo-banner.svg';
         if (file_exists($candidate)) {
             $logoPath = $candidate;
         }
     }
     if (!$logoPath) {
         $searches = [
-            dirname(__DIR__, 4) . '/public/assets/img/logo.png',
-            dirname(__DIR__, 4) . '/assets/img/logo.png',
-            $siteDir . '/assets/img/logo.png',
+            dirname(__DIR__, 4) . '/public/assets/img/logo-banner.svg',
+            dirname(__DIR__, 4) . '/assets/img/logo-banner.svg',
+            $siteDir . '/assets/img/logo-banner.svg',
         ];
         foreach ($searches as $candidate) {
             if (file_exists($candidate)) {
