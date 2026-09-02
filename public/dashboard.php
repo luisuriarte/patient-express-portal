@@ -35,13 +35,13 @@ if (!empty($patient['dob']) && $patient['dob'] !== '0000-00-00') {
     try {
         $dobDate = new \DateTime($patient['dob']);
         $now = new \DateTime();
-        $patientAge = $now->diff($dobDate)->y . ' años';
+        $patientAge = $now->diff($dobDate)->y . ' ' . xl('years');
     } catch (\Throwable $e) {
         $patientAge = 'N/A';
     }
 }
 
-$pageTitle = 'Mis Estudios y Resultados | ' . (defined('CLINIC_NAME') && CLINIC_NAME ? CLINIC_NAME : 'Portal Express del Paciente');
+$pageTitle = xlt('My Studies and Results') . ' | ' . (defined('CLINIC_NAME') && CLINIC_NAME ? CLINIC_NAME : xlt('Patient Express Portal'));
 require_once dirname(__DIR__) . '/templates/header.php';
 ?>
 
@@ -60,31 +60,31 @@ require_once dirname(__DIR__) . '/templates/header.php';
             <div class="space-y-3">
                 <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-sky-500/20 border border-sky-400/30 text-sky-300 text-xs font-semibold">
                     <i data-lucide="user-check" class="w-3.5 h-3.5"></i>
-                    <span>Paciente Activo en Sistema</span>
+                    <span><?= xlt('Active Patient in System') ?></span>
                 </div>
 
                 <div>
                     <h1 class="text-2xl sm:text-3xl font-extrabold font-heading tracking-tight text-white">
-                        Hola, <?= htmlspecialchars($patient['full_name'] ?? 'Estimado Paciente') ?>
+                        <?= xlt('Hello') ?>, <?= htmlspecialchars($patient['full_name'] ?? xlt('Dear Patient')) ?>
                     </h1>
                     <p class="text-xs sm:text-sm text-slate-300 mt-1">
-                        Bienvenido a tu centro de consulta médica. Aquí puedes revisar tus estudios y protocolos de diagnóstico al instante.
+                        <?= xlt('Welcome to your medical consultation center. Here you can review your studies and diagnostic protocols instantly.') ?>
                     </p>
                 </div>
 
                 <!-- Chips Demográficos -->
                 <div class="flex flex-wrap items-center gap-2 pt-1">
                     <span class="inline-flex items-center text-xs bg-slate-800/90 border border-slate-700 px-3 py-1 rounded-lg text-slate-200">
-                        <strong class="text-slate-400 font-medium mr-1.5">DNI:</strong> <?= htmlspecialchars($patient['dni'] ?: 'No registrado') ?>
+                        <strong class="text-slate-400 font-medium mr-1.5"><?= xlt('DNI') ?>:</strong> <?= htmlspecialchars($patient['dni'] ?: xlt('Not registered')) ?>
                     </span>
                     <span class="inline-flex items-center text-xs bg-slate-800/90 border border-slate-700 px-3 py-1 rounded-lg text-slate-200">
-                        <strong class="text-slate-400 font-medium mr-1.5">Historia / PID:</strong> #<?= htmlspecialchars((string)$pid) ?>
+                        <strong class="text-slate-400 font-medium mr-1.5"><?= xlt('History / PID') ?>:</strong> #<?= htmlspecialchars((string)$pid) ?>
                     </span>
                     <span class="inline-flex items-center text-xs bg-slate-800/90 border border-slate-700 px-3 py-1 rounded-lg text-slate-200">
-                        <strong class="text-slate-400 font-medium mr-1.5">Edad:</strong> <?= htmlspecialchars($patientAge) ?>
+                        <strong class="text-slate-400 font-medium mr-1.5"><?= xlt('Age') ?>:</strong> <?= htmlspecialchars($patientAge) ?>
                     </span>
                     <span class="inline-flex items-center text-xs bg-slate-800/90 border border-slate-700 px-3 py-1 rounded-lg text-slate-200">
-                        <strong class="text-slate-400 font-medium mr-1.5">Sexo:</strong> <?= htmlspecialchars($patient['sex'] ?: 'No especificado') ?>
+                        <strong class="text-slate-400 font-medium mr-1.5"><?= xlt('Sex') ?>:</strong> <?= htmlspecialchars($patient['sex'] ?: xlt('Not specified')) ?>
                     </span>
                 </div>
             </div>
@@ -93,11 +93,11 @@ require_once dirname(__DIR__) . '/templates/header.php';
             <div class="grid grid-cols-2 gap-3 min-w-[240px]">
                 <div class="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-4 text-center">
                     <span class="block text-2xl sm:text-3xl font-extrabold font-heading text-sky-300"><?= $totalLabBatches ?></span>
-                    <span class="text-xs text-slate-300 font-medium">Encuentros de Lab</span>
+                    <span class="text-xs text-slate-300 font-medium"><?= xlt('Lab Encounters') ?></span>
                 </div>
                 <div class="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-4 text-center">
                     <span class="block text-2xl sm:text-3xl font-extrabold font-heading text-teal-300"><?= $totalImages ?></span>
-                    <span class="text-xs text-slate-300 font-medium">Estudios Imagen</span>
+                    <span class="text-xs text-slate-300 font-medium"><?= xlt('Imaging Studies') ?></span>
                 </div>
             </div>
 
@@ -112,7 +112,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
                 id="btn-tab-laboratories"
                 class="tab-btn flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-xl text-xs sm:text-sm font-heading font-bold transition-all duration-150 bg-sky-600 text-white shadow-sm cursor-pointer">
             <i data-lucide="test-tube" class="w-4 h-4"></i>
-            <span>Resultados de Laboratorio</span>
+            <span><?= xlt('Laboratory Results') ?></span>
             <span class="ml-1.5 py-0.5 px-2 rounded-full text-[11px] bg-white/20 text-white"><?= $totalLabBatches ?></span>
         </button>
 
@@ -121,7 +121,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
                 id="btn-tab-imaging"
                 class="tab-btn flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-xl text-xs sm:text-sm font-heading font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all duration-150 cursor-pointer">
             <i data-lucide="scan" class="w-4 h-4"></i>
-            <span>Diagnóstico por Imágenes & DICOM</span>
+            <span><?= xlt('Diagnostic Imaging & DICOM') ?></span>
             <span class="ml-1.5 py-0.5 px-2 rounded-full text-[11px] bg-slate-200 text-slate-700"><?= $totalImages ?></span>
         </button>
 
@@ -130,7 +130,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
                 id="btn-tab-fullportal"
                 class="tab-btn flex-1 flex items-center justify-center space-x-2 py-3 px-4 rounded-xl text-xs sm:text-sm font-heading font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all duration-150 cursor-pointer">
             <i data-lucide="layout-grid" class="w-4 h-4"></i>
-            <span>Portal Completo OpenEMR</span>
+            <span><?= xlt('Full OpenEMR Portal') ?></span>
             <i data-lucide="external-link" class="w-3.5 h-3.5 ml-1 text-slate-400"></i>
         </button>
 
@@ -147,11 +147,11 @@ require_once dirname(__DIR__) . '/templates/header.php';
                 <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
                 <input type="text" 
                        id="searchLabInput" 
-                       placeholder="Buscar por encuentro, fecha, análisis o médico..." 
+                       placeholder="<?= xla('Search by encounter, date, test or doctor...') ?>" 
                        class="w-full pl-10 pr-4 py-2 text-xs md:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-sky-500 transition-colors">
             </div>
             <div class="text-xs text-slate-500 font-medium">
-                Mostrando <span id="labCountText" class="font-bold text-slate-800"><?= $totalLabBatches ?></span> encuentros (<?= $totalIndividualLabs ?> estudios en total)
+                <?= xlt('Showing') ?> <span id="labCountText" class="font-bold text-slate-800"><?= $totalLabBatches ?></span> <?= xlt('encounters') ?> (<?= $totalIndividualLabs ?> <?= xlt('studies in total') ?>)
             </div>
         </div>
 
@@ -162,9 +162,9 @@ require_once dirname(__DIR__) . '/templates/header.php';
                     <i data-lucide="file-question" class="w-8 h-8"></i>
                 </div>
                 <div class="space-y-1 max-w-md mx-auto">
-                    <h3 class="font-heading font-bold text-lg text-slate-900">No se encontraron análisis de laboratorio</h3>
+                    <h3 class="font-heading font-bold text-lg text-slate-900"><?= xlt('No laboratory results found') ?></h3>
                     <p class="text-xs text-slate-500 leading-relaxed">
-                        Aún no tienes informes de análisis clínicos registrados bajo procedimientos válidos. Cuando el laboratorio procese y valide tus muestras, aparecerán agrupados por encuentro en esta sección.
+                        <?= xlt('You do not have clinical test reports registered under valid procedures yet. When the laboratory processes and validates your samples, they will appear grouped by encounter in this section.') ?>
                     </p>
                 </div>
             </div>
@@ -199,17 +199,17 @@ require_once dirname(__DIR__) . '/templates/header.php';
                                             <?= htmlspecialchars($batch['encounter_label']) ?> &bull; <?= htmlspecialchars($batch['date_display']) ?>
                                         </h3>
                                         <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-50 text-sky-700 border border-sky-200">
-                                            <?= $batch['total_studies'] ?> <?= $batch['total_studies'] === 1 ? 'análisis' : 'análisis agrupados' ?>
+                                            <?= $batch['total_studies'] ?> <?= $batch['total_studies'] === 1 ? xlt('study') : xlt('grouped studies') ?>
                                         </span>
                                         <?php if ($batch['has_abnormals']): ?>
-                                            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200" title="Contiene determinaciones fuera del rango de referencia habitual">
+                                            <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200" title="<?= xla('Contains determinations outside the usual reference range') ?>">
                                                 <i data-lucide="alert-circle" class="w-3 h-3 mr-1"></i>
-                                                <?= $batch['abnormal_count'] ?> valores a interpretar
+                                                <?= $batch['abnormal_count'] ?> <?= xlt('values to interpret') ?>
                                             </span>
                                         <?php endif; ?>
                                     </div>
                                     <p class="text-xs text-slate-500 mt-0.5">
-                                        Fecha Resultados: <strong class="text-slate-700 font-medium"><?= htmlspecialchars($batch['date_formatted']) ?></strong> &bull; Solicitante(s): <?= htmlspecialchars(implode(', ', $batch['providers'])) ?>
+                                        <?= xlt('Result Date') ?>: <strong class="text-slate-700 font-medium"><?= htmlspecialchars($batch['date_formatted']) ?></strong> &bull; <?= xlt('Requester(s)') ?>: <?= htmlspecialchars(implode(', ', $batch['providers'])) ?>
                                     </p>
                                 </div>
                             </div>
@@ -218,16 +218,16 @@ require_once dirname(__DIR__) . '/templates/header.php';
                             <?php if (empty($batch['has_documents_only'])): ?>
                                 <div class="flex items-center space-x-2 self-end sm:self-center">
                                     <button type="button" 
-                                            onclick="openPdfModal('print_pdf.php?type=lab&encounter=<?= urlencode((string)$batch['encounter_key']) ?>', 'Protocolo de Laboratorio - <?= htmlspecialchars(addslashes($batch['encounter_label'])) ?>')"
+                                            onclick="openPdfModal('print_pdf.php?type=lab&encounter=<?= urlencode((string)$batch['encounter_key']) ?>', '<?= htmlspecialchars(addslashes(xlt('Laboratory Protocol') . ' - ' . $batch['encounter_label'])) ?>')"
                                             class="inline-flex items-center space-x-2 bg-sky-600 hover:bg-sky-700 text-white font-heading font-semibold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-all duration-150 cursor-pointer">
                                         <i data-lucide="file-text" class="w-4 h-4"></i>
-                                        <span>Ver / Bajar PDF</span>
+                                        <span><?= xlt('View / Download PDF') ?></span>
                                     </button>
 
                                     <a href="print_pdf.php?type=lab&encounter=<?= urlencode((string)$batch['encounter_key']) ?>" 
                                     target="_blank" 
                                     rel="noopener noreferrer"
-                                    title="Abrir PDF en pestaña independiente"
+                                    title="<?= xla('Open PDF in a separate tab') ?>"
                                     class="p-2.5 text-slate-500 hover:text-sky-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors">
                                         <i data-lucide="external-link" class="w-4 h-4"></i>
                                     </a>
@@ -238,7 +238,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
 
                         <!-- Desglose de Estudios Incluidos en este Encuentro -->
                         <div class="space-y-2">
-                            <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Estudios incluidos en este encuentro:</span>
+                            <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block"><?= xlt('Studies included in this encounter:') ?></span>
                             
                             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2.5">
                                 <?php foreach ($batch['reports'] as $report): ?>
@@ -257,11 +257,11 @@ require_once dirname(__DIR__) . '/templates/header.php';
                                             <?php if (($report['type'] ?? 'procedure') === 'document'): ?>
                                                 <a href="<?= htmlspecialchars($report['view_url']) ?>" target="_blank" rel="noopener noreferrer"
                                                 class="text-[10px] px-2 py-1 rounded bg-rose-50 border border-rose-200 text-rose-700 flex-shrink-0 font-semibold hover:bg-rose-100">
-                                                    Ver Documento
+                                                    <?= xlt('View Document') ?>
                                                 </a>
                                             <?php else: ?>
                                                 <span class="text-[10px] px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-600 flex-shrink-0">
-                                                    <?= $report['total_results'] ?> determ.
+                                                    <?= $report['total_results'] ?> <?= xlt('det.') ?>
                                                 </span>
                                             <?php endif; ?>                                        </span>
                                     </div>
@@ -287,11 +287,11 @@ require_once dirname(__DIR__) . '/templates/header.php';
                 <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
                 <input type="text" 
                        id="searchImgInput" 
-                       placeholder="Buscar estudio, modalidad o archivo..." 
+                       placeholder="<?= xla('Search study, modality or file...') ?>" 
                        class="w-full pl-10 pr-4 py-2 text-xs md:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-teal-500 transition-colors">
             </div>
             <div class="text-xs text-slate-500 font-medium">
-                Mostrando <span id="imgCountText" class="font-bold text-slate-800"><?= $totalImages ?></span> estudios de imágenes y documentos
+                <?= xlt('Showing') ?> <span id="imgCountText" class="font-bold text-slate-800"><?= $totalImages ?></span> <?= xlt('imaging studies and documents') ?>
             </div>
         </div>
 
@@ -302,9 +302,9 @@ require_once dirname(__DIR__) . '/templates/header.php';
                     <i data-lucide="scan" class="w-8 h-8"></i>
                 </div>
                 <div class="space-y-1 max-w-md mx-auto">
-                    <h3 class="font-heading font-bold text-lg text-slate-900">No se registran estudios de imágenes</h3>
+                    <h3 class="font-heading font-bold text-lg text-slate-900"><?= xlt('No imaging studies recorded') ?></h3>
                     <p class="text-xs text-slate-500 leading-relaxed">
-                        Aún no tienes estudios de radiología, tomografía, resonancia, ecografía o imágenes cargadas en el sistema.
+                        <?= xlt('You do not have radiology, CT, MRI, ultrasound or imaging studies uploaded to the system yet.') ?>
                     </p>
                 </div>
             </div>
@@ -347,11 +347,11 @@ require_once dirname(__DIR__) . '/templates/header.php';
                                     <!-- Badge de Tipo de Archivo -->
                                     <?php if ($isStandardImg): ?>
                                         <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
-                                            IMAGEN (JPG/PNG)
+                                            <?= xlt('IMAGE (JPG/PNG)') ?>
                                         </span>
                                     <?php elseif ($isStandardPdf): ?>
                                         <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                                            DOCUMENTO PDF
+                                            <?= xlt('PDF DOCUMENT') ?>
                                         </span>
                                     <?php endif; ?>
                                 </div>
@@ -359,12 +359,12 @@ require_once dirname(__DIR__) . '/templates/header.php';
                                 <div class="flex flex-wrap items-center gap-y-1 gap-x-4 text-xs text-slate-500">
                                     <span class="flex items-center gap-1.5">
                                         <i data-lucide="calendar" class="w-3.5 h-3.5 text-slate-400"></i>
-                                        Fecha: <strong class="text-slate-700 font-medium"><?= htmlspecialchars($study['date_study']) ?></strong>
+                                        <?= xlt('Date') ?>: <strong class="text-slate-700 font-medium"><?= htmlspecialchars($study['date_study']) ?></strong>
                                     </span>
                                     <?php if (!empty($study['encounter_id'])): ?>
                                         <span class="flex items-center gap-1.5">
                                             <i data-lucide="hash" class="w-3.5 h-3.5 text-slate-400"></i>
-                                            Encuentro: <strong class="text-slate-700 font-medium">#<?= (int)$study['encounter_id'] ?></strong>
+                                            <?= xlt('Encounter') ?>: <strong class="text-slate-700 font-medium">#<?= (int)$study['encounter_id'] ?></strong>
                                             <?php if (!empty($study['encounter_date'])): ?>
                                                 <span class="text-slate-400">&bull;</span> <span class="text-slate-600"><?= htmlspecialchars($study['encounter_date']) ?></span>
                                             <?php endif; ?>
@@ -372,12 +372,12 @@ require_once dirname(__DIR__) . '/templates/header.php';
                                     <?php endif; ?>
                                     <span class="flex items-center gap-1.5">
                                         <i data-lucide="user" class="w-3.5 h-3.5 text-slate-400"></i>
-                                        Médico solicitante: <span class="text-slate-700 font-medium"><?= htmlspecialchars($study['provider_name']) ?></span>
+                                        <?= xlt('Ordering physician') ?>: <span class="text-slate-700 font-medium"><?= htmlspecialchars($study['provider_name']) ?></span>
                                     </span>
                                     <?php if (!empty($study['accession_number'])): ?>
                                         <span class="flex items-center gap-1.5">
                                             <i data-lucide="barcode" class="w-3.5 h-3.5 text-slate-400"></i>
-                                            Ref: <span class="text-slate-600"><?= htmlspecialchars($study['accession_number']) ?></span>
+                                            <?= xlt('Ref') ?>: <span class="text-slate-600"><?= htmlspecialchars($study['accession_number']) ?></span>
                                         </span>
                                     <?php endif; ?>
                                 </div>
@@ -394,7 +394,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
                                    rel="noopener noreferrer"
                                    class="inline-flex items-center space-x-2 bg-teal-600 hover:bg-teal-700 text-white font-heading font-semibold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-all duration-150">
                                     <i data-lucide="monitor" class="w-4 h-4"></i>
-                                    <span>Ver Imagen DICOM (OHIF)</span>
+                                    <span><?= xlt('View DICOM Image (OHIF)') ?></span>
                                     <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 opacity-80"></i>
                                 </a>
 
@@ -402,20 +402,20 @@ require_once dirname(__DIR__) . '/templates/header.php';
                                     <a href="<?= htmlspecialchars($study['report_pdf_url']) ?>" 
                                        target="_blank" 
                                        rel="noopener noreferrer"
-                                       title="Abrir el informe PDF en una pestaña nueva"
+                                       title="<?= xla('Open the PDF report in a new tab') ?>"
                                        class="inline-flex items-center space-x-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-heading font-semibold text-xs px-3.5 py-2.5 rounded-xl transition-colors">
                                         <i data-lucide="file-text" class="w-4 h-4"></i>
-                                        <span>Ver Informe (PDF)</span>
+                                        <span><?= xlt('View Report (PDF)') ?></span>
                                         <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 text-rose-500"></i>
                                     </a>
                                 <?php elseif ($study['has_report'] && !empty($study['report_id'])): ?>
                                     <a href="print_pdf.php?type=image&id=<?= (int)$study['report_id'] ?>&pid=<?= (int)$pid ?>" 
                                        target="_blank" 
                                        rel="noopener noreferrer"
-                                       title="Abrir el informe radiológico en una pestaña nueva"
+                                       title="<?= xla('Open the radiology report in a new tab') ?>"
                                        class="inline-flex items-center space-x-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-heading font-semibold text-xs px-3.5 py-2.5 rounded-xl transition-colors">
                                         <i data-lucide="file-text" class="w-4 h-4"></i>
-                                        <span>Ver Informe (PDF)</span>
+                                        <span><?= xlt('View Report (PDF)') ?></span>
                                         <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 text-rose-500"></i>
                                     </a>
                                 <?php endif; ?>
@@ -426,17 +426,17 @@ require_once dirname(__DIR__) . '/templates/header.php';
                                         onclick="openImageModal('<?= htmlspecialchars($study['viewer_url']) ?>', '<?= htmlspecialchars(addslashes($study['title'])) ?>', '<?= htmlspecialchars($study['download_url'] ?? $study['viewer_url']) ?>')"
                                         class="inline-flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white font-heading font-semibold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-all duration-150 cursor-pointer">
                                     <i data-lucide="eye" class="w-4 h-4"></i>
-                                    <span>Ver Imagen</span>
+                                    <span><?= xlt('View Image') ?></span>
                                 </button>
 
                                 <?php if (!empty($study['has_ohif']) && !empty($study['ohif_url'])): ?>
                                     <a href="<?= htmlspecialchars($study['ohif_url']) ?>" 
                                         target="_blank" 
                                         rel="noopener noreferrer"
-                                        title="Visualizar en Visor Radiológico Avanzado OHIF"
+                                        title="<?= xla('View in advanced radiology viewer OHIF') ?>"
                                         class="inline-flex items-center space-x-1.5 bg-teal-50 hover:bg-teal-100 text-teal-800 border border-teal-200 font-heading font-semibold text-xs px-3.5 py-2.5 rounded-xl transition-colors">
                                         <i data-lucide="monitor" class="w-4 h-4 text-teal-600"></i>
-                                        <span>Visor OHIF</span>
+                                        <span><?= xlt('OHIF Viewer') ?></span>
                                         <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 text-teal-500"></i>
                                     </a>
                                 <?php endif; ?>
@@ -446,16 +446,16 @@ require_once dirname(__DIR__) . '/templates/header.php';
                                     <a href="<?= htmlspecialchars($study['report_pdf_url']) ?>" 
                                        target="_blank" 
                                        rel="noopener noreferrer"
-                                       title="Abrir el informe PDF en una pestaña nueva"
+                                       title="<?= xla('Open the PDF report in a new tab') ?>"
                                        class="inline-flex items-center space-x-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-heading font-semibold text-xs px-3.5 py-2.5 rounded-xl transition-colors">
                                         <i data-lucide="file-text" class="w-4 h-4"></i>
-                                        <span>Ver Informe</span>
+                                        <span><?= xlt('View Report') ?></span>
                                         <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 text-rose-500"></i>
                                     </a>
                                     <a href="<?= htmlspecialchars($study['report_pdf_url']) ?>&download=1"
                                        download
                                        class="p-2.5 text-slate-600 hover:text-rose-600 bg-slate-100 hover:bg-rose-100 rounded-xl transition-colors"
-                                       title="Descargar informe PDF">
+                                       title="<?= xla('Download PDF report') ?>">
                                         <i data-lucide="download" class="w-4 h-4"></i>
                                     </a>
                                 <?php endif; ?>
@@ -463,7 +463,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
                                 <a href="<?= htmlspecialchars($study['download_url'] ?? $study['viewer_url']) ?>" 
                                    download
                                    class="p-2.5 text-slate-600 hover:text-indigo-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
-                                   title="Descargar archivo">
+                                   title="<?= xla('Download file') ?>">
                                     <i data-lucide="download" class="w-4 h-4"></i>
                                 </a>
 
@@ -473,13 +473,13 @@ require_once dirname(__DIR__) . '/templates/header.php';
                                         onclick="openPdfModal('<?= htmlspecialchars($study['viewer_url']) ?>', '<?= htmlspecialchars(addslashes($study['title'])) ?>')"
                                         class="inline-flex items-center space-x-2 bg-rose-600 hover:bg-rose-700 text-white font-heading font-semibold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-all duration-150 cursor-pointer">
                                     <i data-lucide="file-text" class="w-4 h-4"></i>
-                                    <span>Ver Documento PDF</span>
+                                    <span><?= xlt('View PDF Document') ?></span>
                                 </button>
 
                                 <a href="<?= htmlspecialchars($study['download_url'] ?? $study['viewer_url']) ?>" 
                                    download
                                    class="p-2.5 text-slate-600 hover:text-rose-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
-                                   title="Descargar PDF">
+                                   title="<?= xla('Download PDF') ?>">
                                     <i data-lucide="download" class="w-4 h-4"></i>
                                 </a>
                             <?php endif; ?>
@@ -503,13 +503,13 @@ require_once dirname(__DIR__) . '/templates/header.php';
             <div class="max-w-3xl space-y-3">
                 <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-bold">
                     <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
-                    <span>Historia Clínica Digital Integral</span>
+                    <span><?= xlt('Comprehensive Digital Medical Record') ?></span>
                 </div>
                 <h2 class="text-2xl sm:text-3xl font-extrabold font-heading text-slate-900 tracking-tight">
-                    Accede a todas las funcionalidades médicas en el Portal OpenEMR
+                    <?= xlt('Access all medical features in the OpenEMR Portal') ?>
                 </h2>
                 <p class="text-sm text-slate-600 leading-relaxed">
-                    El Portal Express te permite acceder de forma ultrarrápida a tus informes y visores. Si necesitas interactuar con tu equipo de salud, solicitar turnos o descargar documentación clínica complementaria, utiliza el portal centralizado.
+                    <?= xlt('The Express Portal lets you access your reports and viewers very quickly. If you need to interact with your healthcare team, request appointments or download additional clinical documentation, use the centralized portal.') ?>
                 </p>
             </div>
 
@@ -520,9 +520,9 @@ require_once dirname(__DIR__) . '/templates/header.php';
                     <div class="w-10 h-10 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center">
                         <i data-lucide="calendar" class="w-5 h-5"></i>
                     </div>
-                    <h4 class="font-heading font-bold text-sm text-slate-900">Gestión de Turnos</h4>
+                    <h4 class="font-heading font-bold text-sm text-slate-900"><?= xlt('Appointment Management') ?></h4>
                     <p class="text-xs text-slate-500 leading-normal">
-                        Solicita, reprograma y consulta tus próximas citas con especialistas y estudios programados.
+                        <?= xlt('Request, reschedule and check your upcoming appointments with specialists and scheduled studies.') ?>
                     </p>
                 </div>
 
@@ -530,9 +530,9 @@ require_once dirname(__DIR__) . '/templates/header.php';
                     <div class="w-10 h-10 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center">
                         <i data-lucide="message-square" class="w-5 h-5"></i>
                     </div>
-                    <h4 class="font-heading font-bold text-sm text-slate-900">Mensajería Segura</h4>
+                    <h4 class="font-heading font-bold text-sm text-slate-900"><?= xlt('Secure Messaging') ?></h4>
                     <p class="text-xs text-slate-500 leading-normal">
-                        Comunícate de manera privada con tus médicos y recibe indicaciones post-consulta.
+                        <?= xlt('Communicate privately with your doctors and receive post-visit instructions.') ?>
                     </p>
                 </div>
 
@@ -540,9 +540,9 @@ require_once dirname(__DIR__) . '/templates/header.php';
                     <div class="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center">
                         <i data-lucide="pill" class="w-5 h-5"></i>
                     </div>
-                    <h4 class="font-heading font-bold text-sm text-slate-900">Recetas & Medicación</h4>
+                    <h4 class="font-heading font-bold text-sm text-slate-900"><?= xlt('Prescriptions & Medication') ?></h4>
                     <p class="text-xs text-slate-500 leading-normal">
-                        Revisa tu historial de prescripciones médicas, dosis e indicaciones de tratamientos continuos.
+                        <?= xlt('Review your medical prescription history, doses and instructions for ongoing treatments.') ?>
                     </p>
                 </div>
 
@@ -551,15 +551,15 @@ require_once dirname(__DIR__) . '/templates/header.php';
             <!-- CTA Card hacia el Portal Completo -->
             <div class="p-6 rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex flex-col sm:flex-row items-center justify-between gap-6 shadow-lg">
                 <div class="space-y-1 text-center sm:text-left">
-                    <h3 class="font-heading font-bold text-lg text-white">¿Listo para ingresar al Portal Integral?</h3>
-                    <p class="text-xs text-slate-300">Se abrirá la plataforma OpenEMR en una nueva pestaña segura.</p>
+                    <h3 class="font-heading font-bold text-lg text-white"><?= xlt('Ready to access the Full Portal?') ?></h3>
+                    <p class="text-xs text-slate-300"><?= xlt('The OpenEMR platform will open in a new secure tab.') ?></p>
                 </div>
                 <a href="goto_portal.php" 
                    target="_blank" 
                    rel="noopener noreferrer"
                    class="inline-flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-500 text-white font-heading font-bold text-xs sm:text-sm px-6 py-3.5 rounded-xl shadow-md transition-all duration-150 whitespace-nowrap cursor-pointer">
                     <i data-lucide="sparkles" class="w-4 h-4"></i>
-                    <span>Ingresar Directo a OpenEMR Portal</span>
+                    <span><?= xlt('Go Directly to the OpenEMR Portal') ?></span>
                     <i data-lucide="arrow-up-right" class="w-4 h-4"></i>
                 </a>
             </div>

@@ -215,7 +215,7 @@ function imaging_category_name(array $flat, int $categoryId): string
 function imaging_render_category_tree(array $flat, int $selectedId = 0, int $expandToId = 0): string
 {
     if (empty($flat)) {
-        return '<div class="imr-tree-empty">' . xlt('No hay categorías disponibles.') . '</div>';
+        return '<div class="imr-tree-empty">' . xlt('No categories available.') . '</div>';
     }
 
     // Índice por id + listas de hijos.

@@ -27,54 +27,54 @@ function imaging_report_report(int $pid, int $encounter, int $cols, int $id): vo
     );
 
     if (empty($data)) {
-        echo '<p class="text-muted small">Sin datos de informe.</p>';
+        echo '<p class="text-muted small">' . xlt('No report data.') . '</p>';
         return;
     }
 
     $modalidadLabels = [
-        'RX'   => 'Rayos X',
-        'TC'   => 'Tomografía Computada',
-        'RMN'  => 'Resonancia Magnética',
-        'US'   => 'Ecografía',
-        'MG'   => 'Mamografía',
-        'DEXA' => 'Densitometría',
-        'OT'   => 'Otro',
+        'RX'   => xl('X-Ray'),
+        'TC'   => xl('Computed Tomography'),
+        'RMN'  => xl('Magnetic Resonance Imaging'),
+        'US'   => xl('Ultrasound'),
+        'MG'   => xl('Mammography'),
+        'DEXA' => xl('Densitometry'),
+        'OT'   => xl('Other'),
     ];
 
     $modalidad = $modalidadLabels[$data['modalidad'] ?? ''] ?? ($data['modalidad'] ?? '—');
     $estado    = $data['estado'] === 'finalizado'
-        ? '<span style="color:#065f46;font-weight:600;background:#d1fae5;padding:2px 8px;border-radius:8px;font-size:11px;">Finalizado</span>'
-        : '<span style="color:#92400e;font-weight:600;background:#fef3c7;padding:2px 8px;border-radius:8px;font-size:11px;">Borrador</span>';
+        ? '<span style="color:#065f46;font-weight:600;background:#d1fae5;padding:2px 8px;border-radius:8px;font-size:11px;">' . xlt('Completed') . '</span>'
+        : '<span style="color:#92400e;font-weight:600;background:#fef3c7;padding:2px 8px;border-radius:8px;font-size:11px;">' . xlt('Draft') . '</span>';
 
     echo '<div style="font-family:sans-serif;font-size:13px;line-height:1.6;padding:8px 0;">';
     echo '<table style="width:100%;border-collapse:collapse;">';
 
     // Cabecera del resumen
     echo '<tr style="background:#f1f5f9;">';
-    echo '<td style="padding:6px 10px;font-weight:600;color:#334155;width:180px;">Modalidad</td>';
+    echo '<td style="padding:6px 10px;font-weight:600;color:#334155;width:180px;">' . xlt('Modality') . '</td>';
     echo '<td style="padding:6px 10px;color:#1e293b;">' . text($modalidad) . '</td>';
-    echo '<td style="padding:6px 10px;font-weight:600;color:#334155;width:180px;">Estado</td>';
+    echo '<td style="padding:6px 10px;font-weight:600;color:#334155;width:180px;">' . xlt('Status') . '</td>';
     echo '<td style="padding:6px 10px;">' . $estado . '</td>';
     echo '</tr>';
 
     echo '<tr>';
-    echo '<td style="padding:6px 10px;font-weight:600;color:#334155;">Región Anatómica</td>';
+    echo '<td style="padding:6px 10px;font-weight:600;color:#334155;">' . xlt('Anatomical Region') . '</td>';
     echo '<td style="padding:6px 10px;color:#1e293b;">' . text($data['region_anatomica'] ?? '—') . '</td>';
-    echo '<td style="padding:6px 10px;font-weight:600;color:#334155;">Fecha Informe</td>';
+    echo '<td style="padding:6px 10px;font-weight:600;color:#334155;">' . xlt('Report Date') . '</td>';
     echo '<td style="padding:6px 10px;color:#1e293b;">';
     echo $data['fecha_informe'] ? text(date('d/m/Y', strtotime($data['fecha_informe']))) : '—';
     echo '</td>';
     echo '</tr>';
 
     echo '<tr style="background:#f1f5f9;">';
-    echo '<td style="padding:6px 10px;font-weight:600;color:#334155;">Médico Informante</td>';
+    echo '<td style="padding:6px 10px;font-weight:600;color:#334155;">' . xlt('Reporting Physician') . '</td>';
     echo '<td colspan="3" style="padding:6px 10px;color:#1e293b;">' . text($data['medico_informante'] ?? '—') . '</td>';
     echo '</tr>';
 
     // Conclusión / Impresión Diagnóstica (resaltada)
     if (!empty($data['conclusion'])) {
         echo '<tr>';
-        echo '<td style="padding:8px 10px;font-weight:700;color:#0f172a;vertical-align:top;">📌 Conclusión</td>';
+        echo '<td style="padding:8px 10px;font-weight:700;color:#0f172a;vertical-align:top;">📌 ' . xlt('Conclusion') . '</td>';
         echo '<td colspan="3" style="padding:8px 10px;color:#1e293b;white-space:pre-wrap;background:#fffbeb;border-left:3px solid #f59e0b;">';
         echo text($data['conclusion']);
         echo '</td>';
@@ -88,7 +88,7 @@ function imaging_report_report(int $pid, int $encounter, int $cols, int $id): vo
             : $data['interpretacion'];
 
         echo '<tr>';
-        echo '<td style="padding:6px 10px;font-weight:600;color:#334155;vertical-align:top;">🩻 Hallazgos</td>';
+        echo '<td style="padding:6px 10px;font-weight:600;color:#334155;vertical-align:top;">🩻 ' . xlt('Findings') . '</td>';
         echo '<td colspan="3" style="padding:6px 10px;color:#475569;white-space:pre-wrap;">' . text($preview) . '</td>';
         echo '</tr>';
     }
@@ -101,7 +101,7 @@ function imaging_report_report(int $pid, int $encounter, int $cols, int $id): vo
         $pdfUrl  = attr($webroot . '/controller.php?document&retrieve&patient_id=' . $pid . '&document_id=' . $data['pdf_document_id']);
         echo '<tr>';
         echo '<td colspan="4" style="padding:8px 10px;">';
-        echo '<a href="' . $pdfUrl . '" target="_blank" style="color:#0ea5e9;font-weight:600;font-size:12px;">📄 Ver Informe PDF Completo</a>';
+        echo '<a href="' . $pdfUrl . '" target="_blank" style="color:#0ea5e9;font-weight:600;font-size:12px;">📄 ' . xlt('View Full PDF Report') . '</a>';
         echo '</td>';
         echo '</tr>';
     }

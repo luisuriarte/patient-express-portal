@@ -11,17 +11,17 @@ if (!isset($auth)) {
 
 $isLoggedIn = $auth->isAuthenticated();
 $currentPatient = $isLoggedIn ? $auth->getCurrentPatient() : null;
-$pageTitle = $pageTitle ?? ('Portal Express del Paciente' . (defined('CLINIC_NAME') && CLINIC_NAME ? ' | ' . CLINIC_NAME : ''));
+$pageTitle = $pageTitle ?? (xlt('Patient Express Portal') . (defined('CLINIC_NAME') && CLINIC_NAME ? ' | ' . CLINIC_NAME : ''));
 ?>
 <!DOCTYPE html>
-<html lang="es" class="h-full bg-slate-50">
+<html lang="en" class="h-full bg-slate-50">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($pageTitle) ?></title>
     
     <!-- Meta tags SEO y PWA -->
-    <meta name="description" content="Acceso rápido a resultados de análisis clínicos, informes de diagnóstico por imágenes y visor DICOM.">
+    <meta name="description" content="<?= xla('Quick access to clinical test results, diagnostic imaging reports and the DICOM viewer.') ?>">
     <meta name="theme-color" content="#0284c7">
     <meta name="robots" content="noindex, nofollow">
     
@@ -81,7 +81,7 @@ $pageTitle = $pageTitle ?? ('Portal Express del Paciente' . (defined('CLINIC_NAM
                 <div class="flex items-center space-x-3">
                     <a href="dashboard.php" class="flex items-center group">
                         <img src="assets/img/logo-portal-pacientes.svg"
-                             alt="Portal Express del Paciente"
+                             alt="<?= xla('Patient Express Portal') ?>"
                              class="h-12 md:h-14 w-auto transition-transform duration-200 group-hover:scale-105">
                     </a>
                 </div>
@@ -109,18 +109,18 @@ $pageTitle = $pageTitle ?? ('Portal Express del Paciente' . (defined('CLINIC_NAM
                         <a href="goto_portal.php" 
                            target="_blank" 
                            rel="noopener noreferrer"
-                           title="Ingresar automáticamente al Portal Completo OpenEMR"
+                           title="<?= xla('Log in automatically to the full OpenEMR Portal') ?>"
                            class="hidden md:inline-flex items-center space-x-1.5 text-xs font-heading font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 px-3.5 py-2 rounded-xl transition-all">
                             <i data-lucide="external-link" class="w-3.5 h-3.5 text-sky-600"></i>
-                            <span>Portal OpenEMR</span>
+                            <span><?= xlt('OpenEMR Portal') ?></span>
                         </a>
 
                         <!-- Botón Salir / Logout -->
                         <a href="logout.php" 
                            class="inline-flex items-center space-x-1.5 text-xs font-heading font-semibold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100/80 px-3.5 py-2 rounded-xl border border-rose-200/60 transition-all shadow-xs"
-                           title="Cerrar sesión segura">
+                           title="<?= xla('Log out securely') ?>">
                             <i data-lucide="log-out" class="w-4 h-4"></i>
-                            <span class="hidden sm:inline">Cerrar Sesión</span>
+                            <span class="hidden sm:inline"><?= xlt('Log Out') ?></span>
                         </a>
 
                     <?php else: ?>
@@ -128,7 +128,7 @@ $pageTitle = $pageTitle ?? ('Portal Express del Paciente' . (defined('CLINIC_NAM
                         <div class="flex items-center space-x-2 text-xs text-slate-500">
                             <span class="inline-flex items-center px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">
                                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>
-                                Conexión Segura SSL
+                                <?= xlt('Secure SSL Connection') ?>
                             </span>
                         </div>
                     <?php endif; ?>

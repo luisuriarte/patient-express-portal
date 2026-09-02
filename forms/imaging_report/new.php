@@ -28,7 +28,7 @@ $authUser  = $session->get('authUser');
 
 require_once("$srcdir/api.inc.php");
 
-formHeader("Informe de Diagnóstico por Imágenes");
+formHeader(xl("Imaging Report"));
 $returnurl = 'encounter_top.php';
 
 // Cargar datos del médico informante actual
@@ -52,14 +52,14 @@ $estado = $obj['estado'] ?? 'borrador';
 
 // Opciones de modalidad
 $modalidades = [
-    ''    => '-- Seleccione Modalidad --',
-    'RX'  => 'Rayos X (Radiografía Digital)',
-    'TC'  => 'Tomografía Computada (TC)',
-    'RMN' => 'Resonancia Magnética (RMN)',
-    'US'  => 'Ecografía / Ultrasonido (US)',
-    'MG'  => 'Mamografía (MG)',
-    'DEXA' => 'Densitometría Ósea (DEXA)',
-    'OT'  => 'Otro / No especificado',
+    ''    => xl('-- Select Modality --'),
+    'RX'  => xl('X-Ray (Digital Radiography)'),
+    'TC'  => xl('Computed Tomography (CT)'),
+    'RMN' => xl('Magnetic Resonance Imaging (MRI)'),
+    'US'  => xl('Ultrasound (US)'),
+    'MG'  => xl('Mammography (MG)'),
+    'DEXA' => xl('Bone Densitometry (DEXA)'),
+    'OT'  => xl('Other / Not specified'),
 ];
 
 // Listado de Servicios Solicitantes (dropdown normalizado desde list_options)
@@ -112,11 +112,11 @@ if ($selectedCategoryId <= 0) {
 $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategoryId, $selectedCategoryId);
 ?>
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
     <?php Header::setupHeader(); ?>
     <meta charset="UTF-8">
-    <title>Informe de Diagnóstico por Imágenes</title>
+    <title><?= xlt('Imaging Report') ?></title>
     <!-- Tailwind CSS via CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -160,12 +160,12 @@ $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategor
     <div class="bg-gradient-to-r from-slate-900 to-slate-700 text-white rounded-2xl p-6 mb-6 shadow-lg">
         <div class="flex items-center justify-between">
             <div>
-                <h1 class="text-xl font-bold tracking-tight">Informe de Diagnóstico por Imágenes</h1>
-                <p class="text-slate-300 text-sm mt-1">Formulario Clínico Institucional — OpenEMR</p>
+                <h1 class="text-xl font-bold tracking-tight"><?= xlt('Imaging Report') ?></h1>
+                <p class="text-slate-300 text-sm mt-1"><?= xlt('Institutional Clinical Form — OpenEMR') ?></p>
             </div>
             <?php if ($modoEdicion): ?>
                 <span class="px-3 py-1 rounded-full text-xs font-bold <?= $estado === 'finalizado' ? 'badge-finalizado' : 'badge-borrador' ?>">
-                    <?= $estado === 'finalizado' ? '✔ Finalizado' : '⏳ Borrador' ?>
+                    <?= $estado === 'finalizado' ? xlt('✔ Completed') : xlt('⏳ Draft') ?>
                 </span>
             <?php endif; ?>
         </div>
@@ -173,14 +173,14 @@ $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategor
 
     <!-- Selector de plantilla rápida -->
     <div class="bg-white rounded-2xl border border-slate-200 p-4 mb-5 shadow-sm">
-        <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">⚡ Plantillas Rápidas — Informe Normal</p>
+        <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3"><?= xlt('⚡ Quick Templates — Normal Report') ?></p>
         <div class="flex flex-wrap gap-2" id="template-buttons">
-            <button type="button" class="template-btn" data-tpl="RX">Rx Normal</button>
-            <button type="button" class="template-btn" data-tpl="TC">TC Normal</button>
-            <button type="button" class="template-btn" data-tpl="RMN">RMN Normal</button>
-            <button type="button" class="template-btn" data-tpl="US">Eco Normal</button>
-            <button type="button" class="template-btn" data-tpl="MG">Mamografía Normal</button>
-            <button type="button" class="template-btn" data-tpl="DEXA">DEXA Normal</button>
+            <button type="button" class="template-btn" data-tpl="RX"><?= xlt('Rx Normal') ?></button>
+            <button type="button" class="template-btn" data-tpl="TC"><?= xlt('TC Normal') ?></button>
+            <button type="button" class="template-btn" data-tpl="RMN"><?= xlt('MRI Normal') ?></button>
+            <button type="button" class="template-btn" data-tpl="US"><?= xlt('US Normal') ?></button>
+            <button type="button" class="template-btn" data-tpl="MG"><?= xlt('Mammography Normal') ?></button>
+            <button type="button" class="template-btn" data-tpl="DEXA"><?= xlt('DEXA Normal') ?></button>
         </div>
     </div>
 
@@ -195,11 +195,11 @@ $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategor
 
         <!-- Sección 1: Datos del Estudio -->
         <div class="bg-white rounded-2xl border border-slate-200 p-6 mb-5 shadow-sm">
-            <div class="section-header">📋 Datos del Estudio</div>
+            <div class="section-header"><?= xlt('📋 Study Data') ?></div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
 
                 <div>
-                    <label class="form-label" for="modalidad">Modalidad *</label>
+                    <label class="form-label" for="modalidad"><?= xlt('Modality *') ?></label>
                     <select name="modalidad" id="modalidad" class="form-control" required>
                         <?php foreach ($modalidades as $val => $label): ?>
                             <option value="<?= attr($val) ?>"
@@ -211,9 +211,9 @@ $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategor
                 </div>
 
                 <div>
-                    <label class="form-label" for="region_anatomica">Región / Área Anatómica *</label>
+                    <label class="form-label" for="region_anatomica"><?= xlt('Region / Anatomical Area *') ?></label>
                     <select name="region_anatomica" id="region_anatomica" class="form-control" required>
-                        <option value="">-- Seleccione Región... --</option>
+                        <option value=""><?= xlt('-- Select Region... --') ?></option>
                         <?php foreach ($regionesAnatomicas as $k => $titulo): ?>
                             <option value="<?= attr($titulo) ?>"
                                 <?= (($obj['region_anatomica'] ?? '') === $titulo) ? 'selected' : '' ?>>
@@ -223,14 +223,14 @@ $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategor
                     </select>
                     <?php if (!isset($obj['region_anatomica']) || trim($obj['region_anatomica'] ?? '') === ''): ?>
                     <?php elseif (!in_array($obj['region_anatomica'], array_values($regionesAnatomicas), true)): ?>
-                        <p class="text-xs text-amber-600 mt-1">Valor existente no está en la lista: "<?= text($obj['region_anatomica']) ?>"</p>
+                        <p class="text-xs text-amber-600 mt-1"><?= xlt('Existing value not in list:') ?> "<?= text($obj['region_anatomica']) ?>"</p>
                     <?php endif; ?>
                 </div>
 
                 <div>
-                    <label class="form-label" for="servicio_solicitante">Servicio / Solicitante</label>
+                    <label class="form-label" for="servicio_solicitante"><?= xlt('Service / Requester') ?></label>
                     <select name="servicio_solicitante" id="servicio_solicitante" class="form-control">
-                        <option value="">-- Seleccione Servicio... --</option>
+                        <option value=""><?= xlt('-- Select Service... --') ?></option>
                         <?php foreach ($servicios as $k => $titulo): ?>
                             <option value="<?= attr($titulo) ?>"
                                 <?= (($obj['servicio_solicitante'] ?? '') === $titulo) ? 'selected' : '' ?>>
@@ -241,14 +241,14 @@ $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategor
                 </div>
 
                 <div>
-                    <label class="form-label" for="medico_solicitante">Médico Solicitante</label>
+                    <label class="form-label" for="medico_solicitante"><?= xlt('Requesting Physician') ?></label>
                     <select name="medico_solicitante_custom" id="medico_solicitante_select" class="form-control">
                         <option value="" <?= !$esMedicoOpenEMR && $valorMedicoSolicitante === '' ? 'selected' : '' ?>>
-                            -- Nuevo Médico del centro u Otro lugar... --
+                            <?= xlt('-- New In-house Physician or Other... --') ?>
                         </option>
                         <option value="__otro__"
                             <?= ($keyMedicoSolicitante === false && $valorMedicoSolicitante !== '') ? 'selected' : '' ?>>
-                            Otro médico (escribir nombre)
+                            <?= xlt('Other physician (type name)') ?>
                         </option>
                         <?php foreach ($medicosOpenEMR as $mid => $nombre): ?>
                             <option value="<?= attr('med_' . $mid) ?>"
@@ -261,20 +261,20 @@ $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategor
                            value="<?= attr($obj['medico_solicitante'] ?? '') ?>">
                     <div id="medico_otro_container" class="mt-2 <?= ($keyMedicoSolicitante === false && $valorMedicoSolicitante !== '') ? '' : ' hidden' ?>">
                         <input type="text" id="medico_otro_input" class="form-control"
-                               placeholder="Nombre del médico solicitante"
+                               placeholder="<?= xla('Requesting physician name') ?>"
                                value="<?= attr($valorMedicoSolicitante) ?>">
                     </div>
                 </div>
 
                 <div>
-                    <label class="form-label" for="medico_informante">Médico Informante</label>
+                    <label class="form-label" for="medico_informante"><?= xlt('Reporting Physician') ?></label>
                     <input type="text" name="medico_informante" id="medico_informante"
                            class="form-control"
                            value="<?= attr($obj['medico_informante'] ?? $medicoInformante) ?>">
                 </div>
 
                 <div>
-                    <label class="form-label" for="fecha_informe">Fecha del Informe</label>
+                    <label class="form-label" for="fecha_informe"><?= xlt('Report Date') ?></label>
                     <input type="date" name="fecha_informe" id="fecha_informe"
                            class="form-control"
                            value="<?= attr($obj['fecha_informe'] ?? date('Y-m-d')) ?>">
@@ -284,58 +284,58 @@ $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategor
 
         <!-- Sección 2: Técnica / Metodología -->
         <div class="bg-white rounded-2xl border border-slate-200 p-6 mb-5 shadow-sm">
-            <div class="section-header">🔬 Técnica / Metodología</div>
+            <div class="section-header"><?= xlt('🔬 Technique / Methodology') ?></div>
             <textarea name="metodologia" id="metodologia" class="form-control" rows="4"
-                      placeholder="Describa el protocolo, secuencias o proyecciones utilizadas..."><?= text($obj['metodologia'] ?? '') ?></textarea>
+                      placeholder="<?= xla('Describe the protocol, sequences or projections used...') ?>"><?= text($obj['metodologia'] ?? '') ?></textarea>
         </div>
 
         <!-- Sección 3: Interpretación / Hallazgos -->
         <div class="bg-white rounded-2xl border border-slate-200 p-6 mb-5 shadow-sm">
-            <div class="section-header">🩻 Interpretación / Hallazgos</div>
+            <div class="section-header"><?= xlt('🩻 Interpretation / Findings') ?></div>
             <textarea name="interpretacion" id="interpretacion" class="form-control" rows="10"
-                      placeholder="Describa en detalle los hallazgos observados en el estudio..."><?= text($obj['interpretacion'] ?? '') ?></textarea>
+                      placeholder="<?= xla('Describe in detail the findings observed in the study...') ?>"><?= text($obj['interpretacion'] ?? '') ?></textarea>
         </div>
 
         <!-- Sección 4: Conclusión -->
         <div class="bg-white rounded-2xl border border-slate-200 p-6 mb-5 shadow-sm">
-            <div class="section-header">📌 Conclusión / Impresión Diagnóstica</div>
+            <div class="section-header"><?= xlt('📌 Conclusion / Diagnostic Impression') ?></div>
             <textarea name="conclusion" id="conclusion" class="form-control" rows="5"
-                      placeholder="Síntesis diagnóstica final del estudio..."><?= text($obj['conclusion'] ?? '') ?></textarea>
+                      placeholder="<?= xla('Final diagnostic synthesis of the study...') ?>"><?= text($obj['conclusion'] ?? '') ?></textarea>
         </div>
 
         <!-- Sección 5: Observaciones -->
         <div class="bg-white rounded-2xl border border-slate-200 p-6 mb-5 shadow-sm">
-            <div class="section-header">💬 Observaciones y Sugerencias</div>
+            <div class="section-header"><?= xlt('💬 Observations and Suggestions') ?></div>
             <textarea name="observaciones" id="observaciones" class="form-control" rows="4"
-                      placeholder="Recomendaciones de seguimiento, correlación clínica, estudios adicionales..."><?= text($obj['observaciones'] ?? '') ?></textarea>
+                      placeholder="<?= xla('Follow-up recommendations, clinical correlation, additional studies...') ?>"><?= text($obj['observaciones'] ?? '') ?></textarea>
         </div>
 
         <!-- Sección 6: Carpeta destino del PDF -->
         <div class="bg-white rounded-2xl border border-slate-200 p-6 mb-5 shadow-sm">
-            <div class="section-header">📂 Carpeta Destino del PDF</div>
-            <label class="form-label">Seleccioná la carpeta donde se guardará el PDF en el legajo (Documentos del paciente)</label>
+            <div class="section-header"><?= xlt('📂 PDF Destination Folder') ?></div>
+            <label class="form-label"><?= xlt('Select the folder where the PDF will be saved in the patient chart (Patient Documents)') ?></label>
             <div class="imr-tree-container" id="categoryTree">
                 <?= $categoryTreeHtml ?>
             </div>
             <div class="imr-selection-display<?= $selectedCategoryId > 0 ? ' imr-has-selection' : '' ?>" id="selectionDisplay">
-                <?= $selectedCategoryId > 0 ? '📁 ' . text(imaging_category_name($categoryTree, $selectedCategoryId)) : '— No se seleccionó carpeta (se usará la automática) —' ?>
+                <?= $selectedCategoryId > 0 ? '📁 ' . text(imaging_category_name($categoryTree, $selectedCategoryId)) : xlt('— No folder selected (automatic will be used) —') ?>
             </div>
-            <p class="text-xs text-slate-400 mt-2"><?= text('Si no se elige carpeta, se usará la categoría automática según la modalidad (ej: RMN → Resonancia Magnética).') ?></p>
+            <p class="text-xs text-slate-400 mt-2"><?= xlt('If no folder is selected, the automatic category will be used according to the modality (e.g.: MRI → Magnetic Resonance).') ?></p>
         </div>
 
         <!-- Botones de acción -->
         <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
             <button type="button" class="btn-cancel inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-colors">
-                ✕ Cancelar
+                ✕ <?= xlt('Cancel') ?>
             </button>
             <div class="flex items-center gap-3">
                 <button type="button" id="btn-draft"
                         class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold btn-save-draft transition-all">
-                    💾 Guardar Borrador
+                    💾 <?= xlt('Save Draft') ?>
                 </button>
                 <button type="button" id="btn-finalize"
                         class="inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold btn-finalize shadow-md transition-all">
-                    📄 Guardar y Generar PDF
+                    📄 <?= xlt('Save and Generate PDF') ?>
                 </button>
             </div>
         </div>
@@ -361,11 +361,11 @@ document.getElementById('btn-finalize').addEventListener('click', function() {
     const conclusion = document.getElementById('conclusion');
 
     if (!modal.value || !region.value.trim() || !interpretacion.value.trim() || !conclusion.value.trim()) {
-        alert('Por favor complete: Modalidad, Región Anatómica, Interpretación/Hallazgos y Conclusión antes de finalizar el informe.');
+        alert(xl('Please complete: Modality, Anatomical Region, Interpretation/Findings and Conclusion before finalizing the report.'));
         return;
     }
 
-    if (!confirm('¿Confirma finalizar el informe y generar el PDF? Una vez finalizado, el estado cambiará a "Finalizado".')) return;
+    if (!confirm(xl('Are you sure you want to finalize the report and generate the PDF? Once finalized, the status will change to "Completed".'))) return;
 
     document.getElementById('input_accion').value = 'finalizar';
     top.restoreSession();

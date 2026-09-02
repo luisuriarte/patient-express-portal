@@ -1,14 +1,17 @@
 <?php
 /**
- * Clase de Autenticación y Manejo de Sesión de Pacientes
- * Patient Express Portal - Integración Nativa con Funciones OpenEMR
+ * Patient Authentication and Session Management
+ * Patient Express Portal — Native Integration with OpenEMR
+ *
+ * @package   PatientExpressPortal
+ * @license   GNU General Public License 3
  */
 
 namespace App;
 
 class Auth
 {
-    private const SESSION_LIFETIME = 1800; // 30 minutos de inactividad
+    private const SESSION_LIFETIME = 1800; // 30 minutes of inactivity
 
     public function __construct()
     {
@@ -16,7 +19,7 @@ class Auth
     }
 
     /**
-     * Inicia la sesión PHP con parámetros seguros
+     * Starts the PHP session with secure parameters
      */
     private function startSession(): void
     {
@@ -33,7 +36,7 @@ class Auth
             session_start();
         }
 
-        // Control de expiración por inactividad
+        // Inactivity expiration check
         if (isset($_SESSION['express_last_activity']) && (time() - $_SESSION['express_last_activity'] > self::SESSION_LIFETIME)) {
             $this->logout();
         }
@@ -41,10 +44,10 @@ class Auth
     }
 
     /**
-     * Autentica al paciente contra OpenEMR usando sqlQuery() y password_verify()
-     * 
-     * @param string $username Usuario del portal o DNI / Email / PID
-     * @param string $password Contraseña en texto plano
+     * Authenticates the patient against OpenEMR using sqlQuery() and password_verify()
+     *
+     * @param string $username Portal username, SSN/ID, Email or PID
+     * @param string $password Plain-text password
      * @return array ['success' => bool, 'message' => string, 'patient' => array|null]
      */
     public function login(string $username, string $password): array
@@ -55,11 +58,11 @@ class Auth
         if (empty($username) || empty($password)) {
             return [
                 'success' => false,
-                'message' => 'Por favor ingrese su usuario/documento y contraseña.'
+                'message' => xl('Please enter your username/ID and password.')
             ];
         }
 
-        // Consultar la tabla nativa del portal de pacientes de OpenEMR: patient_access_onsite
+        // Query the native OpenEMR patient portal table: patient_access_onsite
         $sql = "SELECT 
                     pao.pid,
                     pao.portal_username,
@@ -100,19 +103,19 @@ class Auth
         if (!$user || empty($user['pid'])) {
             return [
                 'success' => false,
-                'message' => 'Credenciales inválidas o paciente no registrado en el portal.'
+                'message' => xl('Invalid credentials or patient not registered in the portal.')
             ];
         }
 
-        // Verificar estado de habilitación si está configurado en NO
+        // Check portal access status
         if (isset($user['allow_patient_portal']) && strtoupper((string)$user['allow_patient_portal']) === 'NO') {
             return [
                 'success' => false,
-                'message' => 'El acceso al portal se encuentra inactivo para este paciente. Por favor contacte al centro médico.'
+                'message' => xl('Portal access is disabled for this patient. Please contact the medical center.')
             ];
         }
 
-        // Verificar Contraseña con password_verify()
+        // Verify password with password_verify()
         $storedHash = $user['portal_pwd'] ?? '';
         $passwordValid = false;
 
@@ -120,6 +123,7 @@ class Auth
             if (password_verify($password, $storedHash)) {
                 $passwordValid = true;
             } elseif (hash_equals($storedHash, sha1($password)) || hash_equals($storedHash, md5($password))) {
+                // Legacy hash support (sha1/md5) for migration
                 $passwordValid = true;
             }
         }
@@ -127,14 +131,14 @@ class Auth
         if (!$passwordValid) {
             return [
                 'success' => false,
-                'message' => 'Contraseña incorrecta. Verifique los datos ingresados.'
+                'message' => xl('Incorrect password. Please verify your credentials.')
             ];
         }
 
-        // Formatear datos y establecer la sesión exclusiva Express
+        // Format patient data and establish the Express session
         $fullName = trim(($user['fname'] ?? '') . ' ' . ($user['mname'] ?? '') . ' ' . ($user['lname'] ?? ''));
         if (empty($fullName)) {
-            $fullName = 'Paciente #' . $user['pid'];
+            $fullName = xl('Patient') . ' #' . $user['pid'];
         }
 
         session_regenerate_id(true);
@@ -147,7 +151,7 @@ class Auth
         $_SESSION['express_logged_in']      = true;
         $_SESSION['express_logged_at']      = time();
         $_SESSION['express_last_activity']  = time();
-        
+
         $_SESSION['express_patient_data']   = [
             'pid'         => (int)$user['pid'],
             'pubpid'      => $user['pubpid'] ?: (string)$user['pid'],
@@ -166,18 +170,18 @@ class Auth
 
         return [
             'success' => true,
-            'message' => 'Ingreso exitoso.',
+            'message' => xl('Login successful.'),
             'patient' => $_SESSION['express_patient_data']
         ];
     }
 
     /**
-     * Comprueba si el paciente tiene sesión Express activa
+     * Checks whether the patient has an active Express session
      */
     public function isAuthenticated(): bool
     {
-        return isset($_SESSION['express_logged_in']) 
-            && $_SESSION['express_logged_in'] === true 
+        return isset($_SESSION['express_logged_in'])
+            && $_SESSION['express_logged_in'] === true
             && !empty($_SESSION['express_patient_pid']);
     }
 
@@ -197,19 +201,19 @@ class Auth
     }
 
     /**
-     * Guardia de seguridad
+     * Security guard — redirects unauthenticated requests to login
      */
     public function requireAuth(string $redirectUrl = 'index.php'): void
     {
         if (!$this->isAuthenticated()) {
-            $_SESSION['flash_error'] = 'Debe iniciar sesión para acceder al portal.';
+            $_SESSION['flash_error'] = xl('You must log in to access the portal.');
             header("Location: {$redirectUrl}");
             exit;
         }
     }
 
     /**
-     * Cierra la sesión
+     * Destroys the Express session
      */
     public function logout(): void
     {

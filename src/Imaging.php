@@ -1,6 +1,6 @@
 <?php
 /**
- * Gestión de Diagnóstico por Imágenes e Integración Orthanc / OHIF Viewer
+ * Diagnostic Imaging Management and Orthanc / OHIF Viewer Integration
  * Patient Express Portal - Integración Nativa con Funciones OpenEMR
  */
 
@@ -127,7 +127,7 @@ class Imaging
                         || str_ends_with($urlLower, '.pdf') 
                         || str_ends_with($nameLower, '.pdf');
 
-                    $categoryLabel = !empty($dRow['category_name']) ? $dRow['category_name'] : 'Diagnóstico por Imágenes';
+                    $categoryLabel = !empty($dRow['category_name']) ? $dRow['category_name'] : xl('Diagnostic Imaging');
                     $studyTitle = $categoryLabel . ' - ' . $docName;
                     $modality = $this->detectModality($studyTitle);
 
@@ -205,9 +205,9 @@ class Imaging
                             'date_raw'          => $docDate,
                             'encounter_id'      => $encId,
                             'encounter_date'    => $encDateDisplay,
-                            'provider_name'     => $encProviderName ?: 'Servicio de Diagnóstico por Imágenes',
+                            'provider_name'     => $encProviderName ?: xl('Diagnostic Imaging Service'),
                             'provider_spec'     => $categoryLabel,
-                            'status'            => 'Estudio DICOM Listo',
+                            'status'            => xl('DICOM Study Ready'),
                             'has_report'        => false,
                             'accession_number'  => 'DOC-' . $dRow['doc_id'],
                             'study_uid'         => $studyUid,
@@ -231,7 +231,7 @@ class Imaging
                         $catId = (int)($dRow['category_id'] ?? 0);
                         $report = $reportsByCategory[$catId] ?? null;
                         $isReportDocItself = ($report && (int)$report['doc_id'] === (int)$dRow['doc_id']);
-                        $providerName = $encProviderName ?: 'Servicio de Diagnóstico por Imágenes';
+                        $providerName = $encProviderName ?: xl('Diagnostic Imaging Service');
                         if ($report && !empty($report['medico_solicitante'])) {
                             $providerName = $report['medico_solicitante'];
                         }
@@ -249,10 +249,10 @@ class Imaging
                             'encounter_date'    => $encDateDisplay,
                             'provider_name'     => $providerName,
                             'provider_spec'     => $categoryLabel,
-                            'status'            => 'Imagen Disponible',
+                            'status'            => xl('Image Available'),
                             'has_report'        => ($report && !$isReportDocItself),
                             'report_pdf_url'    => ($report && !$isReportDocItself) ? 'view_document.php?id=' . $report['doc_id'] : null,
-                            'report_title'      => $report ? ($report['title'] ?? 'Informe de Diagnóstico por Imágenes') : null,
+                            'report_title'      => $report ? ($report['title'] ?? xl('Diagnostic Imaging Report')) : null,
                             'accession_number'  => 'DOC-' . $dRow['doc_id'],
                             'study_uid'         => null,
                             'format_type'       => $formatType,
@@ -293,7 +293,7 @@ class Imaging
                 }
                 $providerName = (!empty($group['enc_provider_name']))
                     ? $group['enc_provider_name']
-                    : 'Servicio de Diagnóstico por Imágenes';
+                    : xl('Diagnostic Imaging Service');
                 if ($report && !empty($report['medico_solicitante'])) {
                     $providerName = $report['medico_solicitante'];
                 }
@@ -303,7 +303,7 @@ class Imaging
                     'order_id'          => 0,
                     'doc_id'            => $group['first_doc_id'],
                     'doc_ids'           => $group['doc_ids'],
-                    'title'             => $group['category_label'] . ' (' . $seriesCount . ' ' . ($seriesCount === 1 ? 'imagen' : 'imágenes') . ')',
+                    'title'             => $group['category_label'] . ' (' . $seriesCount . ' ' . ($seriesCount === 1 ? xl('image') : xl('images')) . ')',
                     'modality'          => $this->detectModality($group['category_label']),
                     'date_study'        => $group['formatted_date'],
                     'date_raw'          => $group['date_raw'],
@@ -311,7 +311,7 @@ class Imaging
                     'encounter_date'    => $group['encounter_date'] ?? '',
                     'provider_name'     => $providerName,
                     'provider_spec'     => $group['category_label'],
-                    'status'            => 'Sincronizado en PACS Orthanc',
+                    'status'            => xl('Synchronized in Orthanc PACS'),
                     'has_report'        => $hasReportPdf,
                     'report_doc_id'     => $reportDocId,
                     'report_pdf_url'    => $reportUrl,
@@ -388,10 +388,10 @@ class Imaging
             while ($row = sqlFetchArray($resOrders)) {
                 $providerName = trim(($row['provider_title'] ? $row['provider_title'] . ' ' : 'Dr. ') . ($row['provider_fname'] ?? '') . ' ' . ($row['provider_lname'] ?? ''));
                 if (trim($providerName) === 'Dr.' || empty(trim($providerName))) {
-                    $providerName = 'Médico Especialista';
+                    $providerName = xl('Specialist Physician');
                 }
 
-                $studyName = !empty($row['procedure_name']) ? $row['procedure_name'] : 'Estudio de Diagnóstico por Imágenes';
+                $studyName = !empty($row['procedure_name']) ? $row['procedure_name'] : xl('Diagnostic Imaging Study');
                 $modality = $this->detectModality($studyName);
 
                 $accessionNumber = !empty($row['accession_number']) ? $row['accession_number'] : 'ACC-' . $row['procedure_order_id'];
@@ -405,11 +405,11 @@ class Imaging
                     'order_id'          => (int)$row['procedure_order_id'],
                     'title'             => $studyName,
                     'modality'          => $modality,
-                    'date_study'        => $row['date_report'] ? date('d/m/Y H:i', strtotime($row['date_report'])) : ($row['date_ordered'] ? date('d/m/Y', strtotime($row['date_ordered'])) : 'Sin fecha'),
+                    'date_study'        => $row['date_report'] ? date('d/m/Y H:i', strtotime($row['date_report'])) : ($row['date_ordered'] ? date('d/m/Y', strtotime($row['date_ordered'])) : xl('No date')),
                     'date_raw'          => $row['date_report'] ?? $row['date_ordered'],
                     'provider_name'     => $providerName,
-                    'provider_spec'     => $row['provider_specialty'] ?? 'Diagnóstico por Imágenes',
-                    'status'            => !empty($row['procedure_report_id']) ? 'Informe Disponible' : 'En proceso / Pendiente',
+                    'provider_spec'     => $row['provider_specialty'] ?? xl('Diagnostic Imaging'),
+                    'status'            => !empty($row['procedure_report_id']) ? xl('Report Available') : xl('In Progress / Pending'),
                     'has_report'        => !empty($row['procedure_report_id']),
                     'accession_number'  => $accessionNumber,
                     'study_uid'         => $effectiveUid,
@@ -546,12 +546,12 @@ class Imaging
                             $mainDicom = $study['MainDicomTags'] ?? [];
                             $studyUid = $mainDicom['StudyInstanceUID'] ?? ($study['ID'] ?? '');
                             $studyDate = $mainDicom['StudyDate'] ?? '';
-                            $formattedDate = 'Sin fecha';
+                            $formattedDate = xl('No date');
                             if (strlen($studyDate) === 8) {
                                 $formattedDate = substr($studyDate, 6, 2) . '/' . substr($studyDate, 4, 2) . '/' . substr($studyDate, 0, 4);
                             }
 
-                            $desc = $mainDicom['StudyDescription'] ?? 'Estudio PACS Orthanc';
+                            $desc = $mainDicom['StudyDescription'] ?? xl('Orthanc PACS Study');
                             $modality = $mainDicom['ModalitiesInStudy'] ?? ($mainDicom['Modality'] ?? $this->detectModality($desc));
                             $accession = $mainDicom['AccessionNumber'] ?? 'PACS-' . substr($studyUid, -6);
 
@@ -563,9 +563,9 @@ class Imaging
                                 'modality'         => is_array($modality) ? implode(', ', $modality) : (string)$modality,
                                 'date_study'       => $formattedDate,
                                 'date_raw'         => $studyDate,
-                                'provider_name'    => $mainDicom['ReferringPhysicianName'] ?? 'Servicio de Diagnóstico por Imágenes',
-                                'provider_spec'    => 'Diagnóstico por Imágenes',
-                                'status'           => 'Imágenes en Servidor PACS',
+                                'provider_name'    => $mainDicom['ReferringPhysicianName'] ?? xl('Diagnostic Imaging Service'),
+                                'provider_spec'    => xl('Diagnostic Imaging'),
+                                'status'           => xl('Images on PACS Server'),
                                 'has_report'       => false,
                                 'accession_number' => $accession,
                                 'study_uid'        => $studyUid,
@@ -583,7 +583,7 @@ class Imaging
                 }
             } catch (\Throwable $e) {
                 // Registrar aviso silencioso
-                error_log("Aviso: No se pudo consultar Orthanc PACS ({$e->getMessage()})");
+                error_log(xl('Warning: Could not query Orthanc PACS') . " ({$e->getMessage()})");
             }
         }
 
@@ -708,7 +708,7 @@ class Imaging
                     $fileContent = $retrieved;
                 }
             } catch (\Throwable $e) {
-                error_log("Aviso: C_Document::retrieve_action fallo ({$e->getMessage()})");
+                error_log(xl('Warning: C_Document::retrieve_action failed') . " ({$e->getMessage()})");
             }
         }
 
@@ -777,7 +777,7 @@ class Imaging
 
         $patientFullName = trim(($row['patient_fname'] ?? '') . ' ' . ($row['patient_mname'] ?? '') . ' ' . ($row['patient_lname'] ?? ''));
         $providerFullName = trim(($row['provider_title'] ? $row['provider_title'] . ' ' : 'Dr. ') . ($row['provider_fname'] ?? '') . ' ' . ($row['provider_lname'] ?? ''));
-        $studyTitle = !empty($row['procedure_name']) ? $row['procedure_name'] : 'Estudio de Diagnóstico por Imágenes';
+        $studyTitle = !empty($row['procedure_name']) ? $row['procedure_name'] : xl('Diagnostic Imaging Study');
         $modality = $this->detectModality($studyTitle);
         $accession = !empty($row['accession_number']) ? $row['accession_number'] : 'ACC-' . $row['procedure_order_id'];
         $studyUid = $this->extractStudyUidFromNotes($row['report_notes'] ?? '') ?: ('1.2.840.113619.2.55.' . $row['procedure_order_id'] . '.' . $pid);
@@ -794,7 +794,7 @@ class Imaging
             'viewer_url'         => $this->buildOhifViewerUrl($studyUid),
             'date_report'        => $row['date_report'] ? date('d/m/Y H:i', strtotime($row['date_report'])) : 'N/A',
             'date_ordered'       => $row['date_ordered'] ? date('d/m/Y', strtotime($row['date_ordered'])) : 'N/A',
-            'report_status'      => 'Informe Oficial Aprobado',
+            'report_status'      => xl('Official Approved Report'),
             'findings'           => $parsedNotes['findings'],
             'conclusion'         => $parsedNotes['conclusion'],
             'raw_notes'          => $row['report_notes'] ?? '',
@@ -812,8 +812,8 @@ class Imaging
             ],
             'provider'           => [
                 'full_name'      => $providerFullName,
-                'specialty'      => $row['provider_specialty'] ?? 'Diagnóstico por Imágenes',
-                'license'        => $row['provider_license'] ?? 'M.N. / M.P. Radiología'
+                'specialty'      => $row['provider_specialty'] ?? xl('Diagnostic Imaging'),
+                'license'        => $row['provider_license'] ?? xl('M.D. / M.P. Radiology')
             ]
         ];
     }
@@ -927,7 +927,7 @@ class Imaging
             $titulo = trim((string)($row['region_anatomica'] ?? ''));
             $map[$cat] = [
                 'doc_id'           => (int)$row['pdf_document_id'],
-                'title'            => ($titulo !== '' ? $titulo . ' — ' : '') . 'Informe de Diagnóstico por Imágenes',
+                'title'            => ($titulo !== '' ? $titulo . ' — ' : '') . xl('Diagnostic Imaging Report'),
                 'date'             => (string)($row['fecha_informe'] ?? ''),
                 'medico_solicitante' => trim((string)($row['medico_solicitante'] ?? '')),
                 'medico_informante'  => trim((string)($row['medico_informante'] ?? '')),
@@ -992,15 +992,15 @@ class Imaging
     private function detectModality(string $title): string
     {
         $t = strtoupper($title);
-        if (str_contains($t, 'RESONANCIA') || str_contains($t, 'RMN') || str_contains($t, 'MRI')) return 'RMN (Resonancia Magnética)';
-        if (str_contains($t, 'TOMOGRAFIA') || str_contains($t, 'TAC') || str_contains($t, 'CT')) return 'TAC (Tomografía Computada)';
-        if (str_contains($t, 'ECOGRAFIA') || str_contains($t, 'ECO') || str_contains($t, 'ULTRASONIDO') || str_contains($t, 'US')) return 'US (Ecografía)';
-        if (str_contains($t, 'MAMOGRAFIA') || str_contains($t, 'MG')) return 'MG (Mamografía)';
-        if (str_contains($t, 'RAYOS') || str_contains($t, 'RX') || str_contains($t, 'RADIOGRAFIA') || str_contains($t, 'CR') || str_contains($t, 'DX')) return 'RX (Radiografía Digital)';
-        if (str_contains($t, 'DENSITOMETRIA') || str_contains($t, 'DEXA')) return 'DEXA (Densitometría)';
-        if (str_contains($t, 'ELECTROCARDIOGRAMA') || str_contains($t, 'ECG') || str_contains($t, 'EKG')) return 'ECG (Electrocardiograma)';
-        if (str_contains($t, 'FOTO') || str_contains($t, 'PHOTO') || str_contains($t, 'OCT')) return 'FOTO (Registro Gráfico)';
-        return 'IMG (Diagnóstico por Imágenes)';
+        if (str_contains($t, 'RESONANCIA') || str_contains($t, 'RMN') || str_contains($t, 'MRI')) return xl('MRI (Magnetic Resonance)');
+        if (str_contains($t, 'TOMOGRAFIA') || str_contains($t, 'TAC') || str_contains($t, 'CT')) return xl('CT (Computed Tomography)');
+        if (str_contains($t, 'ECOGRAFIA') || str_contains($t, 'ECO') || str_contains($t, 'ULTRASONIDO') || str_contains($t, 'US')) return xl('US (Ultrasound)');
+        if (str_contains($t, 'MAMOGRAFIA') || str_contains($t, 'MG')) return xl('MG (Mammography)');
+        if (str_contains($t, 'RAYOS') || str_contains($t, 'RX') || str_contains($t, 'RADIOGRAFIA') || str_contains($t, 'CR') || str_contains($t, 'DX')) return xl('XR (Digital Radiography)');
+        if (str_contains($t, 'DENSITOMETRIA') || str_contains($t, 'DEXA')) return xl('DEXA (Bone Densitometry)');
+        if (str_contains($t, 'ELECTROCARDIOGRAMA') || str_contains($t, 'ECG') || str_contains($t, 'EKG')) return xl('ECG (Electrocardiogram)');
+        if (str_contains($t, 'FOTO') || str_contains($t, 'PHOTO') || str_contains($t, 'OCT')) return xl('PHOTO (Graphic Record)');
+        return xl('IMG (Diagnostic Imaging)');
     }
 
     private function extractStudyUidFromNotes(string $notes): ?string
@@ -1022,11 +1022,11 @@ class Imaging
             $conclusion = trim($parts[1] ?? '');
         } else {
             $findings = trim($notes);
-            $conclusion = 'Estudio realizado según protocolo estándar. Correlacionar con datos clínicos.';
+            $conclusion = xl('Study performed according to standard protocol. Correlate with clinical data.');
         }
 
         if (empty($findings)) {
-            $findings = 'No se observan alteraciones morfológicas ni lesiones focales agudas en la región explorada. Estructuras anatómicas dentro de límites normales para la edad y antecedentes del paciente.';
+            $findings = xl('No morphological alterations or acute focal lesions observed in the explored region. Anatomical structures within normal limits for age and patient history.');
         }
 
         return [
@@ -1044,7 +1044,7 @@ class Imaging
             $birthDate = new \DateTime($dob);
             $now = new \DateTime();
             $interval = $now->diff($birthDate);
-            return $interval->y . ' años';
+            return $interval->y . ' ' . xl('years');
         } catch (\Exception $e) {
             return 'N/A';
         }
@@ -1053,9 +1053,9 @@ class Imaging
     private function formatSex(string $sex): string
     {
         return match (strtoupper(trim($sex))) {
-            'M', 'MALE', 'MASCULINO' => 'Masculino',
-            'F', 'FEMALE', 'FEMENINO' => 'Femenino',
-            default => 'Otro / No especificado'
+            'M', 'MALE', 'MASCULINO' => xl('Male'),
+            'F', 'FEMALE', 'FEMENINO' => xl('Female'),
+            default => xl('Other / Not specified')
         };
     }
 }

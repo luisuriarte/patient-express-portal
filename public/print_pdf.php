@@ -18,7 +18,7 @@ $reportId = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 $reportDate = isset($_GET['date']) ? trim((string)$_GET['date']) : '';
 
 $data = null;
-$reportTitle = 'INFORME MÉDICO OFICIAL';
+$reportTitle = xl('OFFICIAL MEDICAL REPORT');
 
 if ($type === 'lab') {
     $labService = new \App\Laboratory();
@@ -31,22 +31,22 @@ if ($type === 'lab') {
         $data = $labService->getReportDetails($reportId, $pid);
     }
 
-    $reportTitle = 'INFORME INTEGRAL DE LABORATORIO CLÍNICO';
+    $reportTitle = xl('COMPREHENSIVE CLINICAL LABORATORY REPORT');
 
 } elseif ($type === 'image') {
     $imgService = new \App\Imaging();
     if ($reportId > 0) {
         $data = $imgService->getStudyReportDetails($reportId, $pid);
     }
-    $reportTitle = 'INFORME DE DIAGNÓSTICO POR IMÁGENES';
+    $reportTitle = xl('DIAGNOSTIC IMAGING REPORT');
 } else {
     http_response_code(400);
-    die('Error: Tipo de reporte no reconocido.');
+    die(xl('Error: Unrecognized report type.'));
 }
 
 if (!$data) {
     http_response_code(404);
-    die('Error: Informe no encontrado o no tiene permisos para acceder al documento solicitado.');
+    die(xl('Error: Report not found or you do not have permission to access the requested document.'));
 }
 
 // Cargar Logo en base64 para Dompdf (soporta SVG y PNG)
@@ -266,13 +266,13 @@ ob_start();
         <tr>
             <td style="width: 60%; vertical-align: middle;">
                 <div class="clinic-name"><?= defined('CLINIC_NAME') ? CLINIC_NAME : '' ?></div>
-                <div class="clinic-sub"><?= defined('CLINIC_ADDRESS') ? CLINIC_ADDRESS : '' ?><?= defined('CLINIC_PHONE') && CLINIC_PHONE ? ' | Tel: ' . CLINIC_PHONE : '' ?></div>
-                <div class="clinic-sub"><?= defined('CLINIC_EMAIL') && CLINIC_EMAIL ? 'Email: ' . CLINIC_EMAIL : '' ?><?= defined('CLINIC_WEB') && CLINIC_WEB ? ' | Web: ' . CLINIC_WEB : '' ?></div>
+                <div class="clinic-sub"><?= defined('CLINIC_ADDRESS') ? CLINIC_ADDRESS : '' ?><?= defined('CLINIC_PHONE') && CLINIC_PHONE ? ' | ' . xlt('Tel') . ': ' . CLINIC_PHONE : '' ?></div>
+                <div class="clinic-sub"><?= defined('CLINIC_EMAIL') && CLINIC_EMAIL ? xlt('Email') . ': ' . CLINIC_EMAIL : '' ?><?= defined('CLINIC_WEB') && CLINIC_WEB ? ' | ' . xlt('Web') . ': ' . CLINIC_WEB : '' ?></div>
             </td>
             <td style="width: 40%; text-align: right; vertical-align: middle;">
-                <div style="font-size: 10.5px; font-weight: bold; color: #0284c7;">SERVICIO DE BIOQUÍMICA & DIAGNÓSTICO</div>
-                <div style="font-size: 8.5px; color: #64748b;">Protocolo Electrónico Unificado</div>
-                <div style="font-size: 8px; color: #94a3b8; margin-top: 2px;">Fecha Emisión: <?= date('d/m/Y H:i:s') ?></div>
+                <div style="font-size: 10.5px; font-weight: bold; color: #0284c7;"><?= xlt('BIOCHEMISTRY & DIAGNOSTIC SERVICE') ?></div>
+                <div style="font-size: 8.5px; color: #64748b;"><?= xlt('Unified Electronic Protocol') ?></div>
+                <div style="font-size: 8px; color: #94a3b8; margin-top: 2px;"><?= xlt('Issue Date') ?>: <?= date('d/m/Y H:i:s') ?></div>
             </td>
         </tr>
     </table>
@@ -281,7 +281,7 @@ ob_start();
     <div class="report-header-title">
         <?= htmlspecialchars($reportTitle) ?>
         <?php if ($type === 'lab'): ?>
-            - <?= htmlspecialchars($data['encounter_label'] ?? 'ENCUENTRO') ?> (FECHA: <?= htmlspecialchars($data['batch_date_formatted'] ?? '') ?>)
+            - <?= htmlspecialchars($data['encounter_label'] ?? xlt('ENCOUNTER')) ?> (<?= xlt('DATE') ?>: <?= htmlspecialchars($data['batch_date_formatted'] ?? '') ?>)
         <?php elseif ($type === 'image' && !empty($data['study_name'])): ?>
             - <?= htmlspecialchars($data['study_name']) ?>
         <?php endif; ?>
@@ -290,27 +290,27 @@ ob_start();
     <!-- Ficha del Paciente -->
     <table class="patient-box">
         <tr>
-            <td class="label">Paciente:</td>
+            <td class="label"><?= xlt('Patient') ?>:</td>
             <td class="val"><strong><?= htmlspecialchars($data['patient']['full_name']) ?></strong></td>
-            <td class="label">Historia / PID:</td>
+            <td class="label"><?= xlt('Medical Record / PID') ?>:</td>
             <td class="val">#<?= htmlspecialchars((string)$data['patient']['pid']) ?></td>
         </tr>
         <tr>
-            <td class="label">DNI / Documento:</td>
+            <td class="label"><?= xlt('ID / Document') ?>:</td>
             <td class="val"><?= htmlspecialchars($data['patient']['dni']) ?></td>
-            <td class="label"><?= $type === 'lab' ? 'Fecha de Resultados:' : 'Fecha de Estudio:' ?></td>
+            <td class="label"><?= $type === 'lab' ? xlt('Results Date') . ':' : xlt('Study Date') . ':' ?></td>
             <td class="val"><?= htmlspecialchars($type === 'lab' ? ($data['latest_result_date'] ?? $data['batch_date_formatted'] ?? 'N/A') : ($data['date_report'] ?? 'N/A')) ?></td>
         </tr>
         <tr>
-            <td class="label">Edad / Sexo:</td>
+            <td class="label"><?= xlt('Age / Sex') ?>:</td>
             <td class="val"><?= htmlspecialchars($data['patient']['age']) ?> / <?= htmlspecialchars($data['patient']['sex']) ?></td>
-            <td class="label"><?= $type === 'lab' ? 'Encuentro / Total Paneles:' : 'Modalidad:' ?></td>
-            <td class="val"><?= htmlspecialchars($type === 'lab' ? (($data['encounter_label'] ?? '') . ' (' . (string)($data['total_panels'] ?? '1') . ' estudios)') : ($data['modality'] ?? 'IMG')) ?></td>
+            <td class="label"><?= $type === 'lab' ? xlt('Encounter / Total Panels') . ':' : xlt('Modality') . ':' ?></td>
+            <td class="val"><?= htmlspecialchars($type === 'lab' ? (($data['encounter_label'] ?? '') . ' (' . (string)($data['total_panels'] ?? '1') . ' ' . xlt('studies') . ')') : ($data['modality'] ?? 'IMG')) ?></td>
         </tr>
         <tr>
-            <td class="label">Médico(s) Solicitante(s):</td>
+            <td class="label"><?= xlt('Requesting Physician(s)') ?>:</td>
             <td class="val" colspan="3">
-                <?= htmlspecialchars($type === 'lab' ? ($data['providers_summary'] ?: 'Médicos del Servicio') : ($data['provider']['full_name'] ?? 'Médico Especialista')) ?>
+                <?= htmlspecialchars($type === 'lab' ? ($data['providers_summary'] ?: xlt('Service Physicians')) : ($data['provider']['full_name'] ?? xlt('Specialist Physician'))) ?>
             </td>
         </tr>
     </table>
@@ -327,8 +327,8 @@ ob_start();
                     <div class="panel-header">
                         <span><?= ($index + 1) ?>. <?= htmlspecialchars($panel['panel_name']) ?></span>
                         <span class="panel-meta">
-                            Muestra: <strong><?= htmlspecialchars($panel['specimen_num']) ?></strong> | 
-                            Solicitó: <strong><?= htmlspecialchars($panel['provider']['full_name']) ?></strong>
+                            <?= xlt('Specimen') ?>: <strong><?= htmlspecialchars($panel['specimen_num']) ?></strong> | 
+                            <?= xlt('Requested by') ?>: <strong><?= htmlspecialchars($panel['provider']['full_name']) ?></strong>
                         </span>
                     </div>
 
@@ -336,17 +336,17 @@ ob_start();
                     <table class="results-table">
                         <thead>
                             <tr>
-                                <th style="width: 38%;">Determinación / Analito</th>
-                                <th style="width: 20%;">Resultado</th>
-                                <th style="width: 14%;">Unidades</th>
-                                <th style="width: 28%;">Valores de Referencia</th>
+                                <th style="width: 38%;"><?= xlt('Determination / Analyte') ?></th>
+                                <th style="width: 20%;"><?= xlt('Result') ?></th>
+                                <th style="width: 14%;"><?= xlt('Units') ?></th>
+                                <th style="width: 28%;"><?= xlt('Reference Values') ?></th>
                             </tr>
                         </thead>
                         <tbody>
                             <?php if (empty($panel['results'])): ?>
                                 <tr>
                                     <td colspan="4" style="text-align: center; color: #64748b; padding: 8px;">
-                                        Determinaciones en proceso o sin desglose numérico.
+                                         <?= xlt('Determinations in progress or without numeric breakdown.') ?>
                                     </td>
                                 </tr>
                             <?php else: ?>
@@ -378,7 +378,7 @@ ob_start();
 
                     <?php if (!empty($panel['notes'])): ?>
                         <div style="font-size: 8.5px; color: #475569; background-color: #f8fafc; padding: 4px 8px; border: 1px solid #e2e8f0; border-radius: 3px; margin-bottom: 6px;">
-                            <strong>Observaciones:</strong> <?= nl2br(htmlspecialchars($panel['notes'])) ?>
+                            <strong><?= xlt('Observations') ?>:</strong> <?= nl2br(htmlspecialchars($panel['notes'])) ?>
                         </div>
                     <?php endif; ?>
 
@@ -386,7 +386,7 @@ ob_start();
             <?php endforeach; ?>
         <?php else: ?>
             <div style="text-align: center; padding: 30px; color: #64748b;">
-                No se encontraron análisis registrados para este encuentro.
+                <?= xlt('No analyses found registered for this encounter.') ?>
             </div>
         <?php endif; ?>
 
@@ -397,18 +397,18 @@ ob_start();
         <div style="margin-bottom: 10px;">
             <table style="width: 100%; font-size: 9.5px; border-collapse: collapse;">
                 <tr>
-                    <td style="width: 50%; padding: 3px 0;"><strong>Modalidad:</strong> <?= htmlspecialchars($data['modality']) ?></td>
-                    <td style="width: 50%; padding: 3px 0;"><strong>UID Estudio:</strong> <span style="font-family: monospace; font-size: 8px;"><?= htmlspecialchars($data['study_uid']) ?></span></td>
+                    <td style="width: 50%; padding: 3px 0;"><strong><?= xlt('Modality') ?>:</strong> <?= htmlspecialchars($data['modality']) ?></td>
+                    <td style="width: 50%; padding: 3px 0;"><strong><?= xlt('Study UID') ?>:</strong> <span style="font-family: monospace; font-size: 8px;"><?= htmlspecialchars($data['study_uid']) ?></span></td>
                 </tr>
             </table>
         </div>
 
-        <div class="section-title">Técnica y Hallazgos Descriptivos</div>
+        <div class="section-title"><?= xlt('Technique and Descriptive Findings') ?></div>
         <div class="report-text">
             <?= nl2br(htmlspecialchars($data['findings'])) ?>
         </div>
 
-        <div class="section-title">Conclusión / Impresión Diagnóstica</div>
+        <div class="section-title"><?= xlt('Conclusion / Diagnostic Impression') ?></div>
         <div class="report-text" style="font-weight: 500; background-color: #f8fafc; border-left: 3px solid #0284c7;">
             <?= nl2br(htmlspecialchars($data['conclusion'])) ?>
         </div>
@@ -419,24 +419,24 @@ ob_start();
         <tr>
             <td class="qr-placeholder">
                 <div style="border: 1px solid #cbd5e1; padding: 5px 8px; border-radius: 4px; display: inline-block;">
-                    <strong>VALIDACIÓN ELECTRÓNICA INSTITUCIONAL</strong><br>
-                    <span>ID de Lote: <?= md5(($data['encounter_id'] ?? $reportId) . '-' . $pid . '-ORIGEN') ?></span><br>
-                    <span>Verifique autenticidad en <?= defined('CLINIC_WEB') ? CLINIC_WEB : '' ?></span>
+                    <strong><?= xlt('INSTITUTIONAL ELECTRONIC VALIDATION') ?></strong><br>
+                    <span><?= xlt('Batch ID') ?>: <?= md5(($data['encounter_id'] ?? $reportId) . '-' . $pid . '-ORIGEN') ?></span><br>
+                    <span><?= xlt('Verify authenticity at') ?> <?= defined('CLINIC_WEB') ? CLINIC_WEB : '' ?></span>
                 </div>
             </td>
             <td style="width: 10%;"></td>
             <td class="sig-box">
-                <strong>Servicio de Bioquímica y Diagnóstico Clínico</strong><br>
+                <strong><?= xlt('Biochemistry and Clinical Diagnostics Service') ?></strong><br>
                 <span><?= defined('CLINIC_NAME') ? CLINIC_NAME : '' ?></span><br>
-                <span>Validación Bioquímica Registrada</span><br>
-                <span style="font-size: 8px; color: #0284c7; font-weight: bold;">Documento Firmado Digitalmente</span>
+                <span><?= xlt('Biochemical Validation Recorded') ?></span><br>
+                <span style="font-size: 8px; color: #0284c7; font-weight: bold;"><?= xlt('Digitally Signed Document') ?></span>
             </td>
         </tr>
     </table>
 
     <!-- Pie de página fijo -->
     <div class="footer-disclaimer">
-        Este documento es un protocolo médico oficial emitido por <?= defined('CLINIC_NAME') ? CLINIC_NAME : '' ?>. Su validez y confidencialidad están protegidas por las normativas de salud vigentes (Ley 25.326 / HIPAA).
+        <?= xlt('This document is an official medical protocol issued by') ?> <?= defined('CLINIC_NAME') ? CLINIC_NAME : '' ?>. <?= xlt('Its validity and confidentiality are protected by current health regulations (Law 25.326 / HIPAA).') ?>
     </div>
 
 </body>

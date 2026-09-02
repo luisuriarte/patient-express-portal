@@ -78,7 +78,7 @@ class PortalSSO
             return $basePortalUrl . '/index.php?service_auth=' . urlencode($token);
 
         } catch (Exception $e) {
-            error_log("Error generando OneTimeAuth token para SSO OpenEMR: " . $e->getMessage());
+            error_log(xl('Error generating OneTimeAuth token for SSO OpenEMR') . ": " . $e->getMessage());
             // Fallback al portal regular si falla la generación
             return $basePortalUrl;
         }

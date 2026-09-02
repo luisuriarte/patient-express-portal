@@ -26,7 +26,7 @@ if (isset($_SESSION['flash_error'])) {
 
 // Control de logout
 if (isset($_GET['logout'])) {
-    $successMessage = 'Has cerrado tu sesión de forma segura.';
+    $successMessage = xlt('You have securely logged out.');
 }
 
 // Procesar formulario POST
@@ -44,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$pageTitle = 'Ingreso de Pacientes | ' . (defined('CLINIC_NAME') && CLINIC_NAME ? CLINIC_NAME : 'Portal Express del Paciente');
+$pageTitle = xlt('Patient Login') . ' | ' . (defined('CLINIC_NAME') && CLINIC_NAME ? CLINIC_NAME : xlt('Patient Express Portal'));
 require_once dirname(__DIR__) . '/templates/header.php';
 ?>
 
@@ -55,10 +55,10 @@ require_once dirname(__DIR__) . '/templates/header.php';
             <i data-lucide="shield-check" class="w-8 h-8"></i>
         </div>
         <h1 class="font-heading font-extrabold text-2xl sm:text-3xl text-slate-900 tracking-tight">
-            Portal Express del Paciente
+            <?= xlt('Patient Express Portal') ?>
         </h1>
         <p class="text-xs sm:text-sm text-slate-500 max-w-sm mx-auto">
-            Consulta al instante tus informes de laboratorio, diagnósticos por imágenes y estudios DICOM.
+            <?= xlt('Instantly access your laboratory results, diagnostic imaging studies and DICOM images.') ?>
         </p>
     </div>
 
@@ -84,7 +84,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
                 <!-- Campo Usuario / DNI / Email -->
                 <div class="space-y-1.5">
                     <label for="username" class="block text-xs font-heading font-bold text-slate-700">
-                        Usuario del Portal / DNI / Email
+                        <?= xlt('Portal Username / ID / Email') ?>
                     </label>
                     <div class="relative rounded-xl shadow-xs">
                         <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
@@ -95,7 +95,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
                                id="username" 
                                required 
                                autofocus
-                               placeholder="Ej: tu DNI o usuario" 
+                               placeholder="<?= xla('E.g: your ID or username') ?>" 
                                value="<?= htmlspecialchars($_POST['username'] ?? '') ?>"
                                class="block w-full pl-10 pr-3.5 py-3 text-xs sm:text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-all">
                     </div>
@@ -105,7 +105,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
                 <div class="space-y-1.5">
                     <div class="flex items-center justify-between">
                         <label for="password" class="block text-xs font-heading font-bold text-slate-700">
-                            Contraseña
+                            <?= xlt('Password') ?>
                         </label>
                     </div>
                     <div class="relative rounded-xl shadow-xs">
@@ -132,7 +132,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
                             id="submitBtn"
                             class="w-full flex items-center justify-center space-x-2 py-3.5 px-4 rounded-xl text-xs sm:text-sm font-heading font-bold text-white bg-gradient-to-r from-sky-600 to-sky-700 hover:from-sky-500 hover:to-sky-600 active:scale-[0.99] shadow-md shadow-sky-500/20 transition-all duration-150 cursor-pointer">
                         <i data-lucide="log-in" class="w-4 h-4"></i>
-                        <span>Ingresar a mis Resultados</span>
+                        <span><?= xlt('Access my Results') ?></span>
                     </button>
                 </div>
 
@@ -141,13 +141,13 @@ require_once dirname(__DIR__) . '/templates/header.php';
             <!-- Acceso Alternativo al Portal Completo -->
             <div class="pt-4 border-t border-slate-100 text-center space-y-2">
                 <p class="text-xs text-slate-500">
-                    ¿Necesitas agendar turnos o contactar a tu médico?
+                    <?= xlt('Need to schedule appointments or contact your doctor?') ?>
                 </p>
                 <a href="<?= defined('OPENEMR_PORTAL_URL') ? OPENEMR_PORTAL_URL : 'https://hcd.origen.ar/portal' ?>" 
                    target="_blank" 
                    rel="noopener noreferrer"
                    class="inline-flex items-center space-x-1.5 text-xs font-heading font-bold text-sky-600 hover:text-sky-700 hover:underline">
-                    <span>Acceder al Portal Completo OpenEMR</span>
+                    <span><?= xlt('Access the Full OpenEMR Portal') ?></span>
                     <i data-lucide="arrow-up-right" class="w-3.5 h-3.5"></i>
                 </a>
             </div>

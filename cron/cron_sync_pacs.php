@@ -38,13 +38,13 @@ $lockFile = sys_get_temp_dir() . '/orthanc_sync.lock';
 $lockHandle = fopen($lockFile, 'c+');
 
 if (!$lockHandle || !flock($lockHandle, LOCK_EX | LOCK_NB)) {
-    echo "[" . date('Y-m-d H:i:s') . "] [AVISO] Otra instancia del proceso de sincronización ya se encuentra en ejecución. Saliendo...\n";
+    echo "[" . date('Y-m-d H:i:s') . "] [WARNING] Another instance of the sync process is already running. Exiting...\n";
     exit(0);
 }
 
 echo "==============================================================================\n";
-echo "[" . date('Y-m-d H:i:s') . "] INICIANDO SINCRONIZACIÓN OPENEMR -> ORTHANC PACS\n";
-echo "Servidor Orthanc destino: " . (defined('ORTHANC_URL') ? ORTHANC_URL : 'http://127.0.0.1:8042') . "\n";
+echo "[" . date('Y-m-d H:i:s') . "] STARTING OPENEMR -> ORTHANC PACS SYNC\n";
+echo "Target Orthanc Server: " . (defined('ORTHANC_URL') ? ORTHANC_URL : 'http://127.0.0.1:8042') . "\n";
 echo "==============================================================================\n";
 
 $imgService = new \App\Imaging();
@@ -55,14 +55,14 @@ $imgService = new \App\Imaging();
 try {
     $checkTable = sqlQuery("SHOW TABLES LIKE 'documents_pacs_sync'");
     if (empty($checkTable)) {
-        echo "[" . date('Y-m-d H:i:s') . "] [ERROR] La tabla 'documents_pacs_sync' no existe en la base de datos.\n";
-        echo "Por favor ejecute el script SQL: sql/documents_pacs.sql antes de continuar.\n";
+        echo "[" . date('Y-m-d H:i:s') . "] [ERROR] The table 'documents_pacs_sync' does not exist in the database.\n";
+        echo "Please run the SQL script: sql/documents_pacs.sql before continuing.\n";
         flock($lockHandle, LOCK_UN);
         fclose($lockHandle);
         exit(1);
     }
 } catch (\Throwable $e) {
-    echo "[" . date('Y-m-d H:i:s') . "] [ERROR] No se pudo verificar la base de datos: " . $e->getMessage() . "\n";
+    echo "[" . date('Y-m-d H:i:s') . "] [ERROR] Could not verify the database: " . $e->getMessage() . "\n";
     flock($lockHandle, LOCK_UN);
     fclose($lockHandle);
     exit(1);
@@ -119,7 +119,7 @@ $sql = "SELECT
 
 $res = sqlStatement($sql);
 if (!$res) {
-    echo "[" . date('Y-m-d H:i:s') . "] No se encontraron nuevos documentos para procesar.\n";
+    echo "[" . date('Y-m-d H:i:s') . "] No new documents found to process.\n";
     flock($lockHandle, LOCK_UN);
     fclose($lockHandle);
     exit(0);
@@ -135,19 +135,19 @@ while ($row = sqlFetchArray($res)) {
     $docId = (int)$row['doc_id'];
     $pid = (int)$row['pid'];
     $docName = !empty($row['doc_name']) ? $row['doc_name'] : basename((string)$row['url']);
-    $categoryName = !empty($row['category_name']) ? $row['category_name'] : 'Diagnóstico por Imágenes';
+    $categoryName = !empty($row['category_name']) ? $row['category_name'] : xl('Diagnostic Imaging');
 
     echo "\n------------------------------------------------------------------------------\n";
-    echo "Procesando Doc ID #{$docId} | Paciente PID #{$pid} | Archivo: {$docName}\n";
-    echo "Categoría: {$categoryName}\n";
+    echo "Processing Doc ID #{$docId} | Patient PID #{$pid} | File: {$docName}\n";
+    echo "Category: {$categoryName}\n";
 
     // 1. Obtener información y ruta física del archivo
     $docFile = $imgService->getDocumentFile($docId, $pid);
     if (!$docFile || (!$docFile['exists'])) {
-        echo "  -> [SKIP] El archivo físico o binario no pudo ser localizado en el servidor.\n";
+        echo "  -> [SKIP] The physical or binary file could not be located on the server.\n";
         
         sqlStatement("INSERT INTO documents_pacs_sync (document_id, patient_id, study_instance_uid, status, error_message, synced_at)
-                      VALUES (?, ?, '', 'failed', 'Archivo físico no encontrado en disco', NOW())
+                      VALUES (?, ?, '', 'failed', 'Physical file not found on disk', NOW())
                       ON DUPLICATE KEY UPDATE status = 'failed', error_message = VALUES(error_message)", [
             $docId,
             $pid
@@ -164,7 +164,7 @@ while ($row = sqlFetchArray($res)) {
     // Datos demográficos formateados para cabeceras DICOM
     $rawLname = trim((string)($row['lname'] ?? ''));
     $rawFname = trim((string)($row['fname'] ?? ''));
-    $patientName = strtoupper(($rawLname ?: 'PACIENTE') . '^' . ($rawFname ?: (string)$pid));
+    $patientName = strtoupper(($rawLname ?: 'PATIENT') . '^' . ($rawFname ?: (string)$pid));
     
     $dobFormatted = '';
     if (!empty($row['DOB']) && $row['DOB'] !== '0000-00-00') {
@@ -193,11 +193,11 @@ while ($row = sqlFetchArray($res)) {
     // CASO A: Archivo DICOM Nativo (.dcm o mimetype application/dicom)
     // ==========================================================================
     if ($ext === 'dcm' || $mimeType === 'application/dicom') {
-        echo "  -> Tipo detectado: Archivo DICOM Nativo (.dcm)\n";
+        echo "  -> Type detected: Native DICOM File (.dcm)\n";
         
         $binaryData = $fileContent ?: ($filePath ? file_get_contents($filePath) : null);
         if (empty($binaryData)) {
-            echo "  -> [ERROR] No se pudo leer el contenido binario del archivo DICOM.\n";
+            echo "  -> [ERROR] Could not read the binary content of the DICOM file.\n";
             $failedCount++;
             continue;
         }
@@ -236,11 +236,11 @@ while ($row = sqlFetchArray($res)) {
     // CASO B: Imagen Estándar (JPG, JPEG, PNG, WEBP) -> Convertir a DICOM
     // ==========================================================================
     elseif (in_array($ext, ['jpg', 'jpeg', 'png', 'webp'], true) || str_starts_with($mimeType, 'image/')) {
-        echo "  -> Tipo detectado: Imagen Estándar ({$ext}) -> Convirtiendo a DICOM...\n";
+        echo "  -> Type detected: Standard Image ({$ext}) -> Converting to DICOM...\n";
 
         $imageBinary = $fileContent ?: ($filePath ? file_get_contents($filePath) : null);
         if (empty($imageBinary)) {
-            echo "  -> [ERROR] No se pudo leer el archivo de imagen.\n";
+            echo "  -> [ERROR] Could not read the image file.\n";
             $failedCount++;
             continue;
         }
@@ -268,9 +268,9 @@ while ($row = sqlFetchArray($res)) {
                 'SeriesDescription'       => $docName,
                 'StudyDate'               => $studyDate,
                 'Modality'                => $modality,
-                'InstitutionName'         => defined('CLINIC_NAME') ? CLINIC_NAME : 'Centro de Salud',
+                'InstitutionName'         => defined('CLINIC_NAME') ? CLINIC_NAME : xl('Health Center'),
                 'AccessionNumber'         => 'DOC-' . $docId,
-                'ReferringPhysicianName'  => 'Servicio de Diagnostico'
+                'ReferringPhysicianName'  => xl('Diagnostic Service')
             ],
             'Content' => $base64Data
         ];
@@ -311,10 +311,10 @@ while ($row = sqlFetchArray($res)) {
     // imagen/estudio. Solo se sincronizan las imÁgenes (y archivos DICOM).
     // ==========================================================================
     elseif ($ext === 'pdf' || $mimeType === 'application/pdf') {
-        echo "  -> [SKIP] PDF (Informe) no se sincroniza (desactivado).\n";
+        echo "  -> [SKIP] PDF (Report) is not synced (disabled).\n";
 
         sqlStatement("INSERT INTO documents_pacs_sync (document_id, patient_id, study_instance_uid, status, error_message, synced_at)
-                      VALUES (?, ?, '', 'ignored', 'PDF no se sincroniza (desactivado)', NOW())
+                      VALUES (?, ?, '', 'ignored', 'PDF sync is disabled', NOW())
                       ON DUPLICATE KEY UPDATE status = 'ignored', error_message = VALUES(error_message)", [
             $docId,
             $pid
@@ -322,10 +322,10 @@ while ($row = sqlFetchArray($res)) {
         $skippedCount++;
         continue;
     } else {
-        echo "  -> [SKIP] El formato ({$ext} / {$mimeType}) no es una imagen ni archivo DICOM.\n";
+        echo "  -> [SKIP] The format ({$ext} / {$mimeType}) is not an image or DICOM file.\n";
         
         sqlStatement("INSERT INTO documents_pacs_sync (document_id, patient_id, study_instance_uid, status, error_message, synced_at)
-                      VALUES (?, ?, '', 'ignored', 'Formato no soportado para PACS', NOW())
+                      VALUES (?, ?, '', 'ignored', 'Format not supported for PACS', NOW())
                       ON DUPLICATE KEY UPDATE status = 'ignored', error_message = VALUES(error_message)", [
             $docId,
             $pid
@@ -364,13 +364,13 @@ while ($row = sqlFetchArray($res)) {
             $modality
         ]);
 
-        echo "  -> [OK] Sincronizado exitosamente con Orthanc PACS.\n";
+        echo "  -> [OK] Successfully synchronized with Orthanc PACS.\n";
         echo "     Orthanc Instance ID: {$orthancInstanceId}\n";
         echo "     StudyInstanceUID:    {$finalStudyUid}\n";
         echo "     URL OHIF Viewer:     https://imagenes.origen.ar/viewer?StudyInstanceUIDs={$finalStudyUid}\n";
         $successCount++;
     } else {
-        echo "  -> [ERROR] Falló la subida a Orthanc. Detalle: " . ($errorMessage ?: 'Respuesta inválida de Orthanc') . "\n";
+        echo "  -> [ERROR] Upload to Orthanc failed. Details: " . ($errorMessage ?: xl('Invalid response from Orthanc')) . "\n";
         
         sqlStatement("INSERT INTO documents_pacs_sync 
                         (document_id, patient_id, study_instance_uid, status, error_message, synced_at)
@@ -388,11 +388,11 @@ while ($row = sqlFetchArray($res)) {
 }
 
 echo "\n==============================================================================\n";
-echo "[" . date('Y-m-d H:i:s') . "] RESUMEN DE SINCRONIZACIÓN PACS:\n";
-echo "Total analizados:   {$processedCount}\n";
-echo "Exitosos:           {$successCount}\n";
-echo "Fallidos:           {$failedCount}\n";
-echo "Omitidos:           {$skippedCount}\n";
+echo "[" . date('Y-m-d H:i:s') . "] PACS SYNC SUMMARY:\n";
+echo "Total processed:   {$processedCount}\n";
+echo "Successful:        {$successCount}\n";
+echo "Failed:            {$failedCount}\n";
+echo "Skipped:           {$skippedCount}\n";
 echo "==============================================================================\n";
 
 flock($lockHandle, LOCK_UN);

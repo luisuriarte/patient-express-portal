@@ -1,9 +1,9 @@
 <?php
 /**
- * Gestión de Laboratorios y Resultados Clínicos
- * Patient Express Portal - Integración Nativa con OpenEMR 8.2.0
- * 
- * Estructura de tablas OpenEMR:
+ * Laboratory Results Management
+ * Patient Express Portal — Native Integration with OpenEMR 8.2.0
+ *
+ * OpenEMR table relationships:
  * procedure_order -> procedure_order_code (pc.procedure_order_seq)
  * procedure_order -> procedure_report (pr.procedure_order_seq = pc.procedure_order_seq)
  * procedure_report -> procedure_result (pres.procedure_report_id)
@@ -36,7 +36,7 @@ class Laboratory
                         NULLIF(TRIM(pt.name), ''),
                         NULLIF(TRIM(pt.description), ''),
                         NULLIF(TRIM(pc.procedure_code), ''),
-                        'Panel de Laboratorio'
+                        'Lab Panel'
                     ) AS procedure_name,
                     pr.procedure_report_id,
                     pr.date_report,
@@ -83,10 +83,10 @@ class Laboratory
 
             $providerName = trim(($row['provider_title'] ? $row['provider_title'] . ' ' : 'Dr. ') . ($row['provider_fname'] ?? '') . ' ' . ($row['provider_lname'] ?? ''));
             if (trim($providerName) === 'Dr.' || empty(trim($providerName))) {
-                $providerName = 'Médico Solicitante';
+                $providerName = xl('Requesting Physician');
             }
 
-            $studyTitle = $row['procedure_name'] ?: 'Panel de Laboratorio';
+            $studyTitle = $row['procedure_name'] ?: xl('Lab Panel');
             $uniqueStudyKey = $row['procedure_order_id'] . '_' . $row['procedure_order_seq'] . '_' . ($row['procedure_report_id'] ?? '0');
 
             // Evitar duplicación si hay joins redundantes
@@ -126,7 +126,7 @@ class Laboratory
                 $grouped[$encounterKey] = [
                     'encounter_key'     => $encounterKey,
                     'encounter_id'      => $encounterId,
-                    'encounter_label'   => $encounterId > 0 ? ('Encuentro #' . $encounterId) : ('Orden #' . $row['procedure_order_id']),
+                    'encounter_label'   => $encounterId > 0 ? (xl('Encounter') . ' #' . $encounterId) : (xl('Order') . ' #' . $row['procedure_order_id']),
                     'date_iso'          => $resultDateIso,
                     'date_formatted'    => date('d/m/Y', strtotime($resultDateIso)),
                     'date_display'      => $this->formatDateDisplay($resultDateIso),
@@ -206,7 +206,7 @@ class Laboratory
                 $grouped[$encounterKey] = [
                     'encounter_key'      => $encounterKey,
                     'encounter_id'       => $encId,
-                    'encounter_label'    => $encId > 0 ? ('Encuentro #' . $encId) : 'Documento de Laboratorio',
+                    'encounter_label'    => $encId > 0 ? (xl('Encounter') . ' #' . $encId) : xl('Lab Document'),
                     'date_iso'           => $primaryDateIso,
                     'date_formatted'     => date('d/m/Y', strtotime($primaryDateIso)),
                     'date_display'       => $this->formatDateDisplay($primaryDateIso),
@@ -282,7 +282,7 @@ class Laboratory
                                 NULLIF(TRIM(pt.name), ''),
                                 NULLIF(TRIM(pt.description), ''),
                                 NULLIF(TRIM(pc.procedure_code), ''),
-                                'Panel de Laboratorio'
+                                'Lab Panel'
                             ) AS procedure_name,
                             pc.diagnoses,
                             pr.procedure_report_id,
@@ -387,14 +387,14 @@ class Laboratory
 
             $providerFullName = trim(($rRow['provider_title'] ? $rRow['provider_title'] . ' ' : 'Dr. ') . ($rRow['provider_fname'] ?? '') . ' ' . ($rRow['provider_lname'] ?? ''));
             if (trim($providerFullName) === 'Dr.' || empty(trim($providerFullName))) {
-                $providerFullName = 'Médico de Cabecera';
+                $providerFullName = xl('Primary Care Physician');
             }
 
             if (!in_array($providerFullName, $allProviders, true)) {
                 $allProviders[] = $providerFullName;
             }
 
-            $studyTitle = $rRow['procedure_name'] ?: 'Panel de Laboratorio';
+            $studyTitle = $rRow['procedure_name'] ?: xl('Lab Panel');
 
             $panels[] = [
                 'report_id'            => $reportId,
@@ -429,7 +429,7 @@ class Laboratory
         }
 
         $finalDateIso = $latestResultDate ? date('Y-m-d', strtotime($latestResultDate)) : date('Y-m-d');
-        $encounterLabel = $isNumericEncounter ? ('Encuentro #' . $encounterId) : ('Protocolo ' . $encounterId);
+        $encounterLabel = $isNumericEncounter ? (xl('Encounter') . ' #' . $encounterId) : (xl('Protocol') . ' ' . $encounterId);
 
         return [
             'encounter_id'           => $encounterId,
@@ -502,9 +502,9 @@ class Laboratory
     private function formatDateDisplay(string $dateIso): string
     {
         $months = [
-            1 => 'Enero', 2 => 'Febrero', 3 => 'Marzo', 4 => 'Abril',
-            5 => 'Mayo', 6 => 'Junio', 7 => 'Julio', 8 => 'Agosto',
-            9 => 'Septiembre', 10 => 'Octubre', 11 => 'Noviembre', 12 => 'Diciembre'
+            1 => xl('January'), 2 => xl('February'), 3 => xl('March'), 4 => xl('April'),
+            5 => xl('May'), 6 => xl('June'), 7 => xl('July'), 8 => xl('August'),
+            9 => xl('September'), 10 => xl('October'), 11 => xl('November'), 12 => xl('December')
         ];
 
         $time = strtotime($dateIso);
@@ -512,15 +512,15 @@ class Laboratory
         $month = (int)date('m', $time);
         $year = date('Y', $time);
 
-        return sprintf('%d de %s, %s', $day, $months[$month] ?? date('F', $time), $year);
+        return sprintf('%s %d, %s', $months[$month] ?? date('F', $time), $day, $year);
     }
 
     private function mapStatus(string $status): string
     {
         return match (strtolower(trim($status))) {
-            'complete', 'final', 'reviewed' => 'Completado',
-            'received', 'preliminary', 'pending' => 'Preliminar / En proceso',
-            'cancelled' => 'Cancelado',
+            'complete', 'final', 'reviewed' => xl('Completed'),
+            'received', 'preliminary', 'pending' => xl('Preliminary / In Progress'),
+            'cancelled' => xl('Cancelled'),
             default => ucfirst($status)
         };
     }
@@ -528,11 +528,11 @@ class Laboratory
     private function getAbnormalFlag(string $flag): string
     {
         return match (strtolower(trim($flag))) {
-            'high', 'h' => 'ALTO (H)',
-            'low', 'l' => 'BAJO (L)',
-            'abnormal', 'a', 'yes' => 'ANORMAL',
-            'critical', 'c' => 'CRÍTICO',
-            default => 'Normal'
+            'high', 'h' => xl('HIGH (H)'),
+            'low', 'l' => xl('LOW (L)'),
+            'abnormal', 'a', 'yes' => xl('ABNORMAL'),
+            'critical', 'c' => xl('CRITICAL'),
+            default => xl('Normal')
         };
     }
 
@@ -545,7 +545,7 @@ class Laboratory
             $birthDate = new \DateTime($dob);
             $now = new \DateTime();
             $interval = $now->diff($birthDate);
-            return $interval->y . ' años';
+            return $interval->y . ' ' . xl('years');
         } catch (\Exception $e) {
             return 'N/A';
         }
@@ -554,9 +554,9 @@ class Laboratory
     private function formatSex(string $sex): string
     {
         return match (strtoupper(trim($sex))) {
-            'M', 'MALE', 'MASCULINO' => 'Masculino',
-            'F', 'FEMALE', 'FEMENINO' => 'Femenino',
-            default => 'Otro / No especificado'
+            'M', 'MALE', 'MASCULINO' => xl('Male'),
+            'F', 'FEMALE', 'FEMENINO' => xl('Female'),
+            default => xl('Other / Not specified')
         };
     }
 
@@ -617,12 +617,12 @@ class Laboratory
                     'type'           => 'document',
                     'doc_id'         => (int)$row['doc_id'],
                     'encounter_id'   => $encounterId,
-                    'title'          => $row['category_name'] . ' - ' . $docName,
+                    'title'          => ($row['category_name'] ?? xl('Lab Document')) . ' - ' . $docName,
                     'date_result'    => date('d/m/Y', strtotime($docDate)),
                     'date_raw'       => $docDate,
-                    'provider_name'  => 'Documento Adjunto',
-                    'provider_spec'  => $row['category_name'],
-                    'status'         => 'Documento Disponible',
+                    'provider_name'  => xl('Attached Document'),
+                    'provider_spec'  => $row['category_name'] ?? '',
+                    'status'         => xl('Document Available'),
                     'specimen_num'   => 'N/A',
                     'total_results'  => 0,
                     'has_abnormals'  => false,

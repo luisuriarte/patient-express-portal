@@ -58,7 +58,7 @@ $fields = [
 // ============================================================
 if ($mode === 'new') {
     $newId = formSubmit('form_imaging_report', $fields, $encounter, $userauthorized);
-    addForm($encounter, 'Informe de Diagnóstico por Imágenes', $newId, 'imaging_report', $pid, $userauthorized);
+    addForm($encounter, xl('Imaging Report'), $newId, 'imaging_report', $pid, $userauthorized);
     $formId = (int)$newId;
 } elseif ($mode === 'update' && $formId > 0) {
     formUpdate('form_imaging_report', $fields, $formId, $userauthorized);
@@ -81,7 +81,7 @@ if ($accion === 'finalizar' && $formId > 0) {
     }
 }
 
-formHeader("Redireccionando...");
+formHeader(xl("Redirecting..."));
 formJump();
 formFooter();
 
@@ -187,12 +187,12 @@ function generateAndStorePdf(int $pid, int $formId, array $fields, $session): ?i
     }
 
     if (!$dompdfAutoload) {
-        throw new \RuntimeException('Dompdf no encontrado. Verifique composer install.');
+        throw new \RuntimeException(xl('Dompdf not found. Please verify composer install.'));
     }
     require_once $dompdfAutoload;
 
     if (!class_exists(\Dompdf\Dompdf::class)) {
-        throw new \RuntimeException('La clase Dompdf\\Dompdf no está disponible.');
+        throw new \RuntimeException(xl('The Dompdf\\Dompdf class is not available.'));
     }
 
     $options = new \Dompdf\Options();
@@ -232,7 +232,7 @@ function generateAndStorePdf(int $pid, int $formId, array $fields, $session): ?i
 
     // createDocument() devuelve un string vacío en éxito, o un mensaje de error.
     if (!empty($ret)) {
-        throw new \RuntimeException('Error guardando el documento: ' . $ret);
+        throw new \RuntimeException(xl('Error saving document: ') . $ret);
     }
 
     $documentId = (int)$doc->get_id();

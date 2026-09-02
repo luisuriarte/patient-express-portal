@@ -33,24 +33,24 @@ if (!empty($patientRow['DOB']) && $patientRow['DOB'] !== '0000-00-00') {
     $dob  = new DateTime($patientRow['DOB']);
     $now  = new DateTime();
     $diff = $now->diff($dob);
-    $patAge = $diff->y . ' años';
+    $patAge = $diff->y . xl(' years');
 }
 $patPhone = $patientRow['phone_cell'] ?? '';
 
 // Datos del médico informante
 $medNombre    = trim(($userRow['fname'] ?? '') . ' ' . ($userRow['lname'] ?? '')) ?: ($fields['medico_informante'] ?? '—');
-$medEspecialidad = $userRow['specialty'] ?? 'Medicina / Diagnóstico por Imágenes';
+$medEspecialidad = $userRow['specialty'] ?? xl('Medicine / Diagnostic Imaging');
 $medNpi       = $userRow['npi'] ?? '';
 
 // Modalidad con nombre completo
 $modalidadLabels = [
-    'RX'   => 'Rayos X — Radiografía Digital',
-    'TC'   => 'Tomografía Computada (TC)',
-    'RMN'  => 'Resonancia Magnética (RMN)',
-    'US'   => 'Ecografía / Ultrasonido (US)',
-    'MG'   => 'Mamografía (MG)',
-    'DEXA' => 'Densitometría Ósea (DEXA)',
-    'OT'   => 'Otro / No especificado',
+    'RX'   => xl('X-Ray — Digital Radiography'),
+    'TC'   => xl('Computed Tomography (CT)'),
+    'RMN'  => xl('Magnetic Resonance Imaging (MRI)'),
+    'US'   => xl('Ultrasound (US)'),
+    'MG'   => xl('Mammography (MG)'),
+    'DEXA' => xl('Bone Densitometry (DEXA)'),
+    'OT'   => xl('Other / Not specified'),
 ];
 $modalidadLabel  = $modalidadLabels[$fields['modalidad'] ?? ''] ?? ($fields['modalidad'] ?? '—');
 $fechaInforme    = !empty($fields['fecha_informe'])
@@ -158,10 +158,10 @@ function img_norm_texto(?string $t): string
     return implode("\n", $out);
 }
 ?><!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title><?= htmlspecialchars('Informe de Diagnóstico por Imágenes - ' . $patFname) ?></title>
+    <title><?= xlt('Imaging Report') ?> - <?= htmlspecialchars($patFname) ?></title>
     <style>
         @page {
             margin: 22mm 15mm 20mm 15mm;
@@ -374,7 +374,7 @@ function img_norm_texto(?string $t): string
             </td>
             <td style="vertical-align: middle;">
                 <div class="clinic-name"><?= htmlspecialchars($clinicName) ?></div>
-                <div class="clinic-sub">Servicio de Imagenología y Diagnóstico por Imágenes</div>
+                <div class="clinic-sub"><?= xl('Imaging and Diagnostic Services') ?></div>
                 <div class="clinic-sub">
                     <?= htmlspecialchars($clinicAddr) ?>
                     <?php if ($clinicPhone): ?> | Tel: <?= htmlspecialchars($clinicPhone) ?><?php endif; ?>
@@ -382,9 +382,9 @@ function img_norm_texto(?string $t): string
                 </div>
             </td>
             <td style="width: 34%; text-align: right; vertical-align: middle;">
-                <div class="header-right">INFORME DE DIAGNÓSTICO POR IMÁGENES</div>
-                <div class="header-right-small">Protocolo Electrónico Unificado de Imágenes</div>
-                <div class="header-right-small" style="margin-top: 2px;">Fecha Emisión: <?= htmlspecialchars($fechaImpresion) ?></div>
+                <div class="header-right"><?= xl('IMAGING DIAGNOSTIC REPORT') ?></div>
+                <div class="header-right-small"><?= xl('Unified Electronic Imaging Protocol') ?></div>
+                <div class="header-right-small" style="margin-top: 2px;"><?= xl('Issue Date:') ?> <?= htmlspecialchars($fechaImpresion) ?></div>
             </td>
         </tr>
     </table>
@@ -393,7 +393,7 @@ function img_norm_texto(?string $t): string
     <!-- TÍTULO DEL REPORTE                                                 -->
     <!-- ================================================================= -->
     <div class="report-header-title">
-        Informe de Diagnóstico por Imágenes - <?= htmlspecialchars($modalidadLabel) ?>
+        <?= xl('IMAGING DIAGNOSTIC REPORT') ?> - <?= htmlspecialchars($modalidadLabel) ?>
     </div>
 
     <!-- ================================================================= -->
@@ -401,26 +401,26 @@ function img_norm_texto(?string $t): string
     <!-- ================================================================= -->
     <table class="patient-box">
         <tr>
-            <td class="label">Paciente:</td>
+            <td class="label"><?= xl('Patient:') ?></td>
             <td class="val"><strong><?= htmlspecialchars($patFname ?: ('PID #' . $pid)) ?></strong></td>
-            <td class="label">Historia / PID:</td>
+            <td class="label"><?= xl('Chart / PID:') ?></td>
             <td class="val">#<?= htmlspecialchars((string)$pid) ?></td>
         </tr>
         <tr>
-            <td class="label">DNI / Documento:</td>
+            <td class="label"><?= xl('ID / Document:') ?></td>
             <td class="val"><?= htmlspecialchars($patDni) ?></td>
-            <td class="label">Fecha de Estudio:</td>
+            <td class="label"><?= xl('Study Date:') ?></td>
             <td class="val"><?= htmlspecialchars($fechaInforme) ?></td>
         </tr>
         <tr>
-            <td class="label">Edad / Sexo:</td>
+            <td class="label"><?= xl('Age / Sex:') ?></td>
             <td class="val"><?= htmlspecialchars($patAge) ?> / <?= htmlspecialchars($patSex) ?></td>
-            <td class="label">Modalidad:</td>
+            <td class="label"><?= xl('Modality:') ?></td>
             <td class="val"><?= htmlspecialchars($modalidadLabel) ?></td>
         </tr>
         <tr>
-            <td class="label">Médico Informante:</td>
-            <td class="val" colspan="3"><?= htmlspecialchars($medNombre ?: 'Médico Especialista') ?></td>
+            <td class="label"><?= xl('Reporting Physician:') ?></td>
+            <td class="val" colspan="3"><?= htmlspecialchars($medNombre ?: xl('Specialist Physician')) ?></td>
         </tr>
     </table>
 
@@ -429,15 +429,15 @@ function img_norm_texto(?string $t): string
     <!-- ================================================================= -->
     <table class="study-meta">
         <tr>
-            <td class="label">Región Anatómica:</td>
+            <td class="label"><?= xl('Anatomical Region:') ?></td>
             <td class="val"><?= htmlspecialchars($fields['region_anatomica'] ?? '—') ?></td>
-            <td class="label">Servicio:</td>
+            <td class="label"><?= xl('Service:') ?></td>
             <td class="val"><?= htmlspecialchars($fields['servicio_solicitante'] ?? '—') ?></td>
         </tr>
         <tr>
-            <td class="label">Médico Solicitante:</td>
+            <td class="label"><?= xl('Requesting Physician:') ?></td>
             <td class="val" colspan="1"><?= htmlspecialchars($fields['medico_solicitante'] ?? '—') ?></td>
-            <td class="label">UID Estudio:</td>
+            <td class="label"><?= xl('Study UID:') ?></td>
             <td class="val"><span class="study-uid"><?= htmlspecialchars($fields['study_instance_uid'] ?? 'N/D') ?></span></td>
         </tr>
     </table>
@@ -446,27 +446,27 @@ function img_norm_texto(?string $t): string
     <!-- TÉCNICA / METODOLOGÍA                                              -->
     <!-- ================================================================= -->
     <?php if (!empty($fields['metodologia'])): ?>
-        <div class="section-title">Técnica / Metodología (Secuencias)</div>
+        <div class="section-title"><?= xl('Technique / Methodology (Sequences)') ?></div>
         <div class="report-text"><?= htmlspecialchars(img_norm_texto($fields['metodologia'])) ?></div>
     <?php endif; ?>
 
     <!-- ================================================================= -->
     <!-- INTERPRETACIÓN / HALLAZGOS                                         -->
     <!-- ================================================================= -->
-    <div class="section-title">Interpretación / Hallazgos Descriptivos</div>
+    <div class="section-title"><?= xl('Interpretation / Descriptive Findings') ?></div>
     <div class="report-text"><?= htmlspecialchars(img_norm_texto($fields['interpretacion'] ?? '—')) ?></div>
 
     <!-- ================================================================= -->
     <!-- CONCLUSIÓN / IMPRESIÓN DIAGNÓSTICA                                 -->
     <!-- ================================================================= -->
-    <div class="section-title">Conclusión / Impresión Diagnóstica</div>
+    <div class="section-title"><?= xl('Conclusion / Diagnostic Impression') ?></div>
     <div class="report-text report-text-conclusion"><?= htmlspecialchars(img_norm_texto($fields['conclusion'] ?? '—')) ?></div>
 
     <!-- ================================================================= -->
     <!-- OBSERVACIONES                                                      -->
     <!-- ================================================================= -->
     <?php if (!empty($fields['observaciones'])): ?>
-        <div class="section-title">Observaciones y Sugerencias</div>
+        <div class="section-title"><?= xl('Observations and Suggestions') ?></div>
         <div class="report-text"><?= htmlspecialchars(img_norm_texto($fields['observaciones'])) ?></div>
     <?php endif; ?>
 
@@ -476,18 +476,18 @@ function img_norm_texto(?string $t): string
     <table class="signature-table">
         <tr>
             <td class="sig-box">
-                <strong><?= htmlspecialchars($medNombre ?: 'Médico Informante') ?></strong><br>
+                <strong><?= htmlspecialchars($medNombre ?: xl('Reporting Physician')) ?></strong><br>
                 <span><?= htmlspecialchars($medEspecialidad) ?></span><br>
                 <?php if ($medNpi): ?><span>M.P. / NPI: <?= htmlspecialchars($medNpi) ?></span><br><?php endif; ?>
-                <span style="font-size: 8px; color: #0284c7; font-weight: bold;">Documento Firmado Digitalmente</span>
+                <span style="font-size: 8px; color: #0284c7; font-weight: bold;"><?= xl('Digitally Signed Document') ?></span>
             </td>
             <td style="width: 10%;"></td>
             <td class="qr-placeholder">
                 <div class="val-box">
-                    <strong>VALIDACIÓN ELECTRÓNICA INSTITUCIONAL</strong><br>
-                    <span>ID de Informe: <?= htmlspecialchars($validacionId) ?></span><br>
-                    <span>Informe Nro: <?= htmlspecialchars($reportCode) ?></span><br>
-                    <span>Verifique autenticidad en <?= (defined('CLINIC_WEB') && CLINIC_WEB) ? htmlspecialchars(CLINIC_WEB) : '' ?></span>
+                    <strong><?= xl('INSTITUTIONAL ELECTRONIC VALIDATION') ?></strong><br>
+                    <span><?= xl('Report ID:') ?> <?= htmlspecialchars($validacionId) ?></span><br>
+                    <span><?= xl('Report No.:') ?> <?= htmlspecialchars($reportCode) ?></span><br>
+                    <span><?= xl('Verify authenticity at') ?> <?= (defined('CLINIC_WEB') && CLINIC_WEB) ? htmlspecialchars(CLINIC_WEB) : '' ?></span>
                 </div>
             </td>
         </tr>
@@ -496,7 +496,7 @@ function img_norm_texto(?string $t): string
             <td colspan="3" style="text-align: center; padding-top: 16px;">
                 <img src="<?= $qrDataUri ?>" alt="QR Estudio" style="width: 120px; height: 120px; display: inline-block;">
                 <div style="font-size: 8px; color: #64748b; margin-top: 3px;">
-                    Escaneá para ver el estudio en el visor DICOM (OHIF)
+                    <?= xl('Scan to view the study in the DICOM viewer (OHIF)') ?>
                 </div>
             </td>
         </tr>
@@ -507,7 +507,7 @@ function img_norm_texto(?string $t): string
     <!-- PIE DE PÁGINA                                                      -->
     <!-- ================================================================= -->
     <div class="footer-disclaimer">
-        Este documento es un informe médico oficial emitido por <?= htmlspecialchars($clinicName) ?>. Su validez y confidencialidad están protegidas por las normativas de salud vigentes (Ley 25.326 / HIPAA). Documento generado digitalmente el <?= htmlspecialchars($fechaImpresion) ?> - Informe Nro: <?= htmlspecialchars($reportCode) ?> - PID: <?= htmlspecialchars((string)$pid) ?>.
+        <?= xl('This document is an official medical report issued by') ?> <?= htmlspecialchars($clinicName) ?>. <?= xl('Its validity and confidentiality are protected by current health regulations (Law 25.326 / HIPAA).') ?> <?= xl('Document generated digitally on') ?> <?= htmlspecialchars($fechaImpresion) ?> - <?= xl('Report No.:') ?> <?= htmlspecialchars($reportCode) ?> - PID: <?= htmlspecialchars((string)$pid) ?>.
     </div>
 
 </body>
