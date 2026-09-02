@@ -165,15 +165,6 @@ Cada documento queda registrado en la tabla `documents_pacs_sync` con su estado 
    composer install --no-dev
    ```
 
-3. **Configurar variables de entorno** (copiar `.env.example` a `.env` y completar):
-   ```dotenv
-   # Base de datos OpenEMR
-   OPENEMR_DB_HOST=127.0.0.1
-   OPENEMR_DB_PORT=3306
-   OPENEMR_DB_NAME=openemr
-   OPENEMR_DB_USER=openemr
-   OPENEMR_DB_PASS=tu_password_aqui
-
    # Orthanc PACS
    ORTHANC_URL=http://127.0.0.1:8042
    ORTHANC_USER=orthanc
@@ -187,16 +178,16 @@ Cada documento queda registrado en la tabla `documents_pacs_sync` con su estado 
    OPENEMR_PORTAL_URL=https://hcd.origen.ar/portal
    ```
 
-4. **Crear la(s) tabla(s) de apoyo** en la base de OpenEMR:
+3. **Crear la(s) tabla(s) de apoyo** en la base de OpenEMR:
    - `sql/documents_pacs.sql` → tabla `documents_pacs_sync`.
 
-5. **Datos institucionales**: se cargan **automáticamente desde la tabla `facility`** de OpenEMR (se usa la facility de `billing_location = 1`). Nombre, dirección, teléfono, email y web del centro se toman de ahí, por lo que **no es necesario (ni recomendado) escribir datos de la clínica en el código**. Solo el **logo** se mantiene como recurso estático local (`public/assets/img/logo.png`).
+4. **Datos institucionales**: se cargan **automáticamente desde la tabla `facility`** de OpenEMR (se usa la facility de `billing_location = 1`). Nombre, dirección, teléfono, email y web del centro se toman de ahí, por lo que **no es necesario (ni recomendado) escribir datos de la clínica en el código**. Solo el **logo** se mantiene como recurso estático local (`public/assets/img/logo.png`).
 
-6. **Instalar el formulario clínico** `forms/imaging_report/`: copiarlo dentro de `interface/forms/` (o la carpeta de formularios de OpenEMR) e instalar su esquema (`table.sql`), que además de crear `form_imaging_report` carga las listas normalizadas de **servicios solicitantes** y **regiones anatómicas** en `list_options`.
+5. **Instalar el formulario clínico** `forms/imaging_report/`: copiarlo dentro de `interface/forms/` (o la carpeta de formularios de OpenEMR) e instalar su esquema (`table.sql`), que además de crear `form_imaging_report` carga las listas normalizadas de **servicios solicitantes** y **regiones anatómicas** en `list_options`.
 
-7. **Programar el cron** (ver sección 7).
+6. **Programar el cron** (ver sección 7).
 
-8. **Verificar acceso**: abrir `public/index.php` (ej. `https://hcd.origen.ar/express_portal/index.php`).
+7. **Verificar acceso**: abrir `public/index.php` (ej. `https://hcd.origen.ar/express_portal/index.php`).
 
 ---
 
