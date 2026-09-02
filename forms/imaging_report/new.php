@@ -274,10 +274,15 @@ $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategor
                 </div>
 
                 <div>
-                    <label class="form-label" for="report_date"><?= xlt('Report Date') ?></label>
-                    <input type="date" name="report_date" id="report_date"
+                    <label class="form-label" for="study_date"><?= xlt('Study Date') ?></label>
+                    <input type="date" name="study_date" id="study_date"
                            class="form-control"
-                           value="<?= attr($obj['report_date'] ?? date('Y-m-d')) ?>">
+                           value="<?= attr($obj['study_date'] ?? date('Y-m-d')) ?>">
+                    <?php if (!empty($obj['report_date'])): ?>
+                    <label class="form-label mt-2" for="report_date"><?= xlt('Report Date') ?></label>
+                    <input type="text" name="report_date" id="report_date" class="form-control"
+                           value="<?= attr(date('d/m/Y', strtotime($obj['report_date']))) ?>" readonly>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
