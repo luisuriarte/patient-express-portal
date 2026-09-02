@@ -305,95 +305,22 @@ while ($row = sqlFetchArray($res)) {
         }
     }
     // ==========================================================================
-    // CASO C: PDF / Informe (Encapsulated PDF) -> subir como DICOM modality OT
+    // CASO C: PDF / Informe -> NO se sincroniza como Encapsulated PDF.
+    // La sincronización de PDFs se desactivó a pedido: en los navegadores de
+    // celulares sin visor PDF el encapsulado daba error y no se mostraba la
+    // imagen/estudio. Solo se sincronizan las imÁgenes (y archivos DICOM).
     // ==========================================================================
     elseif ($ext === 'pdf' || $mimeType === 'application/pdf') {
-        echo "  -> Tipo detectado: PDF Informe (Encapsulated PDF)\n";
+        echo "  -> [SKIP] PDF (Informe) no se sincroniza (desactivado).\n";
 
-        $pdfBinary = $fileContent ?: ($filePath ? file_get_contents($filePath) : null);
-        if (empty($pdfBinary)) {
-            echo "  -> [ERROR] No se pudo leer el contenido del PDF.\n";
-            $failedCount++;
-            continue;
-        }
-
-        // Adjuntar el informe PDF como Encapsulated PDF al MISMO estudio que las
-        // imágenes de la MISMA carpeta/categoría del mismo paciente. Para eso se
-        // usa el "Parent" (orthanc_study_id interno), NO StudyInstanceUID, que
-        // dispara el error Orthanc 2020 "Trying to override a value inherited
-        // from a parent module".
-        $parentStudy = '';
-        if (!empty($row['category_id'])) {
-            $parentStudy = findParentStudyForCategory((int)$pid, (int)$row['category_id'], (int)$docId);
-        }
-
-        // Tags de nivel serie/instancia (pueden enviarse siempre, ya que el PDF
-        // se crea como una serie NUEVA y no entran en conflicto con el padre).
-        $pdfTags = [
-            'Modality'         => 'OT', // Other / Encapsulated PDF
-            'SOPClassUID'      => '1.2.840.10008.5.1.4.1.1.104.1', // Encapsulated PDF Storage
-            'SeriesDescription'=> 'Informe de Diagnóstico por Imágenes',
-            'SeriesNumber'     => '1',
-            'DocumentTitle'    => 'Informe de Diagnóstico por Imágenes'
-        ];
-
-        // Si hay un estudio de la misma categoría ya sincronizado, adjuntar el
-        // PDF como nueva serie dentro de ESE estudio. En ese caso Orthanc hereda
-        // automáticamente del Parent los tags de paciente (PatientID, PatientName,
-        // PatientBirthDate, PatientSex) y de estudio (StudyDescription,
-        // StudyDate, AccessionNumber, InstitutionName); enviarlos con un valor
-        // distinto dispara el error Orthanc 2020 "Trying to override a value
-        // inherited from a parent module". Por eso con Parent NO se envían, y
-        // solo se agregan cuando no hay Parent (creación de estudio nuevo).
-        if ($parentStudy !== '') {
-            $pdfPayload = [
-                'Tags'    => $pdfTags,
-                'Parent'  => $parentStudy,
-                'Content' => 'data:application/pdf;base64,' . base64_encode($pdfBinary)
-            ];
-        } else {
-            $pdfTags['PatientID']        = (string)$pid;
-            $pdfTags['PatientName']      = $patientName;
-            $pdfTags['PatientBirthDate'] = $dobFormatted;
-            $pdfTags['PatientSex']       = $patientSex;
-            $pdfTags['StudyDescription'] = $categoryName;
-            $pdfTags['StudyDate']        = $studyDate;
-            $pdfTags['InstitutionName']  = defined('CLINIC_NAME') ? CLINIC_NAME : 'Centro de Salud';
-            $pdfTags['AccessionNumber']  = 'DOC-' . $docId;
-            $pdfPayload = [
-                'Tags'    => $pdfTags,
-                'Content' => 'data:application/pdf;base64,' . base64_encode($pdfBinary)
-            ];
-        }
-
-        $ch = curl_init(rtrim(ORTHANC_URL, '/') . '/tools/create-dicom');
-        curl_setopt_array($ch, [
-            CURLOPT_POST           => true,
-            CURLOPT_POSTFIELDS     => json_encode($pdfPayload),
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
-            CURLOPT_USERPWD        => ORTHANC_USER . ':' . ORTHANC_PASS,
-            CURLOPT_TIMEOUT        => 45,
-            CURLOPT_CONNECTTIMEOUT => 5
+        sqlStatement("INSERT INTO documents_pacs_sync (document_id, patient_id, study_instance_uid, status, error_message, synced_at)
+                      VALUES (?, ?, '', 'ignored', 'PDF no se sincroniza (desactivado)', NOW())
+                      ON DUPLICATE KEY UPDATE status = 'ignored', error_message = VALUES(error_message)", [
+            $docId,
+            $pid
         ]);
-
-        $response = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $curlErr = curl_error($ch);
-        curl_close($ch);
-
-        if ($httpCode === 200 && $response) {
-            $responseData = json_decode($response, true);
-            $orthancInstanceId = $responseData['ID'] ?? null;
-            $orthancStudyId = $responseData['ParentStudy'] ?? null;
-            $orthancSeriesId = $responseData['ParentSeries'] ?? null;
-
-            if ($orthancInstanceId) {
-                $studyInstanceUid = fetchStudyInstanceUidFromOrthanc($orthancInstanceId);
-            }
-        } else {
-            $errorMessage = "Orthanc HTTP {$httpCode}: " . ($curlErr ?: $response);
-        }
+        $skippedCount++;
+        continue;
     } else {
         echo "  -> [SKIP] El formato ({$ext} / {$mimeType}) no es una imagen ni archivo DICOM.\n";
         
