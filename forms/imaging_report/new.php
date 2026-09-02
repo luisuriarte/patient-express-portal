@@ -48,7 +48,7 @@ if ($formId > 0) {
 }
 
 $modoEdicion = !empty($obj);
-$estado = $obj['estado'] ?? 'borrador';
+$estado = $obj['status'] ?? 'draft';
 
 // Opciones de modalidad
 $modalidades = [
@@ -98,7 +98,7 @@ while ($med = sqlFetchArray($resMedicos)) {
 
 // Normaliza el valor del médico: si coincide con un médico de OpenEMR, se usa el
 // nombre completo; en caso contrario (médico externo escrito a mano) se conserva tal cual.
-$valorMedicoSolicitante = trim((string)($obj['medico_solicitante'] ?? ''));
+$valorMedicoSolicitante = trim((string)($obj['requesting_physician'] ?? ''));
 $keyMedicoSolicitante = array_search($valorMedicoSolicitante, $medicosOpenEMR, true);
 $esMedicoOpenEMR = ($keyMedicoSolicitante !== false);
 
@@ -107,7 +107,7 @@ require_once(__DIR__ . '/category_functions.php');
 $categoryTree = imaging_get_category_tree();
 $selectedCategoryId = (int)($obj['pdf_category_id'] ?? 0);
 if ($selectedCategoryId <= 0) {
-    $selectedCategoryId = imaging_default_category_id($obj['modalidad'] ?? '');
+    $selectedCategoryId = imaging_default_category_id($obj['modality'] ?? '');
 }
 $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategoryId, $selectedCategoryId);
 ?>
@@ -164,8 +164,8 @@ $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategor
                 <p class="text-slate-300 text-sm mt-1"><?= xlt('Institutional Clinical Form — OpenEMR') ?></p>
             </div>
             <?php if ($modoEdicion): ?>
-                <span class="px-3 py-1 rounded-full text-xs font-bold <?= $estado === 'finalizado' ? 'badge-finalizado' : 'badge-borrador' ?>">
-                    <?= $estado === 'finalizado' ? xlt('✔ Completed') : xlt('⏳ Draft') ?>
+                <span class="px-3 py-1 rounded-full text-xs font-bold <?= $estado === 'finalized' ? 'badge-finalizado' : 'badge-borrador' ?>">
+                    <?= $estado === 'finalized' ? xlt('✔ Completed') : xlt('⏳ Draft') ?>
                 </span>
             <?php endif; ?>
         </div>
@@ -190,7 +190,7 @@ $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategor
           name="my_form" id="my_form">
 
         <input type="hidden" name="csrf_token_form" value="<?= CsrfUtils::collectCsrfToken(session: $session) ?>">
-        <input type="hidden" name="accion" value="borrador" id="input_accion">
+        <input type="hidden" name="action" value="draft" id="input_action">
         <input type="hidden" name="category_id" id="input_category_id" value="<?= attr($selectedCategoryId) ?>">
 
         <!-- Sección 1: Datos del Estudio -->
@@ -199,11 +199,11 @@ $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategor
             <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
 
                 <div>
-                    <label class="form-label" for="modalidad"><?= xlt('Modality *') ?></label>
-                    <select name="modalidad" id="modalidad" class="form-control" required>
+                    <label class="form-label" for="modality"><?= xlt('Modality *') ?></label>
+                    <select name="modality" id="modality" class="form-control" required>
                         <?php foreach ($modalidades as $val => $label): ?>
                             <option value="<?= attr($val) ?>"
-                                <?= (($obj['modalidad'] ?? '') === $val) ? 'selected' : '' ?>>
+                                <?= (($obj['modality'] ?? '') === $val) ? 'selected' : '' ?>>
                                 <?= text($label) ?>
                             </option>
                         <?php endforeach; ?>
@@ -211,29 +211,29 @@ $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategor
                 </div>
 
                 <div>
-                    <label class="form-label" for="region_anatomica"><?= xlt('Region / Anatomical Area *') ?></label>
-                    <select name="region_anatomica" id="region_anatomica" class="form-control" required>
+                    <label class="form-label" for="anatomical_region"><?= xlt('Region / Anatomical Area *') ?></label>
+                    <select name="anatomical_region" id="anatomical_region" class="form-control" required>
                         <option value=""><?= xlt('-- Select Region... --') ?></option>
                         <?php foreach ($regionesAnatomicas as $k => $titulo): ?>
                             <option value="<?= attr($titulo) ?>"
-                                <?= (($obj['region_anatomica'] ?? '') === $titulo) ? 'selected' : '' ?>>
+                                <?= (($obj['anatomical_region'] ?? '') === $titulo) ? 'selected' : '' ?>>
                                 <?= text($titulo) ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
-                    <?php if (!isset($obj['region_anatomica']) || trim($obj['region_anatomica'] ?? '') === ''): ?>
-                    <?php elseif (!in_array($obj['region_anatomica'], array_values($regionesAnatomicas), true)): ?>
-                        <p class="text-xs text-amber-600 mt-1"><?= xlt('Existing value not in list:') ?> "<?= text($obj['region_anatomica']) ?>"</p>
+                    <?php if (!isset($obj['anatomical_region']) || trim($obj['anatomical_region'] ?? '') === ''): ?>
+                    <?php elseif (!in_array($obj['anatomical_region'], array_values($regionesAnatomicas), true)): ?>
+                        <p class="text-xs text-amber-600 mt-1"><?= xlt('Existing value not in list:') ?> "<?= text($obj['anatomical_region']) ?>"</p>
                     <?php endif; ?>
                 </div>
 
                 <div>
-                    <label class="form-label" for="servicio_solicitante"><?= xlt('Service / Requester') ?></label>
-                    <select name="servicio_solicitante" id="servicio_solicitante" class="form-control">
+                    <label class="form-label" for="requesting_service"><?= xlt('Service / Requester') ?></label>
+                    <select name="requesting_service" id="requesting_service" class="form-control">
                         <option value=""><?= xlt('-- Select Service... --') ?></option>
                         <?php foreach ($servicios as $k => $titulo): ?>
                             <option value="<?= attr($titulo) ?>"
-                                <?= (($obj['servicio_solicitante'] ?? '') === $titulo) ? 'selected' : '' ?>>
+                                <?= (($obj['requesting_service'] ?? '') === $titulo) ? 'selected' : '' ?>>
                                 <?= text($titulo) ?>
                             </option>
                         <?php endforeach; ?>
@@ -241,8 +241,8 @@ $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategor
                 </div>
 
                 <div>
-                    <label class="form-label" for="medico_solicitante"><?= xlt('Requesting Physician') ?></label>
-                    <select name="medico_solicitante_custom" id="medico_solicitante_select" class="form-control">
+                    <label class="form-label" for="requesting_physician"><?= xlt('Requesting Physician') ?></label>
+                    <select name="requesting_physician_custom" id="requesting_physician_select" class="form-control">
                         <option value="" <?= !$esMedicoOpenEMR && $valorMedicoSolicitante === '' ? 'selected' : '' ?>>
                             <?= xlt('-- New In-house Physician or Other... --') ?>
                         </option>
@@ -257,27 +257,27 @@ $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategor
                             </option>
                         <?php endforeach; ?>
                     </select>
-                    <input type="hidden" name="medico_solicitante" id="medico_solicitante"
-                           value="<?= attr($obj['medico_solicitante'] ?? '') ?>">
-                    <div id="medico_otro_container" class="mt-2 <?= ($keyMedicoSolicitante === false && $valorMedicoSolicitante !== '') ? '' : ' hidden' ?>">
-                        <input type="text" id="medico_otro_input" class="form-control"
+                    <input type="hidden" name="requesting_physician" id="requesting_physician"
+                           value="<?= attr($obj['requesting_physician'] ?? '') ?>">
+                    <div id="requesting_physician_other_container" class="mt-2 <?= ($keyMedicoSolicitante === false && $valorMedicoSolicitante !== '') ? '' : ' hidden' ?>">
+                        <input type="text" id="requesting_physician_other_input" class="form-control"
                                placeholder="<?= xla('Requesting physician name') ?>"
                                value="<?= attr($valorMedicoSolicitante) ?>">
                     </div>
                 </div>
 
                 <div>
-                    <label class="form-label" for="medico_informante"><?= xlt('Reporting Physician') ?></label>
-                    <input type="text" name="medico_informante" id="medico_informante"
+                    <label class="form-label" for="reporting_physician"><?= xlt('Reporting Physician') ?></label>
+                    <input type="text" name="reporting_physician" id="reporting_physician"
                            class="form-control"
-                           value="<?= attr($obj['medico_informante'] ?? $medicoInformante) ?>">
+                           value="<?= attr($obj['reporting_physician'] ?? $medicoInformante) ?>">
                 </div>
 
                 <div>
-                    <label class="form-label" for="fecha_informe"><?= xlt('Report Date') ?></label>
-                    <input type="date" name="fecha_informe" id="fecha_informe"
+                    <label class="form-label" for="report_date"><?= xlt('Report Date') ?></label>
+                    <input type="date" name="report_date" id="report_date"
                            class="form-control"
-                           value="<?= attr($obj['fecha_informe'] ?? date('Y-m-d')) ?>">
+                           value="<?= attr($obj['report_date'] ?? date('Y-m-d')) ?>">
                 </div>
             </div>
         </div>
@@ -285,15 +285,15 @@ $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategor
         <!-- Sección 2: Técnica / Metodología -->
         <div class="bg-white rounded-2xl border border-slate-200 p-6 mb-5 shadow-sm">
             <div class="section-header"><?= xlt('🔬 Technique / Methodology') ?></div>
-            <textarea name="metodologia" id="metodologia" class="form-control" rows="4"
-                      placeholder="<?= xla('Describe the protocol, sequences or projections used...') ?>"><?= text($obj['metodologia'] ?? '') ?></textarea>
+            <textarea name="technique" id="technique" class="form-control" rows="4"
+                      placeholder="<?= xla('Describe the protocol, sequences or projections used...') ?>"><?= text($obj['technique'] ?? '') ?></textarea>
         </div>
 
         <!-- Sección 3: Interpretación / Hallazgos -->
         <div class="bg-white rounded-2xl border border-slate-200 p-6 mb-5 shadow-sm">
             <div class="section-header"><?= xlt('🩻 Interpretation / Findings') ?></div>
-            <textarea name="interpretacion" id="interpretacion" class="form-control" rows="10"
-                      placeholder="<?= xla('Describe in detail the findings observed in the study...') ?>"><?= text($obj['interpretacion'] ?? '') ?></textarea>
+            <textarea name="interpretation" id="interpretation" class="form-control" rows="10"
+                      placeholder="<?= xla('Describe in detail the findings observed in the study...') ?>"><?= text($obj['interpretation'] ?? '') ?></textarea>
         </div>
 
         <!-- Sección 4: Conclusión -->
@@ -306,8 +306,8 @@ $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategor
         <!-- Sección 5: Observaciones -->
         <div class="bg-white rounded-2xl border border-slate-200 p-6 mb-5 shadow-sm">
             <div class="section-header"><?= xlt('💬 Observations and Suggestions') ?></div>
-            <textarea name="observaciones" id="observaciones" class="form-control" rows="4"
-                      placeholder="<?= xla('Follow-up recommendations, clinical correlation, additional studies...') ?>"><?= text($obj['observaciones'] ?? '') ?></textarea>
+            <textarea name="observations" id="observations" class="form-control" rows="4"
+                      placeholder="<?= xla('Follow-up recommendations, clinical correlation, additional studies...') ?>"><?= text($obj['observations'] ?? '') ?></textarea>
         </div>
 
         <!-- Sección 6: Carpeta destino del PDF -->
@@ -349,25 +349,25 @@ $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategor
 // Botones de acción
 // ============================================================
 document.getElementById('btn-draft').addEventListener('click', function() {
-    document.getElementById('input_accion').value = 'borrador';
+    document.getElementById('input_action').value = 'draft';
     top.restoreSession();
     document.getElementById('my_form').submit();
 });
 
 document.getElementById('btn-finalize').addEventListener('click', function() {
-    const modal = document.getElementById('modalidad');
-    const region = document.getElementById('region_anatomica');
-    const interpretacion = document.getElementById('interpretacion');
+    const modal = document.getElementById('modality');
+    const region = document.getElementById('anatomical_region');
+    const interpretation = document.getElementById('interpretation');
     const conclusion = document.getElementById('conclusion');
 
-    if (!modal.value || !region.value.trim() || !interpretacion.value.trim() || !conclusion.value.trim()) {
+    if (!modal.value || !region.value.trim() || !interpretation.value.trim() || !conclusion.value.trim()) {
         alert(xl('Please complete: Modality, Anatomical Region, Interpretation/Findings and Conclusion before finalizing the report.'));
         return;
     }
 
     if (!confirm(xl('Are you sure you want to finalize the report and generate the PDF? Once finalized, the status will change to "Completed".'))) return;
 
-    document.getElementById('input_accion').value = 'finalizar';
+    document.getElementById('input_action').value = 'finalize';
     top.restoreSession();
     document.getElementById('my_form').submit();
 });
@@ -377,57 +377,57 @@ document.querySelector('.btn-cancel').addEventListener('click', function() {
 });
 
 // ============================================================
-// Médico Solicitante: sincronizar dropdown + campo "otro" + hidden
+// Requesting Physician: sync dropdown + "other" field + hidden
 // ============================================================
 (function () {
-    const select = document.getElementById('medico_solicitante_select');
-    const hidden = document.getElementById('medico_solicitante');
-    const otroContainer = document.getElementById('medico_otro_container');
-    const otroInput = document.getElementById('medico_otro_input');
+    const select = document.getElementById('requesting_physician_select');
+    const hidden = document.getElementById('requesting_physician');
+    const otherContainer = document.getElementById('requesting_physician_other_container');
+    const otherInput = document.getElementById('requesting_physician_other_input');
 
-    function updateMedico() {
+    function updatePhysician() {
         const val = select.value;
         if (val === '__otro__') {
-            otroContainer.classList.remove('hidden');
-            const nombre = (otroInput.value || '').trim();
-            hidden.value = nombre;
-            otroInput.focus();
+            otherContainer.classList.remove('hidden');
+            const name = (otherInput.value || '').trim();
+            hidden.value = name;
+            otherInput.focus();
         } else if (val === '') {
-            otroContainer.classList.add('hidden');
+            otherContainer.classList.add('hidden');
             hidden.value = '';
         } else if (val.startsWith('med_')) {
-            otroContainer.classList.add('hidden');
+            otherContainer.classList.add('hidden');
             const label = select.options[select.selectedIndex].textContent.trim();
             hidden.value = label;
         }
     }
 
-    otroInput.addEventListener('input', function () {
-        hidden.value = otroInput.value.trim();
+    otherInput.addEventListener('input', function () {
+        hidden.value = otherInput.value.trim();
     });
 
-    select.addEventListener('change', updateMedico);
-    updateMedico();
+    select.addEventListener('change', updatePhysician);
+    updatePhysician();
 })();
 
 // ============================================================
-// Botones de plantilla rápida
+// Quick template buttons
 // ============================================================
 function applyImagingTemplate(tpl) {
     if (typeof IMAGING_TEMPLATES === 'undefined' || !IMAGING_TEMPLATES[tpl]) {
-        console.warn('[imaging_report] Plantilla no disponible:', tpl);
+        console.warn('[imaging_report] Template not available:', tpl);
         return;
     }
     const t = IMAGING_TEMPLATES[tpl];
 
-    // Seleccionar la modalidad correspondiente
-    const modalidadSelect = document.getElementById('modalidad');
-    if (modalidadSelect) modalidadSelect.value = tpl;
+    // Select the matching modality
+    const modalitySelect = document.getElementById('modality');
+    if (modalitySelect) modalitySelect.value = tpl;
 
-    if (t.metodologia)  document.getElementById('metodologia').value  = t.metodologia;
-    if (t.interpretacion) document.getElementById('interpretacion').value = t.interpretacion;
+    if (t.metodologia)  document.getElementById('technique').value  = t.metodologia;
+    if (t.interpretacion) document.getElementById('interpretation').value = t.interpretacion;
     if (t.conclusion)   document.getElementById('conclusion').value   = t.conclusion;
-    if (t.observaciones) document.getElementById('observaciones').value = t.observaciones;
+    if (t.observaciones) document.getElementById('observations').value = t.observaciones;
 }
 
 // Delegación de eventos: funciona aunque los botones se re-rendericen

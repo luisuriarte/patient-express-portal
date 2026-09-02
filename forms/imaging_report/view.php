@@ -54,7 +54,7 @@ $modalidadLabels = [
     'DEXA' => xl('Bone Densitometry (DEXA)'),
     'OT'   => xl('Other / Not specified'),
 ];
-$modalidadLabel = $modalidadLabels[$obj['modalidad'] ?? ''] ?? ($obj['modalidad'] ?? '—');
+$modalidadLabel = $modalidadLabels[$obj['modality'] ?? ''] ?? ($obj['modality'] ?? '—');
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -81,11 +81,11 @@ $modalidadLabel = $modalidadLabels[$obj['modalidad'] ?? ''] ?? ($obj['modalidad'
             <h1 class="text-xl font-bold"><?= xlt('Imaging Report') ?></h1>
             <p class="text-slate-300 text-sm mt-1">
                 <?= xlt('Registered:') ?> <?= text(date('d/m/Y H:i', strtotime($obj['date'] ?? 'now'))) ?>
-                &bull; <?= xlt('Physician:') ?> <?= text($obj['medico_informante'] ?? $obj['user'] ?? '—') ?>
+                &bull; <?= xlt('Physician:') ?> <?= text($obj['reporting_physician'] ?? $obj['user'] ?? '—') ?>
             </p>
         </div>
-        <span class="px-3 py-1.5 rounded-full text-xs font-bold <?= $obj['estado'] === 'finalizado' ? 'badge-finalizado' : 'badge-borrador' ?>">
-            <?= $obj['estado'] === 'finalizado' ? xlt('✔ Completed') : xlt('⏳ Draft') ?>
+        <span class="px-3 py-1.5 rounded-full text-xs font-bold <?= $obj['status'] === 'finalized' ? 'badge-finalizado' : 'badge-borrador' ?>">
+            <?= $obj['status'] === 'finalized' ? xlt('✔ Completed') : xlt('⏳ Draft') ?>
         </span>
     </div>
 
@@ -99,54 +99,54 @@ $modalidadLabel = $modalidadLabels[$obj['modalidad'] ?? ''] ?? ($obj['modalidad'
             </div>
             <div>
                 <p class="section-title"><?= xlt('Anatomical Region') ?></p>
-                <p class="text-sm font-semibold text-slate-800"><?= text($obj['region_anatomica'] ?? '—') ?></p>
+                <p class="text-sm font-semibold text-slate-800"><?= text($obj['anatomical_region'] ?? '—') ?></p>
             </div>
             <div>
                 <p class="section-title"><?= xlt('Report Date') ?></p>
                 <p class="text-sm font-semibold text-slate-800">
-                    <?= $obj['fecha_informe'] ? text(date('d/m/Y', strtotime($obj['fecha_informe']))) : '—' ?>
+                    <?= $obj['report_date'] ? text(date('d/m/Y', strtotime($obj['report_date']))) : '—' ?>
                 </p>
             </div>
             <div>
                 <p class="section-title"><?= xlt('Requesting Service') ?></p>
-                <p class="text-sm text-slate-700"><?= text($obj['servicio_solicitante'] ?? '—') ?></p>
+                <p class="text-sm text-slate-700"><?= text($obj['requesting_service'] ?? '—') ?></p>
             </div>
             <div>
                 <p class="section-title"><?= xlt('Requesting Physician') ?></p>
-                <p class="text-sm text-slate-700"><?= text($obj['medico_solicitante'] ?? '—') ?></p>
+                <p class="text-sm text-slate-700"><?= text($obj['requesting_physician'] ?? '—') ?></p>
             </div>
             <div>
                 <p class="section-title"><?= xlt('Reporting Physician') ?></p>
-                <p class="text-sm font-semibold text-slate-800"><?= text($obj['medico_informante'] ?? '—') ?></p>
+                <p class="text-sm font-semibold text-slate-800"><?= text($obj['reporting_physician'] ?? '—') ?></p>
             </div>
         </div>
     </div>
 
-    <!-- Metodología -->
-    <?php if (!empty($obj['metodologia'])): ?>
+    <!-- Technique / Methodology -->
+    <?php if (!empty($obj['technique'])): ?>
     <div class="bg-white rounded-2xl border border-slate-200 p-6 mb-5 shadow-sm">
         <p class="section-title">🔬 <?= xlt('Technique / Methodology') ?></p>
-        <div class="field-content"><?= text($obj['metodologia']) ?></div>
+        <div class="field-content"><?= text($obj['technique']) ?></div>
     </div>
     <?php endif; ?>
 
-    <!-- Interpretación / Hallazgos -->
+    <!-- Interpretation / Findings -->
     <div class="bg-white rounded-2xl border border-slate-200 p-6 mb-5 shadow-sm">
         <p class="section-title">🩻 <?= xlt('Interpretation / Findings') ?></p>
-        <div class="field-content"><?= text($obj['interpretacion'] ?? '—') ?></div>
+        <div class="field-content"><?= text($obj['interpretation'] ?? '—') ?></div>
     </div>
 
-    <!-- Conclusión -->
+    <!-- Conclusion -->
     <div class="bg-white rounded-2xl border border-slate-200 p-6 mb-5 shadow-sm">
         <p class="section-title">📌 <?= xlt('Conclusion / Diagnostic Impression') ?></p>
         <div class="field-content"><?= text($obj['conclusion'] ?? '—') ?></div>
     </div>
 
-    <!-- Observaciones -->
-    <?php if (!empty($obj['observaciones'])): ?>
+    <!-- Observations -->
+    <?php if (!empty($obj['observations'])): ?>
     <div class="bg-white rounded-2xl border border-slate-200 p-6 mb-5 shadow-sm">
         <p class="section-title">💬 <?= xlt('Observations and Suggestions') ?></p>
-        <div class="field-content"><?= text($obj['observaciones']) ?></div>
+        <div class="field-content"><?= text($obj['observations']) ?></div>
     </div>
     <?php endif; ?>
 
@@ -172,7 +172,7 @@ $modalidadLabel = $modalidadLabels[$obj['modalidad'] ?? ''] ?? ($obj['modalidad'
             </a>
         <?php endif; ?>
 
-        <?php if ($obj['estado'] !== 'finalizado'): ?>
+        <?php if ($obj['status'] !== 'finalized'): ?>
             <a href="<?= attr($rootdir) ?>/forms/imaging_report/new.php?id=<?= attr_url($formId) ?>"
                class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white transition-colors shadow-sm">
                 ✏️ <?= xlt('Edit Report') ?>

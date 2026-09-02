@@ -33,28 +33,28 @@ CsrfUtils::checkCsrfInput(INPUT_POST, dieOnFail: true);
 
 $mode   = $_GET['mode'] ?? 'new';
 $formId = (int)($_GET['id'] ?? 0);
-$accion = $_POST['accion'] ?? 'borrador'; // 'borrador' o 'finalizar'
+$action = $_POST['action'] ?? 'draft'; // 'draft' or 'finalize'
 
 // ============================================================
-// Sanitización y preparación de datos
+// Data sanitization and preparation
 // ============================================================
 $fields = [
-    'modalidad'            => trim((string)($_POST['modalidad'] ?? '')),
-    'region_anatomica'     => trim((string)($_POST['region_anatomica'] ?? '')),
-    'servicio_solicitante' => trim((string)($_POST['servicio_solicitante'] ?? '')),
-    'medico_informante'    => trim((string)($_POST['medico_informante'] ?? '')),
-    'medico_solicitante'   => trim((string)($_POST['medico_solicitante'] ?? '')),
-    'metodologia'          => trim((string)($_POST['metodologia'] ?? '')),
-    'interpretacion'       => trim((string)($_POST['interpretacion'] ?? '')),
+    'modality'             => trim((string)($_POST['modality'] ?? '')),
+    'anatomical_region'    => trim((string)($_POST['anatomical_region'] ?? '')),
+    'requesting_service'   => trim((string)($_POST['requesting_service'] ?? '')),
+    'reporting_physician'  => trim((string)($_POST['reporting_physician'] ?? '')),
+    'requesting_physician' => trim((string)($_POST['requesting_physician'] ?? '')),
+    'technique'            => trim((string)($_POST['technique'] ?? '')),
+    'interpretation'       => trim((string)($_POST['interpretation'] ?? '')),
     'conclusion'           => trim((string)($_POST['conclusion'] ?? '')),
-    'observaciones'        => trim((string)($_POST['observaciones'] ?? '')),
-    'estado'               => ($accion === 'finalizar') ? 'finalizado' : 'borrador',
-    'fecha_informe'        => $_POST['fecha_informe'] ?: date('Y-m-d'),
+    'observations'         => trim((string)($_POST['observations'] ?? '')),
+    'status'               => ($action === 'finalize') ? 'finalized' : 'draft',
+    'report_date'          => $_POST['report_date'] ?: date('Y-m-d'),
     'pdf_category_id'      => ((int)($_POST['category_id'] ?? 0)) ?: null,
 ];
 
 // ============================================================
-// Guardar en la base de datos
+// Save to the database
 // ============================================================
 if ($mode === 'new') {
     $newId = formSubmit('form_imaging_report', $fields, $encounter, $userauthorized);
@@ -65,9 +65,9 @@ if ($mode === 'new') {
 }
 
 // ============================================================
-// Si el usuario pide finalizar, generar PDF
+// If the user wants to finalize, generate the PDF
 // ============================================================
-if ($accion === 'finalizar' && $formId > 0) {
+if ($action === 'finalize' && $formId > 0) {
     try {
         $pdfDocumentId = generateAndStorePdf($pid, $formId, $fields, $session);
         if ($pdfDocumentId) {
@@ -148,12 +148,12 @@ function generateAndStorePdf(int $pid, int $formId, array $fields, $session): ?i
     //    encuentra (p.ej. carpeta distinta), se consulta Orthanc directamente por
     //    PatientID priorizando la modalidad del informe.
     $userCategoryId = (int)($fields['pdf_category_id'] ?? 0);
-    $categoryId = imaging_resolve_category_id($userCategoryId, $fields['modalidad'] ?? '');
+    $categoryId = imaging_resolve_category_id($userCategoryId, $fields['modality'] ?? '');
     $fields['pdf_category_id'] = $categoryId;
-    $dcmModality = modalityToDicom($fields['modalidad'] ?? '');
+    $dcmModality = modalityToDicom($fields['modality'] ?? '');
     $study = knownStudyForCategory($pid, $categoryId, $dcmModality);
     if (empty($study['study_uid'])) {
-        $study = resolveStudyInstanceUid($pid, $fields['modalidad'] ?? '');
+        $study = resolveStudyInstanceUid($pid, $fields['modality'] ?? '');
     }
     $fields['study_instance_uid'] = $study['study_uid'] ?? '';
     $studyOhifUrl = '';
@@ -218,7 +218,7 @@ function generateAndStorePdf(int $pid, int $formId, array $fields, $session): ?i
     //    La carpeta destino la eligió el técnico en el formulario (category_id);
     //    si no es válida o falta, se usa la automática según modalidad.
 
-    $pdfFileName = 'Informe_Imagenes_' . $formId . '_' . date('Ymd_His') . '.pdf';
+    $pdfFileName = 'Imaging_Report_' . $formId . '_' . date('Ymd_His') . '.pdf';
 
     $doc = new \Document();
     $ret = $doc->createDocument(
@@ -245,7 +245,7 @@ function generateAndStorePdf(int $pid, int $formId, array $fields, $session): ?i
     //    bloquea el guardado del informe.
     if ($documentId) {
         try {
-            $dicom = linkPdfToDicomStudy($pid, $documentId, $formId, $fields['modalidad'] ?? '', $pdfOutput, $categoryId);
+            $dicom = linkPdfToDicomStudy($pid, $documentId, $formId, $fields['modality'] ?? '', $pdfOutput, $categoryId);
             if (!empty($dicom['study_uid'])) {
                 sqlStatement(
                     "UPDATE form_imaging_report SET study_instance_uid = ?, accession_number = ? WHERE id = ?",
@@ -463,9 +463,9 @@ function uploadEncapsulatedPdfToOrthanc(string $pdfContent, int $pid, string $pa
         'PatientID'        => (string)$pid,
         'Modality'         => 'OT', // Other / Encapsulated PDF
         'SOPClassUID'      => '1.2.840.10008.5.1.4.1.1.104.1', // Encapsulated PDF Storage
-        'SeriesDescription'=> 'Informe de Diagnóstico por Imágenes',
+        'SeriesDescription'=> 'Imaging Diagnostic Report',
         'SeriesNumber'     => '1',
-        'DocumentTitle'    => 'Informe de Diagnóstico por Imágenes (# ' . $refId . ')',
+        'DocumentTitle'    => 'Imaging Diagnostic Report (#' . $refId . ')',
         'AccessionNumber'  => 'DOC-' . $refId,
     ];
 

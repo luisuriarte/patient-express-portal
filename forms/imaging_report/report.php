@@ -41,8 +41,8 @@ function imaging_report_report(int $pid, int $encounter, int $cols, int $id): vo
         'OT'   => xl('Other'),
     ];
 
-    $modalidad = $modalidadLabels[$data['modalidad'] ?? ''] ?? ($data['modalidad'] ?? '—');
-    $estado    = $data['estado'] === 'finalizado'
+    $modalidad = $modalidadLabels[$data['modality'] ?? ''] ?? ($data['modality'] ?? '—');
+    $estado    = $data['status'] === 'finalized'
         ? '<span style="color:#065f46;font-weight:600;background:#d1fae5;padding:2px 8px;border-radius:8px;font-size:11px;">' . xlt('Completed') . '</span>'
         : '<span style="color:#92400e;font-weight:600;background:#fef3c7;padding:2px 8px;border-radius:8px;font-size:11px;">' . xlt('Draft') . '</span>';
 
@@ -59,19 +59,19 @@ function imaging_report_report(int $pid, int $encounter, int $cols, int $id): vo
 
     echo '<tr>';
     echo '<td style="padding:6px 10px;font-weight:600;color:#334155;">' . xlt('Anatomical Region') . '</td>';
-    echo '<td style="padding:6px 10px;color:#1e293b;">' . text($data['region_anatomica'] ?? '—') . '</td>';
+    echo '<td style="padding:6px 10px;color:#1e293b;">' . text($data['anatomical_region'] ?? '—') . '</td>';
     echo '<td style="padding:6px 10px;font-weight:600;color:#334155;">' . xlt('Report Date') . '</td>';
     echo '<td style="padding:6px 10px;color:#1e293b;">';
-    echo $data['fecha_informe'] ? text(date('d/m/Y', strtotime($data['fecha_informe']))) : '—';
+    echo $data['report_date'] ? text(date('d/m/Y', strtotime($data['report_date']))) : '—';
     echo '</td>';
     echo '</tr>';
 
     echo '<tr style="background:#f1f5f9;">';
     echo '<td style="padding:6px 10px;font-weight:600;color:#334155;">' . xlt('Reporting Physician') . '</td>';
-    echo '<td colspan="3" style="padding:6px 10px;color:#1e293b;">' . text($data['medico_informante'] ?? '—') . '</td>';
+    echo '<td colspan="3" style="padding:6px 10px;color:#1e293b;">' . text($data['reporting_physician'] ?? '—') . '</td>';
     echo '</tr>';
 
-    // Conclusión / Impresión Diagnóstica (resaltada)
+    // Conclusion / Diagnostic Impression (highlighted)
     if (!empty($data['conclusion'])) {
         echo '<tr>';
         echo '<td style="padding:8px 10px;font-weight:700;color:#0f172a;vertical-align:top;">📌 ' . xlt('Conclusion') . '</td>';
@@ -81,11 +81,11 @@ function imaging_report_report(int $pid, int $encounter, int $cols, int $id): vo
         echo '</tr>';
     }
 
-    // Nota breve de hallazgos (primeras 300 caracteres)
-    if (!empty($data['interpretacion'])) {
-        $preview = mb_strlen($data['interpretacion']) > 300
-            ? mb_substr($data['interpretacion'], 0, 300) . '...'
-            : $data['interpretacion'];
+    // Brief findings note (first 300 characters)
+    if (!empty($data['interpretation'])) {
+        $preview = mb_strlen($data['interpretation']) > 300
+            ? mb_substr($data['interpretation'], 0, 300) . '...'
+            : $data['interpretation'];
 
         echo '<tr>';
         echo '<td style="padding:6px 10px;font-weight:600;color:#334155;vertical-align:top;">🩻 ' . xlt('Findings') . '</td>';

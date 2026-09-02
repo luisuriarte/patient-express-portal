@@ -20,7 +20,7 @@ use OpenEMR\Core\Header;
 $order = (int) ($_GET['order'] ?? null);
 $labid = (int) ($_GET['labid'] ?? null);
 // Tipo de orden (imaging, laboratory_test, etc.) enviado desde el formulario.
-// Cuando es 'imaging', el buscador solo muestra el subárbol DIAGNÓSTICO POR IMÁGENES.
+// Cuando es 'imaging', el buscador solo muestra el subárbol DIAGNOSTIC IMAGING.
 $otype = trim((string) ($_REQUEST['otype'] ?? ''));
 
 //////////////////////////////////////////////////////////////////////
@@ -183,7 +183,7 @@ if (isset($_GET['typeid'])) {
                     $search_term = '%' . $_REQUEST['search_term'] . '%';
                     // El buscador filtra el catálogo según el tipo de orden seleccionado
                     // (procedure_type_names = procedure_type.procedure_type_name):
-                    //   - 'imaging'          -> estudios de imágenes (subárbol DIAGNÓSTICO POR IMÁGENES)
+                    //   - 'imaging'          -> estudios de imágenes (subárbol DIAGNOSTIC IMAGING)
                     //   - 'laboratory_test'  -> análisis de laboratorio
                     //   - 'procedure' y demás -> los procedimientos de ese tipo
                     // Los ítems legacy SIN procedure_type_name cargado se siguen mostrando
@@ -196,7 +196,7 @@ if (isset($_GET['typeid'])) {
                             $imageRoot = sqlQuery(
                                 "SELECT procedure_type_id FROM procedure_type " .
                                 "WHERE parent = 0 AND procedure_type = 'grp' AND name = ? AND activity = 1 LIMIT 1",
-                                ['DIAGNÓSTICO POR IMÁGENES']
+                                ['DIAGNOSTIC IMAGING']
                             );
                             $imageRootId = (int) ($imageRoot['procedure_type_id'] ?? 0);
                             if ($imageRootId > 0) {

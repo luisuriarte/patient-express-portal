@@ -232,8 +232,8 @@ class Imaging
                         $report = $reportsByCategory[$catId] ?? null;
                         $isReportDocItself = ($report && (int)$report['doc_id'] === (int)$dRow['doc_id']);
                         $providerName = $encProviderName ?: xl('Diagnostic Imaging Service');
-                        if ($report && !empty($report['medico_solicitante'])) {
-                            $providerName = $report['medico_solicitante'];
+                        if ($report && !empty($report['requesting_physician'])) {
+                            $providerName = $report['requesting_physician'];
                         }
 
                         $studies[] = [
@@ -294,8 +294,8 @@ class Imaging
                 $providerName = (!empty($group['enc_provider_name']))
                     ? $group['enc_provider_name']
                     : xl('Diagnostic Imaging Service');
-                if ($report && !empty($report['medico_solicitante'])) {
-                    $providerName = $report['medico_solicitante'];
+                if ($report && !empty($report['requesting_physician'])) {
+                    $providerName = $report['requesting_physician'];
                 }
                 $studies[] = [
                     'id'                => 'study_' . $group['first_doc_id'],
@@ -362,24 +362,36 @@ class Imaging
                       FROM procedure_order po
                       LEFT JOIN procedure_report pr ON po.procedure_order_id = pr.procedure_order_id
                       LEFT JOIN procedure_order_code poc ON po.procedure_order_id = poc.procedure_order_id
+                      LEFT JOIN procedure_type ptimg ON ptimg.procedure_code = poc.procedure_code
                       LEFT JOIN users u ON po.provider_id = u.id
                       WHERE po.patient_id = ?
                         AND (
-                             poc.procedure_code LIKE 'RAD%' 
-                             OR poc.procedure_code LIKE 'IMG%' 
-                             OR poc.procedure_name LIKE '%RAYOS%' 
-                             OR poc.procedure_name LIKE '%RX%' 
-                             OR poc.procedure_name LIKE '%RESONANCIA%' 
-                             OR poc.procedure_name LIKE '%RMN%' 
-                             OR poc.procedure_name LIKE '%TOMOGRAFIA%' 
-                             OR poc.procedure_name LIKE '%TAC%' 
-                             OR poc.procedure_name LIKE '%ECOGRAFIA%' 
-                             OR poc.procedure_name LIKE '%ECO%' 
-                             OR poc.procedure_name LIKE '%MAMOGRAFIA%' 
-                             OR poc.procedure_name LIKE '%DOPPLER%'
+                             ptimg.procedure_type_name = 'imaging'
+                             OR poc.procedure_code LIKE 'RAD%'
+                             OR poc.procedure_code LIKE 'IMG%'
+                             OR poc.procedure_code LIKE 'RX-%'
+                             OR poc.procedure_code LIKE 'RX-TORAX%'
+                             OR poc.procedure_code LIKE 'RX-CRANEO%'
+                             OR poc.procedure_code LIKE 'RX-RODILLA%'
+                             OR poc.procedure_code LIKE 'RX-HOMBRO%'
+                             OR poc.procedure_code LIKE 'RX-CODO%'
+                             OR poc.procedure_code LIKE 'RX-MU%'
+                             OR poc.procedure_code LIKE 'RX-MANO%'
+                             OR poc.procedure_code LIKE 'RX-TOBILLO%'
+                             OR poc.procedure_code LIKE 'RX-PIE%'
+                             OR poc.procedure_code LIKE 'RX-CADERA%'
+                             OR poc.procedure_code LIKE 'RX-SENOS%'
+                             OR poc.procedure_code LIKE 'US-%'
+                             OR poc.procedure_code LIKE 'ECO-%'
+                             OR poc.procedure_code LIKE 'CT-%'
+                             OR poc.procedure_code LIKE 'TAC-%'
+                             OR poc.procedure_code LIKE 'MRI-%'
+                             OR poc.procedure_code LIKE 'RMN-%'
+                             OR poc.procedure_code LIKE 'MAMMO-%'
+                             OR poc.procedure_code LIKE 'MAMO-%'
                              OR pr.report_notes LIKE '%DICOM%'
+                             OR pr.report_notes LIKE '%STUDY%'
                              OR pr.report_notes LIKE '%ESTUDIO%'
-                             OR poc.procedure_name LIKE '%IMAGEN%'
                         )
                       ORDER BY COALESCE(pr.date_report, po.date_ordered) DESC";
 
@@ -906,8 +918,8 @@ class Imaging
     {
         $map = [];
         $result = sqlStatement(
-            "SELECT id, pdf_document_id, pdf_category_id, modalidad, fecha_informe, region_anatomica,
-                    medico_solicitante, medico_informante
+            "SELECT id, pdf_document_id, pdf_category_id, modality, report_date, anatomical_region,
+                    requesting_physician, reporting_physician
                FROM form_imaging_report
               WHERE pid = ?
                 AND pdf_document_id IS NOT NULL
@@ -924,13 +936,13 @@ class Imaging
             if ($cat <= 0) {
                 continue;
             }
-            $titulo = trim((string)($row['region_anatomica'] ?? ''));
+            $titulo = trim((string)($row['anatomical_region'] ?? ''));
             $map[$cat] = [
-                'doc_id'           => (int)$row['pdf_document_id'],
-                'title'            => ($titulo !== '' ? $titulo . ' — ' : '') . xl('Diagnostic Imaging Report'),
-                'date'             => (string)($row['fecha_informe'] ?? ''),
-                'medico_solicitante' => trim((string)($row['medico_solicitante'] ?? '')),
-                'medico_informante'  => trim((string)($row['medico_informante'] ?? '')),
+                'doc_id'              => (int)$row['pdf_document_id'],
+                'title'               => ($titulo !== '' ? $titulo . ' — ' : '') . xl('Diagnostic Imaging Report'),
+                'date'                => (string)($row['report_date'] ?? ''),
+                'requesting_physician' => trim((string)($row['requesting_physician'] ?? '')),
+                'reporting_physician'  => trim((string)($row['reporting_physician'] ?? '')),
             ];
         }
         return $map;
@@ -953,8 +965,8 @@ class Imaging
                     c.id AS category_id,
                     c.name AS category_name,
                     d.name AS doc_name,
-                    fir.medico_solicitante,
-                    fir.medico_informante
+                    fir.requesting_physician,
+                    fir.reporting_physician
                FROM form_imaging_report fir
                JOIN documents d ON d.id = fir.pdf_document_id
                LEFT JOIN categories_to_documents ctd ON ctd.document_id = d.id
@@ -979,10 +991,10 @@ class Imaging
             }
             if (!isset($map[$enc][$cat])) {
                 $map[$enc][$cat] = [
-                    'doc_id'           => $docId,
-                    'name'             => (string)($row['doc_name'] ?? ''),
-                    'medico_solicitante' => trim((string)($row['medico_solicitante'] ?? '')),
-                    'medico_informante'  => trim((string)($row['medico_informante'] ?? '')),
+                    'doc_id'               => $docId,
+                    'name'                 => (string)($row['doc_name'] ?? ''),
+                    'requesting_physician' => trim((string)($row['requesting_physician'] ?? '')),
+                    'reporting_physician'  => trim((string)($row['reporting_physician'] ?? '')),
                 ];
             }
         }
@@ -992,14 +1004,14 @@ class Imaging
     private function detectModality(string $title): string
     {
         $t = strtoupper($title);
-        if (str_contains($t, 'RESONANCIA') || str_contains($t, 'RMN') || str_contains($t, 'MRI')) return xl('MRI (Magnetic Resonance)');
-        if (str_contains($t, 'TOMOGRAFIA') || str_contains($t, 'TAC') || str_contains($t, 'CT')) return xl('CT (Computed Tomography)');
-        if (str_contains($t, 'ECOGRAFIA') || str_contains($t, 'ECO') || str_contains($t, 'ULTRASONIDO') || str_contains($t, 'US')) return xl('US (Ultrasound)');
-        if (str_contains($t, 'MAMOGRAFIA') || str_contains($t, 'MG')) return xl('MG (Mammography)');
-        if (str_contains($t, 'RAYOS') || str_contains($t, 'RX') || str_contains($t, 'RADIOGRAFIA') || str_contains($t, 'CR') || str_contains($t, 'DX')) return xl('XR (Digital Radiography)');
-        if (str_contains($t, 'DENSITOMETRIA') || str_contains($t, 'DEXA')) return xl('DEXA (Bone Densitometry)');
-        if (str_contains($t, 'ELECTROCARDIOGRAMA') || str_contains($t, 'ECG') || str_contains($t, 'EKG')) return xl('ECG (Electrocardiogram)');
-        if (str_contains($t, 'FOTO') || str_contains($t, 'PHOTO') || str_contains($t, 'OCT')) return xl('PHOTO (Graphic Record)');
+        if (str_contains($t, 'MRI') || str_contains($t, 'MAGNETIC RESONANCE') || str_contains($t, 'RESONANCIA') || str_contains($t, 'RMN')) return xl('MRI (Magnetic Resonance)');
+        if (str_contains($t, 'CT') || str_contains($t, 'COMPUTED TOMOGRAPHY') || str_contains($t, 'TOMOGRAFIA') || str_contains($t, 'TAC')) return xl('CT (Computed Tomography)');
+        if (str_contains($t, 'ULTRASOUND') || str_contains($t, 'ULTRA SOUND') || str_contains($t, 'US') || str_contains($t, 'ECOGRAFIA') || str_contains($t, 'ECO') || str_contains($t, 'ULTRASONIDO')) return xl('US (Ultrasound)');
+        if (str_contains($t, 'MAMMOGRAPHY') || str_contains($t, 'MAMOGRAFIA') || str_contains($t, 'MG') || str_contains($t, 'MAMO') || str_contains($t, 'TOMOSYNTHESIS') || str_contains($t, 'TOMOSINTESIS')) return xl('MG (Mammography)');
+        if (str_contains($t, 'X-RAY') || str_contains($t, 'RADIOLOGY') || str_contains($t, 'RADIOGRAPH') || str_contains($t, 'RX') || str_contains($t, 'RAYOS') || str_contains($t, 'RADIOGRAFIA') || str_contains($t, 'CR ') || str_contains($t, 'DX')) return xl('XR (Digital Radiography)');
+        if (str_contains($t, 'DENSITOMETRY') || str_contains($t, 'DENSITOMETRIA') || str_contains($t, 'DEXA')) return xl('DEXA (Bone Densitometry)');
+        if (str_contains($t, 'ECG') || str_contains($t, 'EKG') || str_contains($t, 'ELECTROCARDIOGRAM')) return xl('ECG (Electrocardiogram)');
+        if (str_contains($t, 'FOTO') || str_contains($t, 'PHOTO')) return xl('PHOTO (Graphic Record)');
         return xl('IMG (Diagnostic Imaging)');
     }
 

@@ -37,12 +37,12 @@ if (!empty($patientRow['DOB']) && $patientRow['DOB'] !== '0000-00-00') {
 }
 $patPhone = $patientRow['phone_cell'] ?? '';
 
-// Datos del médico informante
-$medNombre    = trim(($userRow['fname'] ?? '') . ' ' . ($userRow['lname'] ?? '')) ?: ($fields['medico_informante'] ?? '—');
+// Data for the reporting physician
+$medNombre    = trim(($userRow['fname'] ?? '') . ' ' . ($userRow['lname'] ?? '')) ?: ($fields['reporting_physician'] ?? '—');
 $medEspecialidad = $userRow['specialty'] ?? xl('Medicine / Diagnostic Imaging');
 $medNpi       = $userRow['npi'] ?? '';
 
-// Modalidad con nombre completo
+// Modality with full name
 $modalidadLabels = [
     'RX'   => xl('X-Ray — Digital Radiography'),
     'TC'   => xl('Computed Tomography (CT)'),
@@ -52,9 +52,9 @@ $modalidadLabels = [
     'DEXA' => xl('Bone Densitometry (DEXA)'),
     'OT'   => xl('Other / Not specified'),
 ];
-$modalidadLabel  = $modalidadLabels[$fields['modalidad'] ?? ''] ?? ($fields['modalidad'] ?? '—');
-$fechaInforme    = !empty($fields['fecha_informe'])
-    ? date('d/m/Y', strtotime($fields['fecha_informe']))
+$modalidadLabel  = $modalidadLabels[$fields['modality'] ?? ''] ?? ($fields['modality'] ?? '—');
+$fechaInforme    = !empty($fields['report_date'])
+    ? date('d/m/Y', strtotime($fields['report_date']))
     : date('d/m/Y');
 $fechaImpresion  = date('d/m/Y H:i:s');
 
@@ -430,44 +430,44 @@ function img_norm_texto(?string $t): string
     <table class="study-meta">
         <tr>
             <td class="label"><?= xl('Anatomical Region:') ?></td>
-            <td class="val"><?= htmlspecialchars($fields['region_anatomica'] ?? '—') ?></td>
+            <td class="val"><?= htmlspecialchars($fields['anatomical_region'] ?? '—') ?></td>
             <td class="label"><?= xl('Service:') ?></td>
-            <td class="val"><?= htmlspecialchars($fields['servicio_solicitante'] ?? '—') ?></td>
+            <td class="val"><?= htmlspecialchars($fields['requesting_service'] ?? '—') ?></td>
         </tr>
         <tr>
             <td class="label"><?= xl('Requesting Physician:') ?></td>
-            <td class="val" colspan="1"><?= htmlspecialchars($fields['medico_solicitante'] ?? '—') ?></td>
+            <td class="val" colspan="1"><?= htmlspecialchars($fields['requesting_physician'] ?? '—') ?></td>
             <td class="label"><?= xl('Study UID:') ?></td>
             <td class="val"><span class="study-uid"><?= htmlspecialchars($fields['study_instance_uid'] ?? 'N/D') ?></span></td>
         </tr>
     </table>
 
     <!-- ================================================================= -->
-    <!-- TÉCNICA / METODOLOGÍA                                              -->
+    <!-- TECHNIQUE / METHODOLOGY                                             -->
     <!-- ================================================================= -->
-    <?php if (!empty($fields['metodologia'])): ?>
+    <?php if (!empty($fields['technique'])): ?>
         <div class="section-title"><?= xl('Technique / Methodology (Sequences)') ?></div>
-        <div class="report-text"><?= htmlspecialchars(img_norm_texto($fields['metodologia'])) ?></div>
+        <div class="report-text"><?= htmlspecialchars(img_norm_texto($fields['technique'])) ?></div>
     <?php endif; ?>
 
     <!-- ================================================================= -->
-    <!-- INTERPRETACIÓN / HALLAZGOS                                         -->
+    <!-- INTERPRETATION / FINDINGS                                           -->
     <!-- ================================================================= -->
     <div class="section-title"><?= xl('Interpretation / Descriptive Findings') ?></div>
-    <div class="report-text"><?= htmlspecialchars(img_norm_texto($fields['interpretacion'] ?? '—')) ?></div>
+    <div class="report-text"><?= htmlspecialchars(img_norm_texto($fields['interpretation'] ?? '—')) ?></div>
 
     <!-- ================================================================= -->
-    <!-- CONCLUSIÓN / IMPRESIÓN DIAGNÓSTICA                                 -->
+    <!-- CONCLUSION / DIAGNOSTIC IMPRESSION                                  -->
     <!-- ================================================================= -->
     <div class="section-title"><?= xl('Conclusion / Diagnostic Impression') ?></div>
     <div class="report-text report-text-conclusion"><?= htmlspecialchars(img_norm_texto($fields['conclusion'] ?? '—')) ?></div>
 
     <!-- ================================================================= -->
-    <!-- OBSERVACIONES                                                      -->
+    <!-- OBSERVATIONS                                                        -->
     <!-- ================================================================= -->
-    <?php if (!empty($fields['observaciones'])): ?>
+    <?php if (!empty($fields['observations'])): ?>
         <div class="section-title"><?= xl('Observations and Suggestions') ?></div>
-        <div class="report-text"><?= htmlspecialchars(img_norm_texto($fields['observaciones'])) ?></div>
+        <div class="report-text"><?= htmlspecialchars(img_norm_texto($fields['observations'])) ?></div>
     <?php endif; ?>
 
     <!-- ================================================================= -->

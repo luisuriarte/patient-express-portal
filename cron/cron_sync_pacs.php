@@ -451,18 +451,18 @@ function fetchStudyInstanceUidFromOrthanc(string $id): ?string
 }
 
 /**
- * Mapea nombres de categorías y archivos a Modalidades DICOM estándar
+ * Maps category and file names to standard DICOM modalities
  */
 function detectDicomModality(string $text): string
 {
     $t = strtoupper($text);
-    if (str_contains($t, 'RESONANCIA') || str_contains($t, 'RMN') || str_contains($t, 'MRI')) return 'MR';
-    if (str_contains($t, 'TOMOGRAFIA') || str_contains($t, 'TAC') || str_contains($t, 'CT')) return 'CT';
-    if (str_contains($t, 'ECOGRAFIA') || str_contains($t, 'ECO') || str_contains($t, 'US') || str_contains($t, 'DOPPLER')) return 'US';
-    if (str_contains($t, 'MAMOGRAFIA') || str_contains($t, 'MG')) return 'MG';
-    if (str_contains($t, 'RAYOS') || str_contains($t, 'RX') || str_contains($t, 'X-RAY') || str_contains($t, 'RADIOGRAFIA')) return 'CR';
-    if (str_contains($t, 'ELECTROCARDIOGRAMA') || str_contains($t, 'ECG') || str_contains($t, 'EKG')) return 'ECG';
+    if (str_contains($t, 'RESONANCIA') || str_contains($t, 'RMN') || str_contains($t, 'MRI') || str_contains($t, 'MAGNETIC RESONANCE')) return 'MR';
+    if (str_contains($t, 'TOMOGRAFIA') || str_contains($t, 'TAC') || str_contains($t, 'CT') || str_contains($t, 'COMPUTED TOMOGRAPHY')) return 'CT';
+    if (str_contains($t, 'ECOGRAFIA') || str_contains($t, 'ECO') || str_contains($t, 'US') || str_contains($t, 'DOPPLER') || str_contains($t, 'ULTRASOUND')) return 'US';
+    if (str_contains($t, 'MAMOGRAFIA') || str_contains($t, 'MAMMOGRAPHY') || str_contains($t, 'MG') || str_contains($t, 'MAMMO')) return 'MG';
+    if (str_contains($t, 'RAYOS') || str_contains($t, 'RX') || str_contains($t, 'X-RAY') || str_contains($t, 'RADIOGRAFIA') || str_contains($t, 'RADIOGRAPHY') || str_contains($t, 'RADIOGRAPH') || str_contains($t, 'RADIOLOGY') || str_contains($t, 'RADIOLOG')) return 'CR';
+    if (str_contains($t, 'ELECTROCARDIOGRAMA') || str_contains($t, 'ECG') || str_contains($t, 'EKG') || str_contains($t, 'ELECTROCARDIOGRAM')) return 'ECG';
     if (str_contains($t, 'OCT') || str_contains($t, 'FOTO') || str_contains($t, 'PHOTO') || str_contains($t, 'RETINA')) return 'OPT';
-    if (str_contains($t, 'DENTAL') || str_contains($t, 'PANORAMICA')) return 'DX';
+    if (str_contains($t, 'DENTAL') || str_contains($t, 'PANORAMICA') || str_contains($t, 'PANORAMIC')) return 'DX';
     return 'OT'; // Other
 }

@@ -169,7 +169,7 @@ Each document is recorded in the `documents_pacs_sync` table with its status (`p
 
 3. **Create the support table(s)** in the OpenEMR database:
    - `sql/documents_pacs.sql` → `documents_pacs_sync` table.
-   - `sql/images-procedures.sql` → imaging order/encounter support schema.
+   - Load the **diagnostic imaging catalog** into `procedure_type` from `patch/sql/images-procedures.sql` (English) or `patch/sql/images-procedures_es.sql` (Spanish). Both are idempotent, share the same `procedure_code`/`standard_code`, and differ only in the studies' visible text.
 
 4. **Install the Spanish translations** (so the English UI shows in Spanish for Spanish-language users):
    ```bash
@@ -358,7 +358,8 @@ Details of the most relevant files:
 | `cron/cron_sync_pacs.php` | Sync of imaging documents to Orthanc (CLI). |
 | `forms/imaging_report/` | Clinical form for imaging reports (create, edit, view, report, PDF). |
 | `sql/documents_pacs.sql` | `documents_pacs_sync` table. |
-| `sql/images-procedures.sql` | Imaging order schema. |
+| `patch/sql/images-procedures.sql` | Imaging catalog (English variant). |
+| `patch/sql/images-procedures_es.sql` | Imaging catalog (Spanish variant). |
 | `sql/lang_custom.sql` | Spanish translations for the UI strings. |
 | `.env.example` | Environment variable template. |
 
