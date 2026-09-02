@@ -451,41 +451,6 @@ function fetchStudyInstanceUidFromOrthanc(string $id): ?string
 }
 
 /**
- * Busca el identificador interno de Orthanc (orthanc_study_id) de un estudio ya
- * sincronizado por otro documento (imagen/DICOM) del MISMO paciente y la MISMA
- * carpeta/categoría. Se usa como "Parent" en /tools/create-dicom para que el
- * informe PDF quede DENTRO del mismo estudio que las imágenes en OHIF/STONE
- * (passing StudyInstanceUID directamente provoca el error Orthanc 2020).
- *
- * @return string Orthanc study ID, o '' si no hay ninguno sincronizado aún.
- */
-function findParentStudyForCategory(int $pid, int $categoryId, ?int $excludeDocId = null): string
-{
-    $bind = [$pid, $categoryId];
-    $exclude = '';
-    if ($excludeDocId) {
-        $exclude = ' AND dps.document_id != ?';
-        $bind[] = $excludeDocId;
-    }
-
-    $row = sqlQuery(
-        "SELECT dps.orthanc_study_id
-           FROM documents_pacs_sync dps
-           JOIN categories_to_documents ctd ON ctd.document_id = dps.document_id
-          WHERE dps.patient_id = ?
-            AND ctd.category_id = ?
-            AND dps.orthanc_study_id IS NOT NULL
-            AND dps.orthanc_study_id != ''
-            AND dps.status = 'synced'{$exclude}
-          ORDER BY dps.synced_at DESC
-          LIMIT 1",
-        $bind
-    );
-
-    return $row ? (string)$row['orthanc_study_id'] : '';
-}
-
-/**
  * Mapea nombres de categorías y archivos a Modalidades DICOM estándar
  */
 function detectDicomModality(string $text): string
