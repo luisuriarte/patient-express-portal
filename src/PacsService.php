@@ -22,7 +22,7 @@ class PacsService
     {
         $url = $p->apiUrl() . $path;
         $defaultHeaders = ['Content-Type: application/json'];
-        if (str_starts_with($path, '/instances')) {
+        if ($path === '/instances') {
             $defaultHeaders = ['Content-Type: application/dicom'];
         }
         $allHeaders = array_merge($defaultHeaders, $headers);
@@ -71,6 +71,41 @@ class PacsService
                 'study_id' => $data['ParentStudy'] ?? null,
                 'series_id' => $data['ParentSeries'] ?? null,
                 'message' => xl('DICOM uploaded successfully'),
+            ];
+        }
+        return [
+            'success' => false,
+            'instance_id' => null,
+            'study_id' => null,
+            'series_id' => null,
+            'message' => "Orthanc HTTP {$code}: " . ($err ?: (string)$body),
+        ];
+    }
+
+    /**
+     * Reasigna el StudyInstanceUID de una instancia ya subida (usado para
+     * agrupar los DICOM nativos en el estudio de la orden). Orthanc crea una
+     * instancia nueva con el UID sustituido y elimina la original cuando ya no
+     * comparte estudio con otra instancia. `Force` sobrescribe el valor
+     * heredado del módulo padre.
+     *
+     * @return array{success:bool, instance_id:?string, study_id:?string, series_id:?string, message:string}
+     */
+    public static function modifyInstance(PacsProvider $p, string $instanceId, string $studyUid): array
+    {
+        $payload = json_encode([
+            'Replace' => ['StudyInstanceUID' => $studyUid],
+            'Force'   => true,
+        ]);
+        [$code, $body, $err] = self::request($p, 'POST', '/instances/' . rawurlencode($instanceId) . '/modify', $payload, [], 45);
+        if ($code === 200 && $body) {
+            $data = json_decode($body, true) ?: [];
+            return [
+                'success' => true,
+                'instance_id' => $data['ID'] ?? null,
+                'study_id' => $data['ParentStudy'] ?? null,
+                'series_id' => $data['ParentSeries'] ?? null,
+                'message' => xl('Study reassigned to order'),
             ];
         }
         return [

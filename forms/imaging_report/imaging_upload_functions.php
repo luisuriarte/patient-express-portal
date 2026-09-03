@@ -10,10 +10,11 @@
  * PACS proveedor configurado, se sube de inmediato al PACS de la orden
  * (procedure_order.lab_id -> procedure_providers).
  *
- * Convención "mismo estudio por orden": para imágenes y PDF se fuerza un
- * StudyInstanceUID determinístico derivado de la orden, de modo que todas las
- * series de una misma orden coexisten en un único estudio DICOM en el PACS.
- * Los archivos DICOM nativos conservan el estudio que traen.
+ * Convención "mismo estudio por orden": para imágenes, PDF y DICOM nativos se
+ * fuerza un StudyInstanceUID determinístico derivado de la orden, de modo que
+ * todas las series de una misma orden coexisten en un único estudio DICOM en
+ * el PACS. Los DICOM nativos se reasignan a ese estudio tras subirlos (con
+ * Force en Orthanc); si la reasignación falla, conservan su estudio original.
  *
  * Requiere: globals.php incluido (sqlQuery/sqlStatement), y la tabla
  * `form_imaging_report_images` existente (ver forms/imaging_report/table.sql).
@@ -250,12 +251,27 @@ function imaging_upload_document(array $file, int $pid, int $procedureOrderId, i
         if (in_array($ext, ['dcm', 'dicom'], true)) {
             $res = PacsService::uploadNativeDicom($provider, $fileContent);
             if ($res['success']) {
-                $pacsInstance = (string)$res['instance_id'];
-                $pacsSeries = (string)$res['series_id'];
-                $pacsStudy = (string)$res['study_id'];
-                $studyUid = $pacsStudy ? (PacsService::fetchStudyUid($provider, $pacsStudy) ?? '') : '';
-                if ($studyUid === '' && $pacsInstance) {
-                    $studyUid = PacsService::fetchStudyUid($provider, $pacsInstance) ?? '';
+                // Forzar el estudio de la orden para agrupar todos los archivos
+                // de la misma orden en un único estudio DICOM (igual que imágenes).
+                $orderStudyUid = imaging_study_uid_for_order($procedureOrderId, $provider->ppid);
+                $mod = PacsService::modifyInstance($provider, $res['instance_id'], $orderStudyUid);
+                if ($mod['success']) {
+                    $pacsInstance = (string)$mod['instance_id'];
+                    $pacsSeries = (string)$mod['series_id'];
+                    $pacsStudy = (string)$mod['study_id'];
+                    $studyUid = $orderStudyUid;
+                } else {
+                    // Fallback: conservar el estudio original del DICOM si la
+                    // reasignación falla (el documento igual queda guardado).
+                    $pacsInstance = (string)$res['instance_id'];
+                    $pacsSeries = (string)$res['series_id'];
+                    $pacsStudy = (string)$res['study_id'];
+                    $studyUid = $pacsStudy ? (PacsService::fetchStudyUid($provider, $pacsStudy) ?? '') : '';
+                    if ($studyUid === '' && $pacsInstance) {
+                        $studyUid = PacsService::fetchStudyUid($provider, $pacsInstance) ?? '';
+                    }
+                    $status = 'failed';
+                    $errorMessage = $mod['message'];
                 }
             } else {
                 $status = 'failed';

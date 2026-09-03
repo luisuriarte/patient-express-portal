@@ -149,7 +149,7 @@ patient-express-portal/
 **No hay cron de sincronización.** Las imágenes y PDFs se suben al PACS **en el momento de guardar** desde el formulario del informe (`forms/imaging_report/`), a través del proveedor de la orden de estudio.
 
 - Cada archivo (DICOM, JPG/PNG/WEBP, PDF) se sube directamente al PACS/Orthanc correspondiente vía `POST /instances` (DICOM nativo) o `POST /tools/create-dicom`.
-- Los archivos de una misma orden de estudio comparten un `StudyInstanceUID` determinístico (`1.2.840.113619.2.55.<orderId>.<providerId>`); los DICOM nativos conservan su estudio original.
+- Los archivos de una misma orden de estudio comparten un `StudyInstanceUID` determinístico (`1.2.840.113619.2.55.<orderId>.<providerId>`). Los DICOM nativos se suben por `POST /instances` y luego se reasignan a ese estudio de la orden con `Force` (vía `/instances/{id}/modify`); si la reasignación falla, conservan su estudio original.
 - Cada subida queda registrada en `form_imaging_report_images` (columnas `pacs_instance_id`, `pacs_series_id`, `pacs_study_id`, `study_instance_uid`, `provider_id`, `status`).
 - El **PDF del informe generado NO se sube a PACS**; vive solo en los documentos de OpenEMR del paciente y se vincula al estudio de las imágenes subidas (vía `study_instance_uid`).
 

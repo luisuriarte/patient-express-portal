@@ -363,45 +363,72 @@ $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategor
             </div>
         </div>
 
-        <!-- Sección 1b: Documentos de imágenes (subida directa al PACS) -->
+        <!-- Sección 1b: Documentos de imágenes + carpeta destino -->
         <div class="bg-white rounded-2xl border border-slate-200 p-6 mb-5 shadow-sm">
-            <div class="section-header"><?= xlt('🖼️ Imaging Documents (Direct PACS Upload)') ?></div>
-            <p class="text-sm text-slate-500 mb-3">
-                <?= xlt('Upload DICOM, images (JPG/PNG/WEBP) or the PDF of the study. Each file is saved to the patient chart and sent to the PACS of the selected order.') ?>
-            </p>
+            <div class="section-header"><?= xlt('🖼️ Imaging Documents & Destination Folder') ?></div>
 
-            <?php if ($selectedOrderId <= 0): ?>
-                <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700" id="upload-no-order">
-                    <?= xlt('Select a Requesting Order above to enable uploads.') ?>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Columna izquierda: árbol de carpetas de destino -->
+                <div>
+                    <label class="form-label"><?= xlt('Images Destination Folder') ?></label>
+                    <p class="text-sm text-slate-400 mb-2"><?= xlt('Select the patient-chart folder where the images / PDF will be saved.') ?></p>
+                    <div class="imr-tree-container" id="categoryTree">
+                        <?= $categoryTreeHtml ?>
+                    </div>
+                    <div class="imr-selection-display<?= $selectedCategoryId > 0 ? ' imr-has-selection' : '' ?>" id="selectionDisplay">
+                        <?= $selectedCategoryId > 0 ? '📁 ' . text(imaging_category_name($categoryTree, $selectedCategoryId)) : xlt('— No folder selected (automatic will be used) —') ?>
+                    </div>
+                    <p class="text-xs text-slate-400 mt-2"><?= xlt('If no folder is selected, the automatic category will be used according to the modality (e.g.: MRI → Magnetic Resonance).') ?></p>
                 </div>
-            <?php else: ?>
-                <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 hidden" id="upload-no-order">
-                    <?= xlt('Select a Requesting Order above to enable uploads.') ?>
-                </div>
-            <?php endif; ?>
 
-            <div class="upload-zone" id="uploadZone" data-enabled="<?= $selectedOrderId > 0 ? '1' : '0' ?>">
-                <input type="file" id="imagingDocInput" name="imaging_doc" multiple
-                       accept=".jpg,.jpeg,.png,.webp,.dcm,.dicom,.pdf">
-                <div class="upload-zone-icon">📁</div>
-                <div class="upload-zone-text">
-                    <strong><?= xlt('Drag & drop files here') ?></strong> <?= xlt('or click to browse') ?>
-                </div>
-                <small class="text-slate-400 d-block mt-2">DICOM · JPG · PNG · WEBP · PDF — <?= xlt('max 50 MB each') ?></small>
-            </div>
-
-            <div id="uploadProgress" class="mt-3 hidden"></div>
-
-            <div class="mt-4">
-                <h4 class="text-sm font-bold text-slate-700 mb-2"><?= xlt('Uploaded documents') ?> (<span id="uploadedCount"><?= count($uploadedImages) ?></span>)</h4>
-                <div class="border border-slate-200 rounded-lg divide-y divide-slate-100" id="uploadedList">
-                    <?php if (empty($uploadedImages)): ?>
-                        <div class="px-4 py-3 text-sm text-slate-400" id="uploadedEmpty"><?= xlt('No documents uploaded yet.') ?></div>
+                <!-- Columna derecha: subida de archivos -->
+                <div>
+                    <?php if ($selectedOrderId <= 0): ?>
+                        <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700" id="upload-no-order">
+                            <?= xlt('Select a Requesting Order above to enable uploads.') ?>
+                        </div>
                     <?php else: ?>
-                        <?php foreach ($uploadedImages as $img): ?>
-                            <?= imaging_render_uploaded_row($img) ?>
-                        <?php endforeach; ?>
+                        <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 hidden" id="upload-no-order">
+                            <?= xlt('Select a Requesting Order above to enable uploads.') ?>
+                        </div>
                     <?php endif; ?>
+
+                    <div class="upload-zone" id="uploadZone" data-enabled="<?= $selectedOrderId > 0 ? '1' : '0' ?>">
+                        <input type="file" id="imagingDocInput" name="imaging_doc" multiple
+                               accept=".jpg,.jpeg,.png,.webp,.dcm,.dicom,.pdf">
+                        <div class="upload-zone-icon">📁</div>
+                        <div class="upload-zone-text">
+                            <strong><?= xlt('Drag & drop files here') ?></strong> <?= xlt('or click to browse') ?>
+                        </div>
+                        <small class="text-slate-400 d-block mt-2">DICOM · JPG · PNG · WEBP · PDF — <?= xlt('max 50 MB each') ?></small>
+                    </div>
+
+                    <!-- Archivos seleccionados a subir (pendientes) -->
+                    <div id="pendingSection" class="mt-3 hidden">
+                        <h4 class="text-sm font-bold text-slate-700 mb-2"><?= xlt('Files selected to upload') ?> (<span id="pendingCount">0</span>)</h4>
+                        <div class="border border-slate-200 rounded-lg divide-y divide-slate-100" id="pendingList"></div>
+                        <div class="mt-3 flex items-center justify-end gap-2">
+                            <button type="button" id="btn-upload-pending"
+                                    class="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold btn-save-draft transition-all">
+                                ⬆️ <?= xlt('Upload selected files') ?>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="uploadProgress" class="mt-3 hidden"></div>
+
+                    <div class="mt-4">
+                        <h4 class="text-sm font-bold text-slate-700 mb-2"><?= xlt('Uploaded documents') ?> (<span id="uploadedCount"><?= count($uploadedImages) ?></span>)</h4>
+                        <div class="border border-slate-200 rounded-lg divide-y divide-slate-100" id="uploadedList">
+                            <?php if (empty($uploadedImages)): ?>
+                                <div class="px-4 py-3 text-sm text-slate-400" id="uploadedEmpty"><?= xlt('No documents uploaded yet.') ?></div>
+                            <?php else: ?>
+                                <?php foreach ($uploadedImages as $img): ?>
+                                    <?= imaging_render_uploaded_row($img) ?>
+                                <?php endforeach; ?>
+                            <?php endif; ?>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -432,19 +459,6 @@ $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategor
             <div class="section-header"><?= xlt('💬 Observations and Suggestions') ?></div>
             <textarea name="observations" id="observations" class="form-control" rows="4"
                       placeholder="<?= xla('Follow-up recommendations, clinical correlation, additional studies...') ?>"><?= text($obj['observations'] ?? '') ?></textarea>
-        </div>
-
-        <!-- Sección 6: Carpeta destino del PDF -->
-        <div class="bg-white rounded-2xl border border-slate-200 p-6 mb-5 shadow-sm">
-            <div class="section-header"><?= xlt('📂 PDF Destination Folder') ?></div>
-            <label class="form-label"><?= xlt('Select the folder where the PDF will be saved in the patient chart (Patient Documents)') ?></label>
-            <div class="imr-tree-container" id="categoryTree">
-                <?= $categoryTreeHtml ?>
-            </div>
-            <div class="imr-selection-display<?= $selectedCategoryId > 0 ? ' imr-has-selection' : '' ?>" id="selectionDisplay">
-                <?= $selectedCategoryId > 0 ? '📁 ' . text(imaging_category_name($categoryTree, $selectedCategoryId)) : xlt('— No folder selected (automatic will be used) —') ?>
-            </div>
-            <p class="text-xs text-slate-400 mt-2"><?= xlt('If no folder is selected, the automatic category will be used according to the modality (e.g.: MRI → Magnetic Resonance).') ?></p>
         </div>
 
         <!-- Botones de acción -->
@@ -762,17 +776,71 @@ document.addEventListener('click', function (e) {
         });
     }
 
-    async function handleFiles(fileList) {
+    const pendingListEl   = document.getElementById('pendingList');
+    const pendingCountEl  = document.getElementById('pendingCount');
+    const pendingSection  = document.getElementById('pendingSection');
+    const uploadBtn       = document.getElementById('btn-upload-pending');
+    let pendingFiles = [];
+
+    function renderPending() {
+        pendingCountEl.textContent = pendingFiles.length;
+        pendingListEl.innerHTML = '';
+        if (pendingFiles.length === 0) { pendingSection.classList.add('hidden'); return; }
+        pendingSection.classList.remove('hidden');
+
+        pendingFiles.forEach(function (f, idx) {
+            const rowEl = document.createElement('div');
+            rowEl.className = 'px-4 py-3 flex items-center justify-between gap-3';
+            rowEl.innerHTML =
+                '<div class="min-w-0">' +
+                    '<div class="text-sm font-medium text-slate-700 truncate">' + f.name + '</div>' +
+                    '<div class="text-xs text-slate-400">' + formatBytes(f.size) + '</div>' +
+                '</div>' +
+                '<button type="button" class="text-slate-400 hover:text-red-600 shrink-0" data-idx="' + idx + '" title="' + <?= json_encode(xlt('Remove')) ?> + '">✕</button>';
+            pendingListEl.appendChild(rowEl);
+        });
+    }
+
+    function formatBytes(size) {
+        if (!size) return '';
+        const units = ['B', 'KB', 'MB', 'GB'];
+        let i = 0; let n = size;
+        while (n >= 1024 && i < units.length - 1) { n /= 1024; i++; }
+        return n.toFixed(n >= 10 || i === 0 ? 0 : 1) + ' ' + units[i];
+    }
+
+    function addPending(fileList) {
         if (!isEnabled()) { alert(<?= json_encode(xlt('Select a Requesting Order before uploading.')) ?>); return; }
-        const modality = document.getElementById('modality').value;
         const files = Array.prototype.slice.call(fileList);
         if (files.length === 0) return;
+        pendingFiles = pendingFiles.concat(files);
+        renderPending();
+    }
+
+    function removePendingFile(idx) {
+        pendingFiles.splice(idx, 1);
+        renderPending();
+    }
+
+    pendingListEl.addEventListener('click', function (e) {
+        const btn = e.target.closest('button[data-idx]');
+        if (btn) removePendingFile(Number(btn.getAttribute('data-idx')));
+    });
+
+    async function uploadPending() {
+        if (!isEnabled()) { alert(<?= json_encode(xlt('Select a Requesting Order before uploading.')) ?>); return; }
+        if (pendingFiles.length === 0) return;
+
+        const modality = document.getElementById('modality').value;
+        const uploadList = pendingFiles;
+        pendingFiles = [];
+        renderPending();
 
         progressEl.classList.remove('hidden');
         progressEl.innerHTML = '';
 
-        for (let i = 0; i < files.length; i++) {
-            const f = files[i];
+        for (let i = 0; i < uploadList.length; i++) {
+            const f = uploadList[i];
             const line = document.createElement('div');
             line.className = 'upload-row';
             line.innerHTML =
@@ -792,6 +860,8 @@ document.addEventListener('click', function (e) {
         progressEl.classList.add('hidden');
         fetchUploadedCount();
     }
+
+    if (uploadBtn) uploadBtn.addEventListener('click', uploadPending);
 
     function fetchUploadedCount() {
         const orderId = document.getElementById('input_procedure_order_id').value;
@@ -814,10 +884,10 @@ document.addEventListener('click', function (e) {
         zone.addEventListener('drop', function (e) {
             e.preventDefault();
             zone.classList.remove('upload-dragover');
-            if (e.dataTransfer && e.dataTransfer.files) handleFiles(e.dataTransfer.files);
+            if (e.dataTransfer && e.dataTransfer.files) addPending(e.dataTransfer.files);
         });
         fileInput.addEventListener('change', function () {
-            handleFiles(fileInput.files);
+            addPending(fileInput.files);
             fileInput.value = '';
         });
         updateState();
