@@ -30,9 +30,9 @@ ALTER TABLE `procedure_order`
 -- (PACS/Orthanc) can carry its own connection endpoints. Per
 -- product decision:
 --   remote_host  = OHIF viewer base URL (full path, e.g. https://imagenes.origen.ar/viewer)
---   remote_api   = Orthanc REST API base URL (e.g. https://pacs.origen.ar)
+--   remote_api   = PACS REST API base URL (e.g. https://pacs.origen.ar)
 --   wado_url     = DICOMweb WADO-RS base URL (e.g. https://pacs.origen.ar/dicom-web)
---   login/password = Orthanc HTTP Basic credentials (existing columns)
+--   login/password = PACS HTTP Basic credentials (existing columns)
 --
 -- Idempotent: safe to run more than once (uses IF NOT EXISTS).
 -- ============================================================
