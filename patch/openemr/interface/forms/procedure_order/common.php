@@ -203,7 +203,10 @@ if (($_POST['bn_save'] ?? null) || !empty($_POST['bn_xmit']) || !empty($_POST['b
         "scheduled_start = ?, " .
         "scheduled_end = ?, " .
         "performer_type = ?, " .
-        "location_id = ?";
+        "location_id = ?, " .
+        // Imaging request context
+        "requesting_service = ?, " .
+        "anatomical_region = ?";
 
     $set_array = [
         empty($_POST['form_date_ordered']) ? null : $_POST['form_date_ordered'],
@@ -233,6 +236,9 @@ if (($_POST['bn_save'] ?? null) || !empty($_POST['bn_xmit']) || !empty($_POST['b
         empty($_POST['form_scheduled_end']) ? null : $_POST['form_scheduled_end'],
         trim($_POST['form_performer_type'] ?? ''),
         (int)($_POST['form_location_id'] ?? 0),
+        // Imaging request context (option_id from the list_options dropdowns)
+        empty($_POST['form_requesting_service']) ? null : $_POST['form_requesting_service'],
+        empty($_POST['form_anatomical_region']) ? null : $_POST['form_anatomical_region'],
     ];
 
     require_once(__DIR__ . "/procedure_order_save_functions.php");
@@ -1545,6 +1551,16 @@ $reasonCodeStatii[ReasonStatusCodes::NONE]['description'] = xl("Select a status 
                                 generate_form_field($historyOrderOpts, $row['history_order'] ?? ''); ?>
                             </div>
                             <div class="clearfix"></div>
+                        </div>
+                        <div class="form-group form-row">
+                            <div class="col-md-6">
+                                <label for="form_requesting_service" class="col-form-label"><?php echo xlt('Requesting Service'); ?></label>
+                                <?php generate_form_field(array('data_type' => 1, 'field_id' => 'requesting_service', 'list_id' => 'imaging_report_services', 'empty_title' => '-- Select Service --'), $row['requesting_service'] ?? ''); ?>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="form_anatomical_region" class="col-form-label"><?php echo xlt('Anatomic Region'); ?></label>
+                                <?php generate_form_field(array('data_type' => 1, 'field_id' => 'anatomical_region', 'list_id' => 'imaging_report_anatomy', 'empty_title' => '-- Select Region --'), $row['anatomical_region'] ?? ''); ?>
+                            </div>
                         </div>
                         <div class="form-group form-row">
                             <div class="col-md-6">

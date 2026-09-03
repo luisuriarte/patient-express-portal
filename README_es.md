@@ -104,20 +104,25 @@ patient-express-portal/
 ### 3.1 Publicación de un informe de diagnóstico por imágenes
 
 ```
- 1. El técnico radiólogo abre el encuentro del paciente en OpenEMR
+ 1. El médico solicitante crea una "orden de procedimiento" de imágenes
+    (formulario clínico) eligiendo servicio solicitante y región anatómica;
+    queda guardada en procedure_order (procedure_order_type = 'imaging').
+ 2. El técnico radiólogo abre el encuentro del paciente en OpenEMR
     y crea un "Informe de Diagnóstico por Imágenes" (formulario clínico).
- 2. Carga los datos del estudio (modalidad, región anatómica, servicio
-    solicitante, médico) y redacta técnica, hallazgos, conclusión.
- 3. Guarda como BORRADOR (queda editable) o FINALIZA (genera el PDF).
- 4. Al finalizar, save.php:
+ 3. En "Datos del Estudio" el técnico selecciona la orden de estudio
+    de origen; el formulario auto-completa servicio solicitante, región
+    anatómica y médico solicitante, y guarda el vínculo (procedure_order_id).
+ 4. Carga/redacta el resto (modalidad, técnica, hallazgos, conclusión) y
+    guarda como BORRADOR (queda editable) o FINALIZA (genera el PDF).
+ 5. Al finalizar, save.php:
       a. Genera el PDF institucional (Dompdf).
       b. Lo guarda en "Documentos del paciente" (tabla documents)
          dentro de la carpeta elegida (categoría automática según modalidad).
       c. Vincula el PDF al estudio DICOM del paciente en Orthanc
          (Encapsulated PDF) para que se vea junto a las series.
- 5. El cron de sincronización asegura que las imágenes (DICOM / JPG / PDF)
+ 6. El cron de sincronización asegura que las imágenes (DICOM / JPG / PDF)
     queden subidas a Orthanc.
- 6. El paciente ingresa al Portal Express y ve su estudio + informe.
+ 7. El paciente ingresa al Portal Express y ve su estudio + informe.
 ```
 
 ### 3.2 Consulta del paciente
@@ -180,14 +185,24 @@ Cada documento queda registrado en la tabla `documents_pacs_sync` con su estado 
 
 3. **Crear la(s) tabla(s) de apoyo** en la base de OpenEMR:
    - `sql/documents_pacs.sql` → tabla `documents_pacs_sync`.
+   - Cargar el **catálogo de diagnóstico por imágenes** en `procedure_type` desde `patch/sql/images-procedures.sql` (inglés) o `patch/sql/images-procedures_es.sql` (español). Ambos son idempotentes, comparten el mismo `procedure_code`/`standard_code`, y solo difieren en el texto visible de los estudios.
+   - Si usás el **flujo orden + informe**, aplicá `patch/sql/procedure_order-imaging-context.sql` (agrega `requesting_service`/`anatomical_region` a `procedure_order` y `procedure_order_id` a `form_imaging_report`). Debe correrse **después** de aplicar el patch de código de `interface/forms/procedure_order` para que existan las columnas que referencia el formulario.
 
-4. **Datos institucionales**: se cargan **automáticamente desde la tabla `facility`** de OpenEMR (se usa la facility de `billing_location = 1`). Nombre, dirección, teléfono, email y web del centro se toman de ahí, por lo que **no es necesario (ni recomendado) escribir datos de la clínica en el código**. Solo el **logo** se mantiene como recurso estático local (`public/assets/img/logo.png`).
+4. **Aplicar el patch al núcleo de OpenEMR** para el contexto de la orden de imágenes (solo si usás el flujo orden + informe): aplicá el diff `patch/diffs/common.php.patch` sobre `interface/forms/procedure_order/common.php` para que el formulario de la orden muestre los desplegables **Servicio Solicitante (Requesting Service)** y **Región Anatómica (Anatomic Region)** y los guarde. Luego corré `patch/sql/procedure_order-imaging-context.sql` (paso 3).
 
-5. **Instalar el formulario clínico** `forms/imaging_report/`: copiarlo dentro de `interface/forms/` (o la carpeta de formularios de OpenEMR) e instalar su esquema (`table.sql`), que además de crear `form_imaging_report` carga las listas normalizadas de **servicios solicitantes** y **regiones anatómicas** en `list_options`.
+5. **Instalar las traducciones al español** (para que la interfaz en inglés se vea en español para los usuarios hispanohablantes):
+   ```bash
+   mysql -u<user> -p <openemr_db> < sql/lang_custom.sql
+   ```
+   Es idempotente: no pisa traducciones existentes y se puede volver a correr sin problema.
 
-6. **Programar el cron** (ver sección 7).
+6. **Datos institucionales**: se cargan **automáticamente desde la tabla `facility`** de OpenEMR (se usa la facility de `billing_location = 1`). Nombre, dirección, teléfono, email y web del centro se toman de ahí, por lo que **no es necesario (ni recomendado) escribir datos de la clínica en el código**. Solo el **logo** se mantiene como recurso estático local (`public/assets/img/logo.png`).
 
-7. **Verificar acceso**: abrir `public/index.php` (ej. `https://hcd.origen.ar/express_portal/index.php`).
+7. **Instalar el formulario clínico** `forms/imaging_report/`: copiarlo dentro de `interface/forms/` (o la carpeta de formularios de OpenEMR) e instalar su esquema (`table.sql`), que además de crear `form_imaging_report` carga las listas normalizadas de **servicios solicitantes** y **regiones anatómicas** en `list_options`.
+
+8. **Programar el cron** (ver sección 7).
+
+9. **Verificar acceso**: abrir `public/index.php` (ej. `https://hcd.origen.ar/express_portal/index.php`).
 
 ---
 
@@ -273,6 +288,7 @@ Esta sección es para el personal que genera informes de diagnóstico por imáge
 
 1. En el encuentro del paciente en OpenEMR, abrí **"Informe de Diagnóstico por Imágenes"**.
 2. Completá la sección **"Datos del Estudio"**:
+   - **Orden Solicitante (Requesting Order)**: (opcional) seleccioná la orden de estudio de imágenes de origen del paciente. Al elegirla, el formulario **auto-completa** el servicio solicitante, la región anatómica y el médico solicitante desde esa orden, y vincula el informe a la misma (`procedure_order_id`).
    - **Modalidad** *(obligatoria)*: RX, TC, RMN, US, Mamografía, DEXA u Otro.
    - **Región / Área Anatómica** *(obligatoria)*: elegila del listado normalizado (ej. "Columna Lumbar", "Tórax").
    - **Servicio / Solicitante**: drop-down de servicios (Guardia, Clínica Médica, Traumatología, etc.).
@@ -294,9 +310,9 @@ Esta sección es para el personal que genera informes de diagnóstico por imáge
 
 ### 6.3 Notas de datos
 
-- `form_imaging_report` conserva `study_instance_uid` y `accession_number` para mantener el vínculo con el estudio DICOM.
+- `form_imaging_report` conserva `study_instance_uid` y `accession_number` para mantener el vínculo con el estudio DICOM, y `procedure_order_id` para vincular el informe a la orden de imágenes de origen.
 - El estado puede ser `borrador` o `finalizado`.
-- Las listas de servicios y regiones anatómicas se cargan desde `list_options`; para agregar opciones nuevas editá esas listas en OpenEMR (Administración → Listas).
+- Las listas de servicios y regiones anatómicas se cargan desde `list_options`; para agregar opciones nuevas editá esas listas en OpenEMR (Administración → Listas). El **formulario de la orden de procedimiento** reutiliza las mismas listas (`imaging_report_services` / `imaging_report_anatomy`).
 
 ---
 
@@ -362,6 +378,11 @@ Detalle de los archivos más relevantes:
 | `cron/cron_sync_pacs.php` | Sincronización de documentos de imágenes hacia Orthanc (CLI). |
 | `forms/imaging_report/` | Formulario clínico de informes de imágenes (crear, editar, ver, reporte, PDF). |
 | `sql/documents_pacs.sql` | Tabla `documents_pacs_sync`. |
+| `patch/sql/images-procedures.sql` | Catálogo de imágenes (variante inglés). |
+| `patch/sql/images-procedures_es.sql` | Catálogo de imágenes (variante español). |
+| `patch/sql/procedure_order-imaging-context.sql` | Contexto orden + informe: `requesting_service`/`anatomical_region` en `procedure_order`, `procedure_order_id` en `form_imaging_report`. |
+| `patch/diffs/common.php.patch` | Patch al núcleo: `interface/forms/procedure_order/common.php` guarda y muestra el servicio solicitante / región anatómica de imágenes. |
+| `sql/lang_custom.sql` | Traducciones al español de los strings de la interfaz. |
 | `.env.example` | Plantilla de variables de entorno. |
 
 ---

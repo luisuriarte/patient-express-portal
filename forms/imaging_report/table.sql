@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS `form_imaging_report` (
   `status`                 ENUM('draft','finalized') DEFAULT 'draft',
   `pdf_document_id`        BIGINT(20)      DEFAULT NULL COMMENT 'ID of the PDF document in the documents table',
   `pdf_category_id`        BIGINT(20)      DEFAULT NULL COMMENT 'Chosen destination folder (id in categories table)',
+  `procedure_order_id`     BIGINT(20)      DEFAULT NULL COMMENT 'Originating procedure_order that requested the study',
   `study_instance_uid`     VARCHAR(128)    DEFAULT NULL COMMENT 'DICOM StudyInstanceUID of the linked study (tag 0020,000D)',
   `accession_number`       VARCHAR(64)     DEFAULT NULL COMMENT 'Accession number / study identifier in Orthanc',
   `pdf_path`               VARCHAR(512)    DEFAULT NULL COMMENT 'Physical path relative to the generated PDF',

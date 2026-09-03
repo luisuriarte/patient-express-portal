@@ -63,6 +63,7 @@ $fields = [
     'study_date'           => $_POST['study_date'] ?: date('Y-m-d'),
     'report_date'          => $reportDate,
     'pdf_category_id'      => ((int)($_POST['category_id'] ?? 0)) ?: null,
+    'procedure_order_id'   => ((int)($_POST['procedure_order_id'] ?? 0)) ?: null,
 ];
 
 // ============================================================

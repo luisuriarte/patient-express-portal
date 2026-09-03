@@ -50,6 +50,34 @@ if ($formId > 0) {
 $modoEdicion = !empty($obj);
 $estado = $obj['status'] ?? 'draft';
 
+// ============================================================
+// Lists the patient's imaging procedure orders so the radiology
+// report can be linked to (and auto-filled from) the originating
+// imaging request. `procedure_order.procedure_order_type` stores
+// 'imaging' for imaging orders (see find_order_popup/common.php).
+// ============================================================
+$ordersList = [];
+$ordersRes = sqlStatement(
+    "SELECT po.procedure_order_id, po.date_ordered, po.order_status,
+            po.requesting_service, po.anatomical_region,
+            CONCAT_WS(' ', u.lname, u.fname) AS provider_name
+       FROM procedure_order po
+       LEFT JOIN users u ON po.provider_id = u.id
+      WHERE po.patient_id = ?
+        AND po.procedure_order_type = 'imaging'
+      ORDER BY po.date_ordered DESC, po.procedure_order_id DESC",
+    [$pid]
+);
+while ($ord = sqlFetchArray($ordersRes)) {
+    $ordersList[(int)$ord['procedure_order_id']] = $ord;
+}
+
+// Order to auto-fill from: explicit GET selection or the one already linked.
+$selectedOrderId = (int)($_GET['procedure_order_id'] ?? 0);
+if ($selectedOrderId <= 0) {
+    $selectedOrderId = (int)($obj['procedure_order_id'] ?? 0);
+}
+
 // Opciones de modalidad
 $modalidades = [
     ''    => xl('-- Select Modality --'),
@@ -82,6 +110,24 @@ $resRegiones = sqlStatement(
 );
 while ($reg = sqlFetchArray($resRegiones)) {
     $regionesAnatomicas[$reg['option_id']] = $reg['title'];
+}
+
+// Auto-fill service / anatomical region / requesting physician from the order.
+// Runs here (after $servicios/$regionesAnatomicas are populated) so the mapped
+// option_id can be turned into the visible title used by this form.
+if ($selectedOrderId > 0 && isset($ordersList[$selectedOrderId])) {
+    $orderContext = $ordersList[$selectedOrderId];
+    $servOptionId = (string)($orderContext['requesting_service'] ?? '');
+    $anatOptionId = (string)($orderContext['anatomical_region'] ?? '');
+    if ($servOptionId !== '' && isset($servicios[$servOptionId]) && empty($obj['requesting_service'])) {
+        $obj['requesting_service'] = $servicios[$servOptionId];
+    }
+    if ($anatOptionId !== '' && isset($regionesAnatomicas[$anatOptionId]) && empty($obj['anatomical_region'])) {
+        $obj['anatomical_region'] = $regionesAnatomicas[$anatOptionId];
+    }
+    if (!empty(trim((string)$orderContext['provider_name'])) && empty($obj['requesting_physician'])) {
+        $obj['requesting_physician'] = trim((string)$orderContext['provider_name']);
+    }
 }
 
 // Médico Solicitante: médicos de OpenEMR habilitados para autorizar (authorized=1)
@@ -191,12 +237,26 @@ $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategor
 
         <input type="hidden" name="csrf_token_form" value="<?= CsrfUtils::collectCsrfToken(session: $session) ?>">
         <input type="hidden" name="action" value="draft" id="input_action">
+        <input type="hidden" name="procedure_order_id" id="input_procedure_order_id" value="<?= attr($selectedOrderId) ?>">
         <input type="hidden" name="category_id" id="input_category_id" value="<?= attr($selectedCategoryId) ?>">
 
         <!-- Sección 1: Datos del Estudio -->
         <div class="bg-white rounded-2xl border border-slate-200 p-6 mb-5 shadow-sm">
             <div class="section-header"><?= xlt('📋 Study Data') ?></div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+
+                <div class="md:col-span-2">
+                    <label class="form-label" for="procedure_order_select"><?= xlt('Requesting Order') ?></label>
+                    <select name="procedure_order_select" id="procedure_order_select" class="form-control">
+                        <option value=""><?= xlt('-- Select originating study order... --') ?></option>
+                        <?php foreach ($ordersList as $oid => $ord): ?>
+                            <option value="<?= attr($oid) ?>" <?= ($selectedOrderId === $oid) ? 'selected' : '' ?>>
+                                <?= text('#' . $oid . ' — ' . ($ord['date_ordered'] ?? '') . ': ' . ($ord['provider_name'] ?? xl('No provider'))) ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <p class="text-xs text-slate-400 mt-1"><?= xlt('Selecting an order auto-fills the service, anatomical region and requesting physician from the imaging request.') ?></p>
+                </div>
 
                 <div>
                     <label class="form-label" for="modality"><?= xlt('Modality *') ?></label>
@@ -380,6 +440,83 @@ document.getElementById('btn-finalize').addEventListener('click', function() {
 document.querySelector('.btn-cancel').addEventListener('click', function() {
     parent.closeTab(window.name, false);
 });
+
+// ============================================================
+// Auto-fill from the originating imaging order (procedure_order)
+// Maps procedure_order.requesting_service / anatomical_region
+// (option_id) back to the visible list title used by this form.
+// ============================================================
+const ORDER_AUTOFILL = <?= json_encode($ordersList) ?>;
+const SERVICE_TITLES = <?= json_encode($servicios) ?>;
+const REGION_TITLES  = <?= json_encode($regionesAnatomicas) ?>;
+
+(function () {
+    const orderSelect = document.getElementById('procedure_order_select');
+    const orderHidden = document.getElementById('input_procedure_order_id');
+    const serviceSel = document.getElementById('requesting_service');
+    const regionSel = document.getElementById('anatomical_region');
+    const physSelect = document.getElementById('requesting_physician_select');
+    const physHidden = document.getElementById('requesting_physician');
+    const physOtherContainer = document.getElementById('requesting_physician_other_container');
+    const physOtherInput = document.getElementById('requesting_physician_other_input');
+
+    const SERVICE_TITLE_LOOKUP = {};
+    Object.keys(SERVICE_TITLES).forEach(function (id) {
+        SERVICE_TITLE_LOOKUP[SERVICE_TITLES[id]] = id;
+    });
+    const REGION_TITLE_LOOKUP = {};
+    Object.keys(REGION_TITLES).forEach(function (id) {
+        REGION_TITLE_LOOKUP[REGION_TITLES[id]] = id;
+    });
+
+    function currentPhysicianName() {
+        const val = physSelect.value;
+        if (val === '__otro__') {
+            return (physOtherInput.value || '').trim();
+        }
+        if (val.startsWith('med_')) {
+            return physSelect.options[physSelect.selectedIndex].textContent.trim();
+        }
+        return '';
+    }
+
+    function applyOrder(orderId) {
+        if (!orderId) return;
+        const ord = ORDER_AUTOFILL[orderId];
+        if (!ord) return;
+
+        if (ord.requesting_service && SERVICE_TITLES[ord.requesting_service]) {
+            serviceSel.value = SERVICE_TITLES[ord.requesting_service];
+        }
+        if (ord.anatomical_region && REGION_TITLES[ord.anatomical_region]) {
+            regionSel.value = REGION_TITLES[ord.anatomical_region];
+        }
+        if (ord.provider_name && physSelect) {
+            const name = String(ord.provider_name).trim();
+            const optionForName = Array.from(physSelect.options).find(function (o) {
+                return o.value && o.value !== '__otro__' && o.textContent.trim() === name;
+            });
+            if (optionForName) {
+                physSelect.value = optionForName.value;
+                physOtherContainer.classList.add('hidden');
+                physHidden.value = name;
+            } else {
+                physSelect.value = '__otro__';
+                physOtherContainer.classList.remove('hidden');
+                physOtherInput.value = name;
+                physHidden.value = name;
+            }
+        }
+    }
+
+    orderSelect.addEventListener('change', function () {
+        orderHidden.value = orderSelect.value;
+        applyOrder(orderSelect.value);
+    });
+
+    // Keep the hidden order id in sync with a server pre-selected order.
+    orderHidden.value = orderSelect.value;
+})();
 
 // ============================================================
 // Requesting Physician: sync dropdown + "other" field + hidden

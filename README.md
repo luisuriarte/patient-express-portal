@@ -106,19 +106,24 @@ patient-express-portal/
 ### 3.1 Publishing a diagnostic imaging report
 
 ```
- 1. The radiology technician opens the patient's encounter in OpenEMR
+ 1. The ordering physician creates an imaging "procedure order" (clinical
+    form) choosing the requesting service and anatomical region; it is
+    stored on procedure_order (procedure_order_type = 'imaging').
+ 2. The radiology technician opens the patient's encounter in OpenEMR
     and creates an "Imaging Diagnostic Report" (clinical form).
- 2. Loads the study data (modality, anatomical region, requesting
-    service, physician) and writes technique, findings, conclusion.
- 3. Saves as DRAFT (remains editable) or FINALIZES (generates the PDF).
- 4. When finalizing, save.php:
+ 3. In "Study Data" the technician selects the originating study order;
+    the report form auto-fills the requesting service, anatomical region
+    and requesting physician from it, and stores the link (procedure_order_id).
+ 4. Loads/writes the rest (modality, technique, findings, conclusion) and
+    saves as DRAFT (remains editable) or FINALIZES (generates the PDF).
+ 5. When finalizing, save.php:
       a. Generates the institutional PDF (Dompdf).
       b. Saves it in "Patient Documents" (documents table) inside the
          chosen folder (automatic category based on modality).
       c. Records the study data that will be synchronized to Orthanc.
- 5. The synchronization cron ensures images (DICOM / JPG) are pushed
+ 6. The synchronization cron ensures images (DICOM / JPG) are pushed
     to Orthanc.
- 6. The patient logs into the Express Portal and sees their study + report.
+ 7. The patient logs into the Express Portal and sees their study + report.
 ```
 
 ### 3.2 Patient consultation
@@ -170,20 +175,23 @@ Each document is recorded in the `documents_pacs_sync` table with its status (`p
 3. **Create the support table(s)** in the OpenEMR database:
    - `sql/documents_pacs.sql` → `documents_pacs_sync` table.
    - Load the **diagnostic imaging catalog** into `procedure_type` from `patch/sql/images-procedures.sql` (English) or `patch/sql/images-procedures_es.sql` (Spanish). Both are idempotent, share the same `procedure_code`/`standard_code`, and differ only in the studies' visible text.
+   - If you use the **order + report flow**, apply `patch/sql/procedure_order-imaging-context.sql` (adds `requesting_service`/`anatomical_region` to `procedure_order` and `procedure_order_id` to `form_imaging_report`). This must run **after** applying the `interface/forms/procedure_order` code patch so the columns referenced by the form exist.
 
-4. **Install the Spanish translations** (so the English UI shows in Spanish for Spanish-language users):
+4. **Patch OpenEMR core** for the imaging order context (only if you use the order + report flow): apply the `patch/diffs/common.php.patch` diff onto `interface/forms/procedure_order/common.php` so the procedure order form shows the **Requesting Service** and **Anatomic Region** dropdowns and saves them. Then run `patch/sql/procedure_order-imaging-context.sql` (step 3).
+
+5. **Install the Spanish translations** (so the English UI shows in Spanish for Spanish-language users):
    ```bash
    mysql -u<user> -p <openemr_db> < sql/lang_custom.sql
    ```
    This is idempotent: it does not overwrite existing translations and can be re-run safely.
 
-5. **Institutional data**: loaded **automatically from the OpenEMR `facility` table** (the facility with `billing_location = 1` is used). Name, address, phone, email and website are taken from there, so there is **no need (nor is it recommended) to write clinic data in code**. Only the **logo** is kept as a local static resource (`public/assets/img/logo.png`).
+6. **Institutional data**: loaded **automatically from the OpenEMR `facility` table** (the facility with `billing_location = 1` is used). Name, address, phone, email and website are taken from there, so there is **no need (nor is it recommended) to write clinic data in code**. Only the **logo** is kept as a local static resource (`public/assets/img/logo.png`).
 
-6. **Install the clinical form** `forms/imaging_report/`: copy it into `interface/forms/` (or OpenEMR's forms folder) and install its schema (`table.sql`), which besides creating `form_imaging_report` loads the normalized lists of **requesting services** and **anatomical regions** into `list_options`.
+7. **Install the clinical form** `forms/imaging_report/`: copy it into `interface/forms/` (or OpenEMR's forms folder) and install its schema (`table.sql`), which besides creating `form_imaging_report` loads the normalized lists of **requesting services** and **anatomical regions** into `list_options`.
 
-7. **Schedule the cron** (see section 7).
+8. **Schedule the cron** (see section 7).
 
-8. **Verify access**: open `public/index.php` (e.g. `https://hcd.origen.ar/express_portal/index.php`).
+9. **Verify access**: open `public/index.php` (e.g. `https://hcd.origen.ar/express_portal/index.php`).
 
 ---
 
@@ -269,6 +277,7 @@ This section is for the staff who generate diagnostic imaging reports inside Ope
 
 1. In the patient's encounter in OpenEMR, open **"Imaging Diagnostic Report"**.
 2. Fill in the **"Study Data"** section:
+   - **Requesting Order**: (optional) select the originating imaging study order for the patient. Picking one **auto-fills** the requesting service, anatomical region and requesting physician from that order, and links the report to it (`procedure_order_id`).
    - **Modality** *(required)*: XR, CT, MRI, US, Mammography, DEXA or Other.
    - **Region / Anatomical Area** *(required)*: choose from the normalized list (e.g. "Lumbar Spine", "Thorax").
    - **Service / Requester**: dropdown of services (Emergency, Internal Medicine, Traumatology, etc.).
@@ -290,9 +299,9 @@ This section is for the staff who generate diagnostic imaging reports inside Ope
 
 ### 6.3 Data notes
 
-- `form_imaging_report` keeps `study_instance_uid` and `accession_number` to maintain the link with the DICOM study.
+- `form_imaging_report` keeps `study_instance_uid` and `accession_number` to maintain the link with the DICOM study, and `procedure_order_id` to link the report back to the originating imaging order.
 - The status can be `draft` or `finalized`.
-- The service and anatomical region lists are loaded from `list_options`; to add new options edit those lists in OpenEMR (Administration → Lists).
+- The service and anatomical region lists are loaded from `list_options`; to add new options edit those lists in OpenEMR (Administration → Lists). The **procedure order form** reuses the same lists (`imaging_report_services` / `imaging_report_anatomy`).
 
 ---
 
@@ -360,6 +369,8 @@ Details of the most relevant files:
 | `sql/documents_pacs.sql` | `documents_pacs_sync` table. |
 | `patch/sql/images-procedures.sql` | Imaging catalog (English variant). |
 | `patch/sql/images-procedures_es.sql` | Imaging catalog (Spanish variant). |
+| `patch/sql/procedure_order-imaging-context.sql` | Order + report context: `requesting_service`/`anatomical_region` on `procedure_order`, `procedure_order_id` on `form_imaging_report`. |
+| `patch/diffs/common.php.patch` | Core patch: `interface/forms/procedure_order/common.php` saves and shows the imaging requesting service / anatomic region. |
 | `sql/lang_custom.sql` | Spanish translations for the UI strings. |
 | `.env.example` | Environment variable template. |
 
