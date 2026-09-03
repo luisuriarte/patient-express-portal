@@ -32,7 +32,8 @@ CREATE TABLE IF NOT EXISTS `form_imaging_report` (
   `report_date`            DATE            DEFAULT NULL COMMENT 'Date the report was generated/finalized (automatic)',
   PRIMARY KEY (`id`),
   KEY `idx_pid`            (`pid`),
-  KEY `idx_status`         (`status`)
+  KEY `idx_status`         (`status`),
+  KEY `idx_procedure_order_id` (`procedure_order_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================
