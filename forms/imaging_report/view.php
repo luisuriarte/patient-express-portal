@@ -102,9 +102,9 @@ $modalidadLabel = $modalidadLabels[$obj['modality'] ?? ''] ?? ($obj['modality'] 
                 <p class="text-sm font-semibold text-slate-800"><?= text($obj['anatomical_region'] ?? '—') ?></p>
             </div>
             <div>
-                <p class="section-title"><?= xlt('Report Date') ?></p>
+                <p class="section-title"><?= xlt('Study Date') ?></p>
                 <p class="text-sm font-semibold text-slate-800">
-                    <?= $obj['report_date'] ? text(date('d/m/Y', strtotime($obj['report_date']))) : '—' ?>
+                    <?= $obj['study_date'] ? text(date('d/m/Y', strtotime($obj['study_date']))) : '—' ?>
                 </p>
             </div>
             <div>

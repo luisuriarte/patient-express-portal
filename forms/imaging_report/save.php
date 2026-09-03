@@ -38,6 +38,17 @@ $action = $_POST['action'] ?? 'draft'; // 'draft' or 'finalize'
 // ============================================================
 // Data sanitization and preparation
 // ============================================================
+// The report date is auto-generated ONLY when finalizing (generating the PDF).
+// On drafts we keep the previously stored value (null or the already generated one).
+$reportDate = null;
+if ($mode === 'update' && $formId > 0) {
+    $existing  = sqlQuery("SELECT report_date FROM form_imaging_report WHERE id = ?", [$formId]);
+    $reportDate = $existing['report_date'] ?? null;
+}
+if ($action === 'finalize') {
+    $reportDate = date('Y-m-d');
+}
+
 $fields = [
     'modality'             => trim((string)($_POST['modality'] ?? '')),
     'anatomical_region'    => trim((string)($_POST['anatomical_region'] ?? '')),
@@ -49,7 +60,8 @@ $fields = [
     'conclusion'           => trim((string)($_POST['conclusion'] ?? '')),
     'observations'         => trim((string)($_POST['observations'] ?? '')),
     'status'               => ($action === 'finalize') ? 'finalized' : 'draft',
-    'report_date'          => $_POST['report_date'] ?: date('Y-m-d'),
+    'study_date'           => $_POST['study_date'] ?: date('Y-m-d'),
+    'report_date'          => $reportDate,
     'pdf_category_id'      => ((int)($_POST['category_id'] ?? 0)) ?: null,
 ];
 

@@ -60,9 +60,9 @@ function imaging_report_report(int $pid, int $encounter, int $cols, int $id): vo
     echo '<tr>';
     echo '<td style="padding:6px 10px;font-weight:600;color:#334155;">' . xlt('Anatomical Region') . '</td>';
     echo '<td style="padding:6px 10px;color:#1e293b;">' . text($data['anatomical_region'] ?? '—') . '</td>';
-    echo '<td style="padding:6px 10px;font-weight:600;color:#334155;">' . xlt('Report Date') . '</td>';
+    echo '<td style="padding:6px 10px;font-weight:600;color:#334155;">' . xlt('Study Date') . '</td>';
     echo '<td style="padding:6px 10px;color:#1e293b;">';
-    echo $data['report_date'] ? text(date('d/m/Y', strtotime($data['report_date']))) : '—';
+    echo $data['study_date'] ? text(date('d/m/Y', strtotime($data['study_date']))) : '—';
     echo '</td>';
     echo '</tr>';
 

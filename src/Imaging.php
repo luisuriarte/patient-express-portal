@@ -918,7 +918,7 @@ class Imaging
     {
         $map = [];
         $result = sqlStatement(
-            "SELECT id, pdf_document_id, pdf_category_id, modality, report_date, anatomical_region,
+            "SELECT id, pdf_document_id, pdf_category_id, modality, study_date, anatomical_region,
                     requesting_physician, reporting_physician
                FROM form_imaging_report
               WHERE pid = ?
@@ -940,7 +940,7 @@ class Imaging
             $map[$cat] = [
                 'doc_id'              => (int)$row['pdf_document_id'],
                 'title'               => ($titulo !== '' ? $titulo . ' — ' : '') . xl('Diagnostic Imaging Report'),
-                'date'                => (string)($row['report_date'] ?? ''),
+                'date'                => (string)($row['study_date'] ?? ''),
                 'requesting_physician' => trim((string)($row['requesting_physician'] ?? '')),
                 'reporting_physician'  => trim((string)($row['reporting_physician'] ?? '')),
             ];
