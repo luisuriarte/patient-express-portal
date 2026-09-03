@@ -26,6 +26,7 @@ $pid     = PatientSessionUtil::getPid();
 
 require_once("$srcdir/api.inc.php");
 require_once(__DIR__ . '/category_functions.php');
+require_once(__DIR__ . '/imaging_upload_functions.php');
 
 formHeader(xl("Imaging Report — View"));
 
@@ -44,6 +45,9 @@ if (empty($obj)) {
     formFooter();
     exit;
 }
+
+// Documentos de imágenes vinculados al informe
+$uploadedImages = imaging_get_report_images($formId);
 
 $modalidadLabels = [
     'RX'   => xl('X-Ray (Digital Radiography)'),
@@ -120,6 +124,52 @@ $modalidadLabel = $modalidadLabels[$obj['modality'] ?? ''] ?? ($obj['modality'] 
                 <p class="text-sm font-semibold text-slate-800"><?= text($obj['reporting_physician'] ?? '—') ?></p>
             </div>
         </div>
+    </div>
+
+    <!-- Imaging Documents -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 mb-5 shadow-sm">
+        <h2 class="text-sm font-bold text-slate-800 mb-4 uppercase tracking-wider">🖼️ <?= xlt('Imaging Documents') ?></h2>
+        <?php if (empty($uploadedImages)): ?>
+            <p class="text-sm text-slate-400"><?= xlt('No imaging documents uploaded for this report.') ?></p>
+        <?php else: ?>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="text-left text-xs uppercase tracking-wider text-slate-500 border-b border-slate-200">
+                            <th class="py-2 pr-3"><?= xlt('Document') ?></th>
+                            <th class="py-2 pr-3"><?= xlt('Modality') ?></th>
+                            <th class="py-2 pr-3"><?= xlt('Study UID') ?></th>
+                            <th class="py-2 pr-3"><?= xlt('Status') ?></th>
+                            <th class="py-2"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php foreach ($uploadedImages as $img): ?>
+                        <?php
+                        $docId = (int)($img['document_id'] ?? 0);
+                        $docUrl = $docId > 0
+                            ? $webroot . '/controller.php?document&retrieve&patient_id=' . urlencode((string)$pid) .
+                              '&document_id=' . urlencode((string)$docId) . '&as_file=false'
+                            : '';
+                        ?>
+                        <tr class="border-b border-slate-100">
+                            <td class="py-2 pr-3 font-medium text-slate-700"><?= text($img['filename'] ?? '—') ?></td>
+                            <td class="py-2 pr-3 text-slate-600"><?= text($img['modality'] ?? '—') ?></td>
+                            <td class="py-2 pr-3 text-xs text-slate-400"><?= text($img['study_instance_uid'] ?? '—') ?></td>
+                            <td class="py-2 pr-3">
+                                <?= $img['status'] === 'failed' ? '<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">' . xlt('Failed') . '</span>' : '<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">' . xlt('Uploaded') . '</span>' ?>
+                            </td>
+                            <td class="py-2 text-right">
+                                <?php if ($docUrl !== ''): ?>
+                                    <a href="<?= attr($docUrl) ?>" target="_blank" class="text-sky-600 hover:underline text-xs font-semibold"><?= xlt('View') ?></a>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        <?php endif; ?>
     </div>
 
     <!-- Technique / Methodology -->

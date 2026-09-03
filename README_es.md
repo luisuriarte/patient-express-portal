@@ -68,7 +68,9 @@ patient-express-portal/
 ├── src/                           # Lógica (clases PHP, namespace App\)
 │   ├── Auth.php                   # Autenticación de pacientes y sesión
 │   ├── Laboratory.php             # Resultados de laboratorio (por encuentro)
-│   ├── Imaging.php                # Imágenes: documentos + Orthanc PACS + informes
+│   ├── Imaging.php                # Imágenes: documentos + PACS multi-proveedor + informes
+│   ├── PacsProvider.php           # Modelo de configuración PACS/Orthanc por proveedor
+│   ├── PacsService.php            # Cliente REST/DICOMweb de Orthanc (consciente de proveedor)
 │   └── PortalSSO.php              # Single Sign-On hacia el portal completo
 ├── public/                        # Páginas web (punto de entrada del navegador)
 │   ├── index.php                  # Pantalla de login
@@ -78,24 +80,28 @@ patient-express-portal/
 │   ├── goto_portal.php            # Redirección SSO a OpenEMR
 │   └── logout.php                 # Cierre de sesión
 ├── templates/                     # Cabecera y pie comunes (navbar + modales)
-├── cron/
-│   └── cron_sync_pacs.php         # Sincronización OpenEMR → Orthanc (CLI)
 ├── forms/
-│   └── imaging_report/            # Formulario clínico de informes de imágenes
+│   └── imaging_report/            # Formulario clínico de informes de imágenes (subida directa a PACS)
 ├── sql/
-│   └── documents_pacs.sql        # Tabla documents_pacs_sync
+│   ├── images-procedures.sql      # Esquema de orden/encuentro de imágenes
+│   └── lang_custom.sql            # Traducciones al español de la interfaz
 ├── config/                        # Config alternativa (PDO standalone)
+├── patch/                         # Patches al núcleo de OpenEMR + migraciones SQL
 └── composer.json                  # Dependencias (dompdf)
 ```
 
 ### 2.3 Componentes externos con los que se integra
 
-| Servicio | URL (constante) | Default |
-|----------|----------------|---------|
-| API REST de Orthanc | `ORTHANC_URL` | `http://127.0.0.1:8042` |
-| DICOM-WADO/STOW | `ORTHANC_WADO_URL` | `https://pacs.origen.ar/dicom-web` |
-| Visor OHIF v3 | `OHIF_VIEWER_BASE_URL` | `https://imagenes.origen.ar/viewer` |
+| Servicio | Campo (por proveedor) | Fallback por defecto |
+|----------|----------------------|----------------------|
+| API REST de Orthanc | `remote_api` | `ORTHANC_URL` (default `http://127.0.0.1:8042`) |
+| DICOM-WADO/STOW | `wado_url` | `ORTHANC_WADO_URL` (default `https://pacs.origen.ar/dicom-web`) |
+| Visor OHIF v3 | `remote_host` | `OHIF_VIEWER_BASE_URL` (default `https://imagenes.origen.ar/viewer`) |
 | Portal completo OpenEMR | `OPENEMR_PORTAL_URL` | `https://hcd.origen.ar/portal` |
+
+> Los endpoints de PACS (REST, WADO, OHIF) pueden configurarse **por proveedor** en la
+> tabla `procedure_providers` (ver sección 4.3). Las constantes `ORTHANC_*` / `OHIF_*`
+> actúan solo como fallback cuando el campo del proveedor está vacío.
 
 ---
 
@@ -112,16 +118,18 @@ patient-express-portal/
  3. En "Datos del Estudio" el técnico selecciona la orden de estudio
     de origen; el formulario auto-completa servicio solicitante, región
     anatómica y médico solicitante, y guarda el vínculo (procedure_order_id).
- 4. Carga/redacta el resto (modalidad, técnica, hallazgos, conclusión) y
+ 4. El técnico sube las imágenes/PDF directamente en el formulario del
+    informe (arrastrar y soltar, multi-archivo: DICOM, JPG/PNG, PDF). Cada
+    archivo se envía al PACS del proveedor de la orden de estudio al
+    guardar y queda registrado en form_imaging_report_images con su
+    StudyInstanceUID e IDs de PACS.
+ 5. Carga/redacta el resto (modalidad, técnica, hallazgos, conclusión) y
     guarda como BORRADOR (queda editable) o FINALIZA (genera el PDF).
- 5. Al finalizar, save.php:
-      a. Genera el PDF institucional (Dompdf).
-      b. Lo guarda en "Documentos del paciente" (tabla documents)
-         dentro de la carpeta elegida (categoría automática según modalidad).
-      c. Vincula el PDF al estudio DICOM del paciente en Orthanc
-         (Encapsulated PDF) para que se vea junto a las series.
- 6. El cron de sincronización asegura que las imágenes (DICOM / JPG / PDF)
-    queden subidas a Orthanc.
+ 6. Al finalizar, save.php:
+      a. Genera el PDF institucional (Dompdf) y lo guarda en
+         "Documentos del paciente" (tabla documents).
+      b. Vincula el PDF generado al estudio de las imágenes subidas
+         (el PDF en sí NO se sube a PACS).
  7. El paciente ingresa al Portal Express y ve su estudio + informe.
 ```
 
@@ -136,15 +144,14 @@ patient-express-portal/
  5. Con un clic pasa al Portal Completo (SSO) sin volver a loguearse.
 ```
 
-### 3.3 Sincronización con PACS (cron)
+### 3.3 Subida directa a PACS (multi-proveedor)
 
-El cron recorre los documentos de imágenes que aún no están sincronizados y los sube a Orthanc según su tipo:
+**No hay cron de sincronización.** Las imágenes y PDFs se suben al PACS **en el momento de guardar** desde el formulario del informe (`forms/imaging_report/`), a través del proveedor de la orden de estudio.
 
-- **DICOM nativo (`.dcm`)** → `POST /instances` (sube el binario directo).
-- **Imagen estándar (JPG/PNG/WEBP)** → `POST /tools/create-dicom` (convierte a DICOM con los tags del paciente/estudio).
-- **PDF / Informe** → `POST /tools/create-dicom` (sube como **Encapsulated PDF**, modalidad `OT`, adjuntado al estudio de la misma carpeta/paciente mediante el campo `Parent`).
-
-Cada documento queda registrado en la tabla `documents_pacs_sync` con su estado (`pending`, `synced`, `failed`, `ignored`).
+- Cada archivo (DICOM, JPG/PNG/WEBP, PDF) se sube directamente al PACS/Orthanc correspondiente vía `POST /instances` (DICOM nativo) o `POST /tools/create-dicom`.
+- Los archivos de una misma orden de estudio comparten un `StudyInstanceUID` determinístico (`1.2.840.113619.2.55.<orderId>.<providerId>`); los DICOM nativos conservan su estudio original.
+- Cada subida queda registrada en `form_imaging_report_images` (columnas `pacs_instance_id`, `pacs_series_id`, `pacs_study_id`, `study_instance_uid`, `provider_id`, `status`).
+- El **PDF del informe generado NO se sube a PACS**; vive solo en los documentos de OpenEMR del paciente y se vincula al estudio de las imágenes subidas (vía `study_instance_uid`).
 
 ---
 
@@ -184,7 +191,8 @@ Cada documento queda registrado en la tabla `documents_pacs_sync` con su estado 
    ```
 
 3. **Crear la(s) tabla(s) de apoyo** en la base de OpenEMR:
-   - `sql/documents_pacs.sql` → tabla `documents_pacs_sync`.
+   - Si usás el **PACS multi-proveedor**, aplicá `patch/sql/pacs-multiprovider.sql` para agregar `remote_api` y `wado_url` a `procedure_providers` (`remote_host`, `login` y `password` ya existen nativamente). Ver sección 4.3 para los campos del proveedor.
+   - Aplicá `patch/sql/fase4-remove-pacs-sync.sql` para eliminar la tabla obsoleta `documents_pacs_sync` (el flujo viejo de cron ya no existe; el vínculo ahora vive en `form_imaging_report_images`).
    - Cargar el **catálogo de diagnóstico por imágenes** en `procedure_type` desde `patch/sql/images-procedures.sql` (inglés) o `patch/sql/images-procedures_es.sql` (español). Ambos son idempotentes, comparten el mismo `procedure_code`/`standard_code`, y solo difieren en el texto visible de los estudios.
    - Si usás el **flujo orden + informe**, aplicá `patch/sql/procedure_order-imaging-context.sql` (agrega `requesting_service`/`anatomical_region` a `procedure_order` y `procedure_order_id` a `form_imaging_report`). Debe correrse **después** de aplicar el patch de código de `interface/forms/procedure_order` para que existan las columnas que referencia el formulario.
 
@@ -200,9 +208,44 @@ Cada documento queda registrado en la tabla `documents_pacs_sync` con su estado 
 
 7. **Instalar el formulario clínico** `forms/imaging_report/`: copiarlo dentro de `interface/forms/` (o la carpeta de formularios de OpenEMR) e instalar su esquema (`table.sql`), que además de crear `form_imaging_report` carga las listas normalizadas de **servicios solicitantes** y **regiones anatómicas** en `list_options`.
 
-8. **Programar el cron** (ver sección 7).
+8. **Configurar los proveedores de PACS** en OpenEMR: cada fila de `procedure_providers` debe apuntar a su Orthanc/OHIF (ver sección 4.3). **No hay cron que programar** — las subidas ocurren al guardar.
 
 9. **Verificar acceso**: abrir `public/index.php` (ej. `https://hcd.origen.ar/express_portal/index.php`).
+
+### 4.3 Campos del proveedor PACS (`procedure_providers`)
+
+Cada PACS/Orthanc conectado se configura **como una fila de "procedure provider"** en la tabla `procedure_providers` de OpenEMR. La orden de estudio vincula el estudio del paciente a un proveedor mediante `procedure_order.lab_id → procedure_providers.ppid`.
+
+> `remote_host`, `login` y `password` ya existen nativamente en OpenEMR.
+> `remote_api` y `wado_url` se agregan con `patch/sql/pacs-multiprovider.sql`.
+
+| Columna | Significado | Ejemplo |
+|---------|-------------|---------|
+| `name` | Nombre visible que se muestra en el portal | `Centro 1` |
+| `remote_host` | URL base del **visor OHIF** (path completo) | `https://imagenes.origen.ar/viewer` |
+| `remote_api` | URL base de la **API REST de Orthanc** | `https://pacs.origen.ar` (o `http://10.0.0.5:8042`) |
+| `wado_url` | URL base de **DICOMweb WADO-RS** (usado por OHIF/STONE) | `https://pacs.origen.ar/dicom-web` |
+| `login` | Usuario **HTTP Basic** de Orthanc | `orthanc` |
+| `password` | Contraseña **HTTP Basic** de Orthanc | `changeme` |
+
+Ejemplo SQL para dar de alta un proveedor:
+
+```sql
+INSERT INTO procedure_providers
+    (name, remote_host, remote_api, wado_url, login, password, active)
+VALUES
+    ('Centro 1',
+     'https://imagenes.origen.ar/viewer',   -- remote_host (URL base del visor OHIF)
+     'https://pacs.origen.ar',              -- remote_api  (URL base REST de Orthanc)
+     'https://pacs.origen.ar/dicom-web',    -- wado_url    (URL base WADO-RS)
+     'orthanc',                             -- login (HTTP Basic de Orthanc)
+     'changeme',                            -- password
+     1);
+```
+
+Si un proveedor deja `remote_api` / `wado_url` vacíos, el portal cae a las constantes
+`ORTHANC_URL` / `ORTHANC_WADO_URL` / `OHIF_VIEWER_BASE_URL`; `wado_url` también puede
+derivarse automáticamente de `remote_api` (`https://host/dicom-web`) cuando no está definido.
 
 ---
 
@@ -316,44 +359,26 @@ Esta sección es para el personal que genera informes de diagnóstico por imáge
 
 ---
 
-## 7. Operación y mantenimiento (cron / PACS)
+## 7. Operación y mantenimiento (PACS)
 
-### 7.1 Sincronización automática
+### 7.1 Subida directa al guardar
 
-El script `cron/cron_sync_pacs.php` sube los documentos de imágenes a Orthanc. Se recomienda programarlo en el crontab, por ejemplo:
+**No hay cron de sincronización.** Cada archivo de imágenes (DICOM, JPG/PNG/WEBP, PDF)
+se sube al PACS de la orden de estudio **cuando se guarda el formulario del informe**
+(`forms/imaging_report/`). Cada subida queda registrada en `form_imaging_report_images`
+con su `study_instance_uid`, `pacs_instance_id`, `pacs_series_id`, `pacs_study_id`
+y `provider_id`, a partir de los cuales el portal reconstruye la lista de estudios agrupada.
 
-```cron
-*/5 * * * * php /var/www/html/origen.ar/hcd/express_portal/cron/cron_sync_pacs.php >> /var/log/orthanc_sync.log 2>&1
-```
+### 7.2 Si una subida falla
 
-### 7.2 Modos de ejecución y flags
-
-| Flag | Efecto |
-|------|--------|
-| *(ninguno)* | Procesa hasta 200 documentos pendientes. |
-| `--all` | Procesa hasta 1000 documentos. |
-| `--retry` / `--force` | Incluye los documentos en estado `failed` para reintentarlos. |
-
-El script usa **file lock** (evita ejecuciones concurrentes), limita memoria (512M) y tiempo (600s), y solo actúa si la tabla `documents_pacs_sync` existe.
-
-### 7.3 Estados en `documents_pacs_sync`
-
-- `pending` → pendiente de procesar.
-- `synced` → subido correctamente a Orthanc.
-- `failed` → error (revisar `error_message`).
-- `ignored` → descartado.
-
-### 7.4 Reintentar un PDF/informe que quedó sin sincronizar
-
-Si un informe quedó `pending` o `failed`, se resetea su estado y se corre el cron normal:
-
-```sql
-UPDATE documents_pacs_sync SET status = 'pending' WHERE document_id = <id>;
-```
-
-```bash
-php cron/cron_sync_pacs.php --retry
-```
+- Una subida fallida conserva el archivo en los `documents` de OpenEMR del paciente
+  (primero siempre se guarda localmente) y marca la fila `status = 'failed'` en
+  `form_imaging_report_images` con el error en `error_message`.
+- Para reintentar, volvé a abrir el formulario del informe (Ver → Editar mientras sea
+  borrador) y volvé a subir el archivo, o subilo de nuevo desde la zona de subida.
+- Los proveedores se resuelven desde la orden de estudio (`procedure_order.lab_id →
+  procedure_providers.ppid`); si el proveedor está mal configurado el portal cae al
+  primer proveedor activo y la falla queda registrada en el log.
 
 ---
 
@@ -366,7 +391,9 @@ Detalle de los archivos más relevantes:
 | `config.php` | Bootstrap de OpenEMR, constantes de integración, carga dinámica de datos institucionales desde `facility`, autoloading. |
 | `src/Auth.php` | Autenticación de pacientes (tabla `patient_access_onsite`), sesión con expiración, logout. |
 | `src/Laboratory.php` | Resultados de laboratorio agrupados por encuentro. |
-| `src/Imaging.php` | Imágenes: documentos de OpenEMR, informes, órdenes y estudios de Orthanc; visores OHIF/Stone. |
+| `src/Imaging.php` | Imágenes: documentos de OpenEMR, informes, órdenes y estudios de PACS multi-proveedor; visores OHIF/Stone. |
+| `src/PacsProvider.php` | Modelo de PACS/Orthanc por proveedor (campos, constructores de URL de visor/API/WADO, resolución por orden). |
+| `src/PacsService.php` | Cliente REST / DICOMweb de Orthanc para consultar y subir (consciente de proveedor). |
 | `src/PortalSSO.php` | Generación de tokens `onetime_auth` para el SSO al portal completo. |
 | `public/index.php` | Pantalla de login del paciente. |
 | `public/dashboard.php` | Panel principal (3 pestañas + buscadores). |
@@ -375,9 +402,9 @@ Detalle de los archivos más relevantes:
 | `public/goto_portal.php` | Redirección SSO a OpenEMR. |
 | `public/logout.php` | Cierre de sesión. |
 | `templates/header.php` / `templates/footer.php` | Layout común + modales PDF/imagen. |
-| `cron/cron_sync_pacs.php` | Sincronización de documentos de imágenes hacia Orthanc (CLI). |
-| `forms/imaging_report/` | Formulario clínico de informes de imágenes (crear, editar, ver, reporte, PDF). |
-| `sql/documents_pacs.sql` | Tabla `documents_pacs_sync`. |
+| `forms/imaging_report/` | Formulario clínico: crear/editar/ver + **subida directa multi-archivo a PACS** (`upload.php`, `imaging_upload_functions.php`) e informe PDF. |
+| `patch/sql/pacs-multiprovider.sql` | Agrega `remote_api` / `wado_url` a `procedure_providers`. |
+| `patch/sql/fase4-remove-pacs-sync.sql` | Elimina la tabla obsoleta `documents_pacs_sync` (flujo de cron removido). |
 | `patch/sql/images-procedures.sql` | Catálogo de imágenes (variante inglés). |
 | `patch/sql/images-procedures_es.sql` | Catálogo de imágenes (variante español). |
 | `patch/sql/procedure_order-imaging-context.sql` | Contexto orden + informe: `requesting_service`/`anatomical_region` en `procedure_order`, `procedure_order_id` en `form_imaging_report`. |
@@ -405,9 +432,8 @@ Detalle de los archivos más relevantes:
 | Problema | Causa posible / Solución |
 |----------|--------------------------|
 | No puedo ingresar al portal | Verificá usuario/contraseña, o que el paciente tenga `allow_patient_portal = 'YES'` en OpenEMR. |
-| El visor OHIF no abre un PDF encapsulado | Conocido: OHIF no renderiza PDF encapsulado; usar el visor **Stone** o descargar el **PDF del informe**. |
-| Un estudio no aparece en el portal | El informe puede estar en `borrador`, o la sincronización no terminó. Reintentá con el cron (`--retry`). |
-| El cron no corre | Verificá la tabla `documents_pacs_sync` y los permisos de escritura/lectura; revisá `/var/log/orthanc_sync.log`. |
+| Un estudio no aparece en el portal | El informe puede estar en `borrador`, o las imágenes no se subieron al guardar. Revisá `form_imaging_report_images` y volvé a subir desde el formulario del informe. |
+| Falla la subida de una imagen | Verificá la configuración del proveedor en `procedure_providers` (sección 4.3) y la conectividad/credenciales de Orthanc; el archivo queda igual en `documents`. |
 | Error de PDF / Dompdf no encontrado | Ejecutá `composer install` en el proyecto (dependencia `dompdf/dompdf`). |
 | Error 2020 de Orthanc al subir PDF con `Parent` | El payload con `Parent` no debe reenviar tags de paciente/estudio (producen el error "Trying to override a value inherited from a parent module"). El código ya maneja esto. |
 

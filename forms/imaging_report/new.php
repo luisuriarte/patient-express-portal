@@ -27,6 +27,7 @@ $encounter = EncounterSessionUtil::getEncounter();
 $authUser  = $session->get('authUser');
 
 require_once("$srcdir/api.inc.php");
+require_once(__DIR__ . '/imaging_upload_functions.php');
 
 formHeader(xl("Imaging Report"));
 $returnurl = 'encounter_top.php';
@@ -77,6 +78,9 @@ $selectedOrderId = (int)($_GET['procedure_order_id'] ?? 0);
 if ($selectedOrderId <= 0) {
     $selectedOrderId = (int)($obj['procedure_order_id'] ?? 0);
 }
+
+// Documentos de imágenes ya subidos para el informe (o la orden seleccionada)
+$uploadedImages = imaging_get_report_images($formId, $selectedOrderId);
 
 // Opciones de modalidad
 $modalidades = [
@@ -195,6 +199,18 @@ $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategor
         .imr-tree-toggle.imr-hidden-toggle { visibility: hidden; }
         .imr-tree-icon { color: #f59e0b; width: 16px; text-align: center; }
         .imr-tree-children.imr-hidden { display: none; }
+        /* ---- Zona de subida de imágenes ---- */
+        .upload-zone { border: 2px dashed #cbd5e1; border-radius: 12px; padding: 22px 16px; text-align: center; cursor: pointer; background: #f8fafc; transition: all 0.2s; position: relative; }
+        .upload-zone:hover, .upload-zone.upload-dragover { border-color: #3b82f6; background: #eff6ff; }
+        .upload-zone.upload-dragover { border-style: solid; }
+        .upload-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+        .upload-zone.upload-disabled { opacity: 0.55; cursor: not-allowed; }
+        .upload-zone.upload-disabled input[type="file"] { cursor: not-allowed; }
+        .upload-zone-icon { font-size: 26px; margin-bottom: 6px; }
+        .upload-zone-text { color: #334155; font-size: 14px; }
+        .upload-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px; border-bottom: 1px solid #f1f5f9; }
+        .upload-row:last-child { border-bottom: 0; }
+        .upload-progress-bar { height: 6px; border-radius: 999px; background: #e2e8f0; overflow: hidden; }
         .imr-selection-display { margin-top: 10px; padding: 8px 12px; border-radius: 8px; border: 1px dashed #cbd5e1; font-size: 13px; min-height: 38px; display: flex; align-items: center; color: #64748b; }
         .imr-selection-display.imr-has-selection { border-color: #3b82f6; background: #f0f7ff; color: #1e40af; font-weight: 500; }
     </style>
@@ -342,6 +358,49 @@ $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategor
                     <label class="form-label mt-2" for="report_date"><?= xlt('Report Date') ?></label>
                     <input type="text" name="report_date" id="report_date" class="form-control"
                            value="<?= attr(date('d/m/Y', strtotime($obj['report_date']))) ?>" readonly>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sección 1b: Documentos de imágenes (subida directa al PACS) -->
+        <div class="bg-white rounded-2xl border border-slate-200 p-6 mb-5 shadow-sm">
+            <div class="section-header"><?= xlt('🖼️ Imaging Documents (Direct PACS Upload)') ?></div>
+            <p class="text-sm text-slate-500 mb-3">
+                <?= xlt('Upload DICOM, images (JPG/PNG/WEBP) or the PDF of the study. Each file is saved to the patient chart and sent to the PACS of the selected order.') ?>
+            </p>
+
+            <?php if ($selectedOrderId <= 0): ?>
+                <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700" id="upload-no-order">
+                    <?= xlt('Select a Requesting Order above to enable uploads.') ?>
+                </div>
+            <?php else: ?>
+                <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700 hidden" id="upload-no-order">
+                    <?= xlt('Select a Requesting Order above to enable uploads.') ?>
+                </div>
+            <?php endif; ?>
+
+            <div class="upload-zone" id="uploadZone" data-enabled="<?= $selectedOrderId > 0 ? '1' : '0' ?>">
+                <input type="file" id="imagingDocInput" name="imaging_doc" multiple
+                       accept=".jpg,.jpeg,.png,.webp,.dcm,.dicom,.pdf">
+                <div class="upload-zone-icon">📁</div>
+                <div class="upload-zone-text">
+                    <strong><?= xlt('Drag & drop files here') ?></strong> <?= xlt('or click to browse') ?>
+                </div>
+                <small class="text-slate-400 d-block mt-2">DICOM · JPG · PNG · WEBP · PDF — <?= xlt('max 50 MB each') ?></small>
+            </div>
+
+            <div id="uploadProgress" class="mt-3 hidden"></div>
+
+            <div class="mt-4">
+                <h4 class="text-sm font-bold text-slate-700 mb-2"><?= xlt('Uploaded documents') ?> (<span id="uploadedCount"><?= count($uploadedImages) ?></span>)</h4>
+                <div class="border border-slate-200 rounded-lg divide-y divide-slate-100" id="uploadedList">
+                    <?php if (empty($uploadedImages)): ?>
+                        <div class="px-4 py-3 text-sm text-slate-400" id="uploadedEmpty"><?= xlt('No documents uploaded yet.') ?></div>
+                    <?php else: ?>
+                        <?php foreach ($uploadedImages as $img): ?>
+                            <?= imaging_render_uploaded_row($img) ?>
+                        <?php endforeach; ?>
                     <?php endif; ?>
                 </div>
             </div>
@@ -625,6 +684,148 @@ document.addEventListener('click', function (e) {
             if (node) { e.preventDefault(); node.click(); }
         }
     });
+})();
+
+// ============================================================
+// Subida directa de documentos de imágenes (multi-file al PACS)
+// ============================================================
+(function () {
+    const zone       = document.getElementById('uploadZone');
+    const fileInput  = document.getElementById('imagingDocInput');
+    const progressEl = document.getElementById('uploadProgress');
+    const listEl     = document.getElementById('uploadedList');
+    const countEl    = document.getElementById('uploadedCount');
+    const noOrderEl  = document.getElementById('upload-no-order');
+    const CSRF       = document.querySelector('input[name="csrf_token_form"]');
+    const formId     = <?= (int)$formId; ?>;
+    const webroot    = <?= json_encode($rootdir); ?>;
+
+    function isEnabled() {
+        const orderId = parseInt(document.getElementById('input_procedure_order_id').value, 10);
+        return orderId > 0;
+    }
+
+    function updateState() {
+        const enabled = isEnabled();
+        zone.classList.toggle('upload-disabled', !enabled);
+        if (noOrderEl) noOrderEl.classList.toggle('hidden', enabled);
+        return enabled;
+    }
+
+    function statusBadgeHtml(ok) {
+        if (ok) {
+            return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">' + <?= json_encode(xlt('Uploaded')) ?> + '</span>';
+        }
+        return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">' + <?= json_encode(xlt('Failed')) ?> + '</span>';
+    }
+
+    function makeRow(filename, modality, uid, ok, message) {
+        const rowEl = document.createElement('div');
+        rowEl.className = 'px-4 py-3 flex items-center justify-between gap-3';
+        const modal = modality || 'OT';
+        let uidHtml = uid ? '<span class="text-xs text-slate-400">' + uid + '</span>'
+                          : '<span class="text-xs text-slate-400">' + <?= json_encode(xlt('No study UID')) ?> + '</span>';
+        let noteHtml = message ? '<div class="text-xs text-red-600">' + message + '</div>' : '';
+        rowEl.innerHTML =
+            '<div class="min-w-0">' +
+                '<div class="text-sm font-medium text-slate-700 truncate">' + filename + '</div>' +
+                '<div class="flex items-center gap-2 mt-0.5"><span class="text-xs text-slate-400">' + modal + '</span>' + uidHtml + '</div>' +
+                noteHtml +
+            '</div>' +
+            '<div class="flex items-center gap-2 shrink-0">' + statusBadgeHtml(ok) + '</div>';
+        return rowEl;
+    }
+
+    function uploadFile(file) {
+        return new Promise(function (resolve) {
+            const fd = new FormData();
+            fd.append('csrf_token_form', CSRF ? CSRF.value : '');
+            fd.append('procedure_order_id', document.getElementById('input_procedure_order_id').value);
+            fd.append('modality', document.getElementById('modality').value);
+            fd.append('form_id', formId);
+            fd.append('imaging_doc', file);
+
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', webroot + '/forms/imaging_report/upload.php');
+            xhr.onload = function () {
+                try {
+                    const res = JSON.parse(xhr.responseText || '{}');
+                    resolve(res);
+                } catch (e) {
+                    resolve({ success: false, message: <?= json_encode(xlt('Invalid server response.')) ?> });
+                }
+            };
+            xhr.onerror = function () {
+                resolve({ success: false, message: <?= json_encode(xlt('Network error during upload.')) ?> });
+            };
+            xhr.send(fd);
+        });
+    }
+
+    async function handleFiles(fileList) {
+        if (!isEnabled()) { alert(<?= json_encode(xlt('Select a Requesting Order before uploading.')) ?>); return; }
+        const modality = document.getElementById('modality').value;
+        const files = Array.prototype.slice.call(fileList);
+        if (files.length === 0) return;
+
+        progressEl.classList.remove('hidden');
+        progressEl.innerHTML = '';
+
+        for (let i = 0; i < files.length; i++) {
+            const f = files[i];
+            const line = document.createElement('div');
+            line.className = 'upload-row';
+            line.innerHTML =
+                '<div class="min-w-0 flex-1">' +
+                    '<div class="text-sm font-medium text-slate-700 truncate">' + f.name + '</div>' +
+                    '<div class="upload-progress-bar mt-1"><div class="h-full bg-sky-500 animate-pulse" style="width:100%"></div></div>' +
+                '</div>';
+            progressEl.appendChild(line);
+
+            const res = await uploadFile(f);
+            line.remove();
+            const row = makeRow(f.name, res.modality_dicom || modality, res.study_uid || '', res.success, res.message || '');
+            if (!res.success) fetchUploadedCount();
+            listEl.insertBefore(row, listEl.firstChild);
+            if (listEl.firstChild.id === 'uploadedEmpty') listEl.firstChild.remove();
+        }
+        progressEl.classList.add('hidden');
+        fetchUploadedCount();
+    }
+
+    function fetchUploadedCount() {
+        const orderId = document.getElementById('input_procedure_order_id').value;
+        fetch(webroot + '/forms/imaging_report/upload.php?action=count&procedure_order_id=' + encodeURIComponent(orderId))
+            .then(function (r) { return r.json(); })
+            .then(function (res) { if (countEl && typeof res.count === 'number') countEl.textContent = res.count; })
+            .catch(function () {});
+    }
+
+    // Eventos de arrastre y selección de archivos
+    if (zone) {
+        zone.addEventListener('click', function () {
+            if (isEnabled()) fileInput.click();
+        });
+        zone.addEventListener('dragover', function (e) {
+            e.preventDefault();
+            if (isEnabled()) zone.classList.add('upload-dragover');
+        });
+        zone.addEventListener('dragleave', function () { zone.classList.remove('upload-dragover'); });
+        zone.addEventListener('drop', function (e) {
+            e.preventDefault();
+            zone.classList.remove('upload-dragover');
+            if (e.dataTransfer && e.dataTransfer.files) handleFiles(e.dataTransfer.files);
+        });
+        fileInput.addEventListener('change', function () {
+            handleFiles(fileInput.files);
+            fileInput.value = '';
+        });
+        updateState();
+    }
+
+    // Actualizar estado cuando cambia la orden seleccionada
+    const orderSelect = document.getElementById('procedure_order_select');
+    if (orderSelect) orderSelect.addEventListener('change', updateState);
 })();
 </script>
 </body>

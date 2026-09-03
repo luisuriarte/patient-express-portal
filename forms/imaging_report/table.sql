@@ -87,3 +87,34 @@ INSERT IGNORE INTO `list_options` (`list_id`, `option_id`, `title`, `seq`, `is_d
 ('imaging_report_anatomy', 'knee',                 'Knee',                             52, 0, 0, '', 'Femorotibial joint and patella', 'SNOMED-CT:72696002'),
 ('imaging_report_anatomy', 'leg_tibia_fibula',     'Leg (Tibia and Fibula)',           53, 0, 0, '', 'Tibia and fibula', 'SNOMED-CT:30254006'),
 ('imaging_report_anatomy', 'ankle_foot',           'Ankle / Foot',                     54, 0, 0, '', 'Tarsals, metatarsals and phalanges', 'SNOMED-CT:56459004');
+
+-- ============================================================
+-- Uploaded imaging documents linked to a report / order
+-- Each row = one file (DICOM, image or PDF) associated with a
+-- radiology report (form_imaging_report) and its originating
+-- procedure order. Holds the Orthanc/PACS linkage (study UID and
+-- internal ids) so the portal and OHIF can open the study.
+-- ============================================================
+CREATE TABLE IF NOT EXISTS `form_imaging_report_images` (
+  `id`                 BIGINT(20)   NOT NULL AUTO_INCREMENT,
+  `form_id`            BIGINT(20)   DEFAULT NULL COMMENT 'form_imaging_report.id (null if the report has not been saved yet)',
+  `procedure_order_id` BIGINT(20)   DEFAULT NULL COMMENT 'Originating procedure_order.procedure_order_id',
+  `pid`                BIGINT(20)   DEFAULT NULL COMMENT 'patient pid',
+  `encounter_id`       BIGINT(20)   DEFAULT NULL COMMENT 'encounter id',
+  `document_id`        BIGINT(20)   DEFAULT NULL COMMENT 'documents.id',
+  `provider_id`        BIGINT(20)   DEFAULT NULL COMMENT 'procedure_providers.ppid (PACS provider)',
+  `study_instance_uid` VARCHAR(128) DEFAULT NULL COMMENT 'DICOM StudyInstanceUID',
+  `pacs_instance_id`  VARCHAR(128) DEFAULT NULL COMMENT 'PACS instance id (e.g. Orthanc instance UUID)',
+  `pacs_series_id`    VARCHAR(128) DEFAULT NULL COMMENT 'PACS series id',
+  `pacs_study_id`     VARCHAR(128) DEFAULT NULL COMMENT 'PACS internal study id',
+  `modality`           VARCHAR(31)  DEFAULT NULL,
+  `filename`           VARCHAR(255) DEFAULT NULL,
+  `status`             ENUM('uploaded','failed') DEFAULT 'uploaded',
+  `error_message`      TEXT,
+  `created_at`         DATETIME     DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  KEY `idx_form`  (`form_id`),
+  KEY `idx_order` (`procedure_order_id`),
+  KEY `idx_pid`   (`pid`),
+  KEY `idx_doc`   (`document_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

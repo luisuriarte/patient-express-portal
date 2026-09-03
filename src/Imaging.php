@@ -14,13 +14,77 @@ class Imaging
     private string $ohifBaseUrl;
     private string $orthancWadoUrl;
 
+    /**
+     * Proveedores de PACS configurados (procedure_providers activos).
+     * Cada estudio consultado lleva su propio provider_id, y los visores
+     * (OHIF / Stone) se construyen contra el proveedor correcto.
+     *
+     * @var PacsProvider[]
+     */
+    private array $providers = [];
+
+    /**
+     * Mapa study_uid (StudyInstanceUID) -> PacsProvider, para resolver el
+     * visor correcto de cada estudio sin repetir consultas REST.
+     *
+     * @var array<string, PacsProvider>
+     */
+    private array $providerByStudyUid = [];
+
     public function __construct()
     {
-        $this->orthancUrl = defined('ORTHANC_URL') ? ORTHANC_URL : 'http://127.0.0.1:8042';
-        $this->orthancUser = defined('ORTHANC_USER') ? ORTHANC_USER : 'orthanc';
-        $this->orthancPass = defined('ORTHANC_PASS') ? ORTHANC_PASS : 'orthanc';
-        $this->ohifBaseUrl = defined('OHIF_VIEWER_BASE_URL') ? OHIF_VIEWER_BASE_URL : 'https://imagenes.origen.ar/viewer';
-        $this->orthancWadoUrl = defined('ORTHANC_WADO_URL') ? ORTHANC_WADO_URL : 'https://pacs.origen.ar/dicom-web';
+        $this->loadProviders();
+
+        $def = $this->firstProvider();
+
+        $this->orthancUrl = $def ? $def->apiUrl() : (defined('ORTHANC_URL') ? ORTHANC_URL : 'http://127.0.0.1:8042');
+        $this->orthancUser = $def ? $def->user : (defined('ORTHANC_USER') ? ORTHANC_USER : 'orthanc');
+        $this->orthancPass = $def ? $def->pass : (defined('ORTHANC_PASS') ? ORTHANC_PASS : 'orthanc');
+        $this->ohifBaseUrl = $def ? $def->ohifBaseUrl() : (defined('OHIF_VIEWER_BASE_URL') ? OHIF_VIEWER_BASE_URL : 'https://imagenes.origen.ar/viewer');
+        $this->orthancWadoUrl = $def ? $def->wadoBaseUrl() : (defined('ORTHANC_WADO_URL') ? ORTHANC_WADO_URL : 'https://pacs.origen.ar/dicom-web');
+    }
+
+    /**
+     * Carga los proveedores de PACS activos desde procedure_providers.
+     * Se consideran proveedores "consultables" los que tienen remote_api
+     * (REST de Orthanc). Los demás (solo visor) se ignoran para query pero
+     * quedan registrados para resolver visores si se enlazan por orden.
+     */
+    private function loadProviders(): void
+    {
+        $this->providers = [];
+        try {
+            $res = sqlStatement("SELECT * FROM procedure_providers WHERE active = 1 ORDER BY ppid ASC");
+            while ($row = sqlFetchArray($res)) {
+                $this->providers[] = new PacsProvider($row);
+            }
+        } catch (\Throwable $e) {
+            $this->providers = [];
+        }
+    }
+
+    /**
+     * Devuelve el primer proveedor configurado, o null.
+     */
+    private function firstProvider(): ?PacsProvider
+    {
+        return $this->providers[0] ?? null;
+    }
+
+    /**
+     * Resuelve el proveedor PACS de una orden usando el lab_id ya cargado
+     * (si es > 0) o consultando procedure_order.lab_id.
+     */
+    private function resolveOrderProvider(int $procedureOrderId, int $labId = 0): PacsProvider
+    {
+        if ($labId > 0) {
+            foreach ($this->providers as $p) {
+                if ($p->ppid === $labId) {
+                    return $p;
+                }
+            }
+        }
+        return PacsProvider::resolveForOrder($procedureOrderId);
     }
 
     /**
@@ -67,13 +131,18 @@ class Imaging
                             c.id AS category_id,
                             c.name AS category_name,
                             cp.name AS parent_category_name,
-                            dps.study_instance_uid AS pacs_study_uid,
-                            dps.status AS pacs_status
+                            fir.study_instance_uid AS pacs_study_uid,
+                            fir.status AS pacs_status,
+                            fir.pacs_instance_id,
+                            fir.pacs_series_id,
+                            fir.pacs_study_id,
+                            fir.provider_id AS pacs_provider_id,
+                            fir.modality AS pacs_modality
                         FROM documents d
                         INNER JOIN categories_to_documents ctd ON d.id = ctd.document_id
                         INNER JOIN categories c ON ctd.category_id = c.id
                         LEFT JOIN categories cp ON c.parent = cp.id
-                        LEFT JOIN documents_pacs_sync dps ON d.id = dps.document_id
+                        LEFT JOIN form_imaging_report_images fir ON d.id = fir.document_id
                         LEFT JOIN form_encounter fe ON fe.pid = d.foreign_id AND fe.encounter = d.encounter_id
                         LEFT JOIN users up ON up.id = fe.provider_id
                         WHERE d.foreign_id = ? 
@@ -106,7 +175,7 @@ class Imaging
                     $urlLower = strtolower((string)$dRow['url']);
                     $nameLower = strtolower($docName);
 
-                    $hasPacsSync = !empty($dRow['pacs_study_uid']) && ($dRow['pacs_status'] === 'synced');
+                    $hasPacsSync = !empty($dRow['pacs_study_uid']) && ($dRow['pacs_status'] === 'uploaded');
                     $pacsStudyUid = $dRow['pacs_study_uid'] ?? null;
 
                     $isDicom = ($mime === 'application/dicom') 
@@ -159,6 +228,7 @@ class Imaging
                                     'encounter_date' => $encDateDisplay,
                                     'enc_provider_name' => $encProviderName,
                                     'category_id'    => (int)($dRow['category_id'] ?? 0),
+                                    'provider_ppid'  => (int)($dRow['pacs_provider_id'] ?? 0),
                                     'date_raw'       => $docDate,
                                     'formatted_date' => $formattedDate,
                                     'report_doc_id'  => null,
@@ -166,6 +236,9 @@ class Imaging
                                 ];
                             }
                             $groupedStudies[$pacsStudyUid]['doc_ids'][] = (int)$dRow['doc_id'];
+                            if ((int)($dRow['pacs_provider_id'] ?? 0) > 0) {
+                                $groupedStudies[$pacsStudyUid]['provider_ppid'] = (int)$dRow['pacs_provider_id'];
+                            }
                             if ((int)($dRow['encounter_id'] ?? 0) > 0) {
                                 $groupedStudies[$pacsStudyUid]['encounter_id'] = (int)$dRow['encounter_id'];
                                 if ($encDateDisplay !== '') {
@@ -194,6 +267,9 @@ class Imaging
                         $studyUid = $pacsStudyUid ?: basename((string)$dRow['url'], '.dcm');
                         $registeredStudyUids[] = $studyUid;
 
+                        $docProvider = $this->providerForStudy($studyUid);
+                        $this->providerByStudyUid[$studyUid] = $docProvider;
+
                         $studies[] = [
                             'id'                => 'doc_' . $dRow['doc_id'],
                             'report_id'         => null,
@@ -206,6 +282,8 @@ class Imaging
                             'encounter_id'      => $encId,
                             'encounter_date'    => $encDateDisplay,
                             'provider_name'     => $encProviderName ?: xl('Diagnostic Imaging Service'),
+                            'provider_id'       => $docProvider->ppid ?: null,
+                            'pacs_provider'     => $docProvider->name ?: xl('Diagnostic Imaging Service'),
                             'provider_spec'     => $categoryLabel,
                             'status'            => xl('DICOM Study Ready'),
                             'has_report'        => false,
@@ -213,9 +291,9 @@ class Imaging
                             'study_uid'         => $studyUid,
                             'format_type'       => $isImage ? 'image' : ($isDicom ? 'dicom' : 'pdf'),
                             'viewer_type'       => $isImage ? 'inline_image' : 'ohif',
-                            'viewer_url'        => $isImage ? $viewUrl : $this->buildOhifViewerUrl($studyUid),
-                            'ohif_url'          => $this->buildOhifViewerUrl($studyUid),
-                            'stone_url'         => $this->buildStoneViewerUrl($studyUid),
+                            'viewer_url'        => $isImage ? $viewUrl : $this->buildOhifViewerUrl($studyUid, $docProvider),
+                            'ohif_url'          => $this->buildOhifViewerUrl($studyUid, $docProvider),
+                            'stone_url'         => $this->buildStoneViewerUrl($studyUid, $docProvider),
                             'has_ohif'          => true,
                             'direct_view_url'   => $viewUrl,
                             'download_url'      => $downloadUrl,
@@ -297,6 +375,11 @@ class Imaging
                 if ($report && !empty($report['requesting_physician'])) {
                     $providerName = $report['requesting_physician'];
                 }
+                $docProvider = $this->providerForStudy((string)$uid);
+                if ((int)($group['provider_ppid'] ?? 0) > 0) {
+                    $docProvider = $this->providerForPpid((int)$group['provider_ppid']) ?: $docProvider;
+                }
+                $this->providerByStudyUid[$uid] = $docProvider;
                 $studies[] = [
                     'id'                => 'study_' . $group['first_doc_id'],
                     'report_id'         => null,
@@ -310,6 +393,8 @@ class Imaging
                     'encounter_id'      => (int)($group['encounter_id'] ?? 0),
                     'encounter_date'    => $group['encounter_date'] ?? '',
                     'provider_name'     => $providerName,
+                    'provider_id'       => $docProvider->ppid ?: null,
+                    'pacs_provider'     => $docProvider->name ?: xl('Diagnostic Imaging Service'),
                     'provider_spec'     => $group['category_label'],
                     'status'            => xl('Synchronized in Orthanc PACS'),
                     'has_report'        => $hasReportPdf,
@@ -319,9 +404,9 @@ class Imaging
                     'study_uid'         => $uid,
                     'format_type'       => 'dicom',
                     'viewer_type'       => 'ohif',
-                    'viewer_url'        => $this->buildOhifViewerUrl($uid),
-                    'ohif_url'          => $this->buildOhifViewerUrl($uid),
-                    'stone_url'         => $this->buildStoneViewerUrl($uid),
+                    'viewer_url'        => $this->buildOhifViewerUrl($uid, $docProvider),
+                    'ohif_url'          => $this->buildOhifViewerUrl($uid, $docProvider),
+                    'stone_url'         => $this->buildStoneViewerUrl($uid, $docProvider),
                     'has_ohif'          => true,
                     'direct_view_url'   => null,
                     'download_url'      => null,
@@ -353,6 +438,7 @@ class Imaging
                         pr.specimen_num AS accession_number,
                         po.date_ordered,
                         po.patient_instructions,
+                        po.lab_id AS order_provider_id,
                         poc.procedure_name,
                         poc.procedure_code,
                         u.fname AS provider_fname,
@@ -411,6 +497,10 @@ class Imaging
                 $effectiveUid = $studyUid ?: ('1.2.840.113619.2.55.' . $row['procedure_order_id'] . '.' . $pid);
                 $registeredStudyUids[] = $effectiveUid;
 
+                // Resolver el proveedor PACS de la orden (procedure_order.lab_id).
+                $orderProvider = $this->resolveOrderProvider((int)$row['procedure_order_id'], (int)($row['order_provider_id'] ?? 0));
+                $this->providerByStudyUid[$effectiveUid] = $orderProvider;
+
                 $studies[] = [
                     'id'                => 'po_' . ($row['procedure_report_id'] ?: $row['procedure_order_id']),
                     'report_id'         => $row['procedure_report_id'] ? (int)$row['procedure_report_id'] : null,
@@ -420,6 +510,8 @@ class Imaging
                     'date_study'        => $row['date_report'] ? date('d/m/Y H:i', strtotime($row['date_report'])) : ($row['date_ordered'] ? date('d/m/Y', strtotime($row['date_ordered'])) : xl('No date')),
                     'date_raw'          => $row['date_report'] ?? $row['date_ordered'],
                     'provider_name'     => $providerName,
+                    'provider_id'       => $orderProvider->ppid ?: null,
+                    'pacs_provider'     => $orderProvider->name ?: xl('Diagnostic Imaging Service'),
                     'provider_spec'     => $row['provider_specialty'] ?? xl('Diagnostic Imaging'),
                     'status'            => !empty($row['procedure_report_id']) ? xl('Report Available') : xl('In Progress / Pending'),
                     'has_report'        => !empty($row['procedure_report_id']),
@@ -427,9 +519,9 @@ class Imaging
                     'study_uid'         => $effectiveUid,
                     'format_type'       => 'dicom', // DICOM -> Visor OHIF
                     'viewer_type'       => 'ohif',
-                    'viewer_url'        => $this->buildOhifViewerUrl($effectiveUid),
-                    'ohif_url'          => $this->buildOhifViewerUrl($effectiveUid),
-                    'stone_url'         => $this->buildStoneViewerUrl($effectiveUid),
+                    'viewer_url'        => $this->buildOhifViewerUrl($effectiveUid, $orderProvider),
+                    'ohif_url'          => $this->buildOhifViewerUrl($effectiveUid, $orderProvider),
+                    'stone_url'         => $this->buildStoneViewerUrl($effectiveUid, $orderProvider),
                     'direct_view_url'   => null,
                     'download_url'      => null,
                     'source'            => 'openemr_order'
@@ -515,6 +607,98 @@ class Imaging
     public function fetchOrthancStudies(string $patientId, ?string $dni = null): array
     {
         $results = [];
+        $seen = [];
+
+        // Proveedores consultables (con REST de Orthanc). Si no hay ninguno
+        // configurado, se usa el fallback global (constantes ORTHANC_*).
+        $queryable = array_values(array_filter($this->providers, function (PacsProvider $p) {
+            return $p->remoteApi !== '';
+        }));
+        if (empty($queryable)) {
+            $queryable = [null];
+        }
+
+        foreach ($queryable as $provider) {
+            try {
+                if ($provider === null) {
+                    // Fallback: config global única (comportamiento previo).
+                    $orthancStudies = $this->fetchOrthancStudiesLegacy($patientId, $dni);
+                } else {
+                    $orthancStudies = PacsService::findStudies($provider, $patientId, $dni);
+                }
+            } catch (\Throwable $e) {
+                error_log(xl('Warning: Could not query PACS provider') . " ({$e->getMessage()})");
+                continue;
+            }
+
+            foreach ($orthancStudies as $s) {
+                $studyUid = (string)($s['study_uid'] ?? '');
+                if ($studyUid === '') {
+                    continue;
+                }
+                // Evitar duplicados: si dos proveedores tienen el mismo estudio, gana el primero.
+                if (isset($seen[$studyUid])) {
+                    continue;
+                }
+                $seen[$studyUid] = true;
+                $this->providerByStudyUid[$studyUid] = $provider ?? $this->firstProvider() ??
+                    $this->legacyProvider();
+
+                $studyDate = (string)($s['study_date'] ?? '');
+                $formattedDate = xl('No date');
+                if (strlen($studyDate) === 8) {
+                    $formattedDate = substr($studyDate, 6, 2) . '/' . substr($studyDate, 4, 2) . '/' . substr($studyDate, 0, 4);
+                }
+
+                $desc = (string)($s['description'] ?? '');
+                $title = $desc !== '' ? $desc : xl('Orthanc PACS Study');
+                $modality = (string)($s['modality'] ?? 'OT');
+                $accession = (string)($s['accession'] ?? '');
+                if ($accession === '') {
+                    $accession = 'PACS-' . substr($studyUid, -6);
+                }
+
+                $providerName = $provider ? $provider->name : xl('Diagnostic Imaging Service');
+                $providerPpid = $provider ? $provider->ppid : null;
+
+                $results[] = [
+                    'id'               => 'orthanc_' . (string)($s['study_id'] ?? $studyUid),
+                    'report_id'        => null,
+                    'order_id'         => 0,
+                    'title'            => $title,
+                    'modality'         => $modality,
+                    'date_study'       => $formattedDate,
+                    'date_raw'         => $studyDate,
+                    'provider_name'    => $providerName,
+                    'provider_id'      => $providerPpid,
+                    'pacs_provider'    => $providerName,
+                    'provider_spec'    => xl('Diagnostic Imaging'),
+                    'status'           => xl('Images on PACS Server'),
+                    'has_report'       => false,
+                    'accession_number' => $accession,
+                    'study_uid'        => $studyUid,
+                    'format_type'      => 'dicom',
+                    'viewer_type'      => 'ohif',
+                    'viewer_url'       => $this->buildOhifViewerUrl($studyUid, $provider),
+                    'ohif_url'         => $this->buildOhifViewerUrl($studyUid, $provider),
+                    'stone_url'        => $this->buildStoneViewerUrl($studyUid, $provider),
+                    'direct_view_url'  => null,
+                    'download_url'     => null,
+                    'source'           => 'orthanc'
+                ];
+            }
+        }
+
+        return $results;
+    }
+
+    /**
+     * Fallback: consulta REST a una única Orthanc global (constantes ORTHANC_*),
+     * para preservar el comportamiento previo cuando no hay proveedores en BD.
+     */
+    private function fetchOrthancStudiesLegacy(string $patientId, ?string $dni = null): array
+    {
+        $results = [];
         $idsToSearch = array_unique(array_filter([
             $patientId,
             $dni,
@@ -530,9 +714,7 @@ class Imaging
                 $url = rtrim($this->orthancUrl, '/') . '/tools/find';
                 $payload = json_encode([
                     'Level' => 'Study',
-                    'Query' => [
-                        'PatientID' => (string)$idVal
-                    ],
+                    'Query' => ['PatientID' => (string)$idVal],
                     'Expand' => true
                 ]);
 
@@ -581,11 +763,11 @@ class Imaging
                                 'has_report'       => false,
                                 'accession_number' => $accession,
                                 'study_uid'        => $studyUid,
-                                'format_type'      => 'dicom', // DICOM -> Visor OHIF
+                                'format_type'      => 'dicom',
                                 'viewer_type'      => 'ohif',
-                                'viewer_url'       => $this->buildOhifViewerUrl($studyUid),
-                                'ohif_url'         => $this->buildOhifViewerUrl($studyUid),
-                                'stone_url'        => $this->buildStoneViewerUrl($studyUid),
+                                'viewer_url'       => $this->buildOhifViewerUrl($studyUid, null),
+                                'ohif_url'         => $this->buildOhifViewerUrl($studyUid, null),
+                                'stone_url'        => $this->buildStoneViewerUrl($studyUid, null),
                                 'direct_view_url'  => null,
                                 'download_url'     => null,
                                 'source'           => 'orthanc'
@@ -594,12 +776,26 @@ class Imaging
                     }
                 }
             } catch (\Throwable $e) {
-                // Registrar aviso silencioso
                 error_log(xl('Warning: Could not query Orthanc PACS') . " ({$e->getMessage()})");
             }
         }
 
         return $results;
+    }
+
+    /**
+     * Proveedor fallback construido desde las constantes globales, para resolver
+     * visores cuando no hay proveedores en BD.
+     */
+    private function legacyProvider(): PacsProvider
+    {
+        $p = new PacsProvider();
+        $p->remoteApi = $this->orthancUrl;
+        $p->user = $this->orthancUser;
+        $p->pass = $this->orthancPass;
+        $p->remoteHost = $this->ohifBaseUrl;
+        $p->wadoUrl = $this->orthancWadoUrl;
+        return $p;
     }
 
     /**
@@ -755,6 +951,7 @@ class Imaging
                     pr.specimen_num AS accession_number,
                     po.date_ordered,
                     po.patient_instructions,
+                    po.lab_id AS order_provider_id,
                     poc.procedure_name,
                     poc.procedure_code,
                     u.fname AS provider_fname,
@@ -794,6 +991,10 @@ class Imaging
         $accession = !empty($row['accession_number']) ? $row['accession_number'] : 'ACC-' . $row['procedure_order_id'];
         $studyUid = $this->extractStudyUidFromNotes($row['report_notes'] ?? '') ?: ('1.2.840.113619.2.55.' . $row['procedure_order_id'] . '.' . $pid);
 
+        // Resolver el proveedor PACS de la orden del informe.
+        $reportProvider = $this->resolveOrderProvider((int)$row['procedure_order_id'], (int)($row['order_provider_id'] ?? 0));
+        $this->providerByStudyUid[$studyUid] = $reportProvider;
+
         $parsedNotes = $this->parseReportNotes($row['report_notes'] ?? '');
 
         return [
@@ -803,7 +1004,9 @@ class Imaging
             'modality'           => $modality,
             'accession_number'   => $accession,
             'study_uid'          => $studyUid,
-            'viewer_url'         => $this->buildOhifViewerUrl($studyUid),
+            'provider_id'        => $reportProvider->ppid ?: null,
+            'pacs_provider'      => $reportProvider->name ?: xl('Diagnostic Imaging Service'),
+            'viewer_url'         => $this->buildOhifViewerUrl($studyUid, $reportProvider),
             'date_report'        => $row['date_report'] ? date('d/m/Y H:i', strtotime($row['date_report'])) : 'N/A',
             'date_ordered'       => $row['date_ordered'] ? date('d/m/Y', strtotime($row['date_ordered'])) : 'N/A',
             'report_status'      => xl('Official Approved Report'),
@@ -833,35 +1036,71 @@ class Imaging
     /**
      * Construye la URL exacta hacia el visor DICOM OHIF:
      * Si se pasa un Orthanc UUID interno (con guiones), lo resuelve al StudyInstanceUID real de DICOM.
+     * El visor se resuelve por proveedor (o el que corresponda al estudio).
      */
-    public function buildOhifViewerUrl(string $studyUid): string
+    public function buildOhifViewerUrl(string $studyUid, ?PacsProvider $provider = null): string
     {
-        $realStudyUid = $this->resolveRealStudyInstanceUid($studyUid);
+        $provider = $provider ?: $this->providerForStudy($studyUid);
+        $realStudyUid = $this->resolveRealStudyInstanceUid($studyUid, $provider);
 
         // OHIF v3 en la ruta /viewer usa el dataSource "dicomweb" ya configurado
         // en app-config.js (defaultDataSourceName). No acepta un endpoint WADO-RS
         // arbitrario vía ?url= en esta ruta — eso solo aplica a /viewer/dicomjson.
-        return rtrim($this->ohifBaseUrl, '/') . '?StudyInstanceUIDs=' . urlencode($realStudyUid);
+        return $provider->ohifBaseUrl() . '?StudyInstanceUIDs=' . urlencode($realStudyUid);
     }
 
     /**
-     * Construye la URL directa hacia el visor nativo de Orthanc (Stone WebViewer)
+     * Construye la URL directa hacia el visor nativo de Orthanc (Stone WebViewer),
+     * resolviendo el host WADO por proveedor.
      */
-    public function buildStoneViewerUrl(string $studyUid): string
+    public function buildStoneViewerUrl(string $studyUid, ?PacsProvider $provider = null): string
     {
-        $realStudyUid = $this->resolveRealStudyInstanceUid($studyUid);
-        $pacsHost = parse_url($this->orthancWadoUrl, PHP_URL_HOST) ?: 'pacs.origen.ar';
-        $pacsScheme = parse_url($this->orthancWadoUrl, PHP_URL_SCHEME) ?: 'https';
+        $provider = $provider ?: $this->providerForStudy($studyUid);
+        $realStudyUid = $this->resolveRealStudyInstanceUid($studyUid, $provider);
+        $pacsHost = parse_url($provider->wadoBaseUrl(), PHP_URL_HOST) ?: 'pacs.origen.ar';
+        $pacsScheme = parse_url($provider->wadoBaseUrl(), PHP_URL_SCHEME) ?: 'https';
         return "{$pacsScheme}://{$pacsHost}/stone-webviewer/index.html?study=" . urlencode($realStudyUid);
     }
 
     /**
-     * Resuelve un UUID interno de Orthanc a su StudyInstanceUID real de DICOM
+     * Devuelve el proveedor al que pertenece un estudio (StudyInstanceUID),
+     * o el primero / fallback si no está registrado.
      */
-    public function resolveRealStudyInstanceUid(string $uid): string
+    private function providerForStudy(string $studyUid): PacsProvider
+    {
+        $studyUid = trim($studyUid);
+        if ($studyUid !== '' && isset($this->providerByStudyUid[$studyUid])) {
+            return $this->providerByStudyUid[$studyUid];
+        }
+        return $this->firstProvider() ?? $this->legacyProvider();
+    }
+
+    /**
+     * Resuelve un proveedor PACS por su ppid (procedure_providers.ppid),
+     * o null si no se encuentra entre los proveedores activos.
+     */
+    private function providerForPpid(int $ppid): ?PacsProvider
+    {
+        if ($ppid <= 0) {
+            return null;
+        }
+        foreach ($this->providers as $p) {
+            if ($p->ppid === $ppid) {
+                return $p;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Resuelve un UUID interno de Orthanc a su StudyInstanceUID real de DICOM,
+     * consultando el proveedor correcto.
+     */
+    public function resolveRealStudyInstanceUid(string $uid, ?PacsProvider $provider = null): string
     {
         $uid = trim($uid);
-        
+        $provider = $provider ?: $this->providerForStudy($uid);
+
         // Si ya es un StudyInstanceUID numérico con puntos (ej: 2.16.840...), usarlo directo
         if (preg_match('/^[0-9]+(\.[0-9]+)+$/', $uid)) {
             return $uid;
@@ -869,9 +1108,9 @@ class Imaging
 
         // Si tiene formato de UUID de Orthanc con guiones (ej: a2a05afc-3208-4995-a86a-7972256fbad6)
         if (str_contains($uid, '-')) {
-            // 1. Intentar consultar en documents_pacs_sync si ya está registrado
-            $sqlDps = "SELECT study_instance_uid FROM documents_pacs_sync 
-                       WHERE (orthanc_study_id = ? OR orthanc_instance_id = ?) 
+            // 1. Intentar consultar en form_imaging_report_images si ya está registrado
+            $sqlDps = "SELECT study_instance_uid FROM form_imaging_report_images 
+                       WHERE (pacs_study_id = ? OR pacs_instance_id = ?) 
                          AND study_instance_uid REGEXP '^[0-9]+\\.[0-9]+'
                        LIMIT 1";
             $rowDps = sqlQuery($sqlDps, [$uid, $uid]);
@@ -879,7 +1118,13 @@ class Imaging
                 return $rowDps['study_instance_uid'];
             }
 
-            // 2. Consultar directamente a la API REST de Orthanc
+            // 2. Consultar directamente a la API REST del proveedor
+            $realUid = PacsService::fetchStudyUid($provider, $uid);
+            if ($realUid !== null && $realUid !== '') {
+                return $realUid;
+            }
+
+            // 3. Fallback: consultar a la config global única (compatibilidad)
             try {
                 $ch = curl_init(rtrim($this->orthancUrl, '/') . '/studies/' . $uid);
                 curl_setopt_array($ch, [
