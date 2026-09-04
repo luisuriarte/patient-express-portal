@@ -725,7 +725,7 @@ class Imaging
                     CURLOPT_RETURNTRANSFER => true,
                     CURLOPT_HTTPHEADER     => ['Content-Type: application/json'],
                     CURLOPT_USERPWD        => "{$this->orthancUser}:{$this->orthancPass}",
-                    CURLOPT_TIMEOUT        => ORTHANC_TIMEOUT,
+                    CURLOPT_TIMEOUT        => defined('ORTHANC_TIMEOUT') ? ORTHANC_TIMEOUT : 4,
                     CURLOPT_CONNECTTIMEOUT => 2
                 ]);
 
@@ -1130,7 +1130,7 @@ class Imaging
                 curl_setopt_array($ch, [
                     CURLOPT_RETURNTRANSFER => true,
                     CURLOPT_USERPWD        => "{$this->orthancUser}:{$this->orthancPass}",
-                    CURLOPT_TIMEOUT        => ORTHANC_TIMEOUT,
+                    CURLOPT_TIMEOUT        => defined('ORTHANC_TIMEOUT') ? ORTHANC_TIMEOUT : 4,
                     CURLOPT_CONNECTTIMEOUT => 2
                 ]);
                 $res = curl_exec($ch);

@@ -447,27 +447,27 @@ function img_norm_texto(?string $t): string
     <!-- ================================================================= -->
     <?php if (!empty($fields['technique'])): ?>
         <div class="section-title"><?= xl('Technique / Methodology (Sequences)') ?></div>
-        <div class="report-text"><?= htmlspecialchars(img_norm_texto($fields['technique'])) ?></div>
+        <div class="report-text"><?= htmlspecialchars(img_norm_texto(xl($fields['technique']))) ?></div>
     <?php endif; ?>
 
     <!-- ================================================================= -->
     <!-- INTERPRETATION / FINDINGS                                           -->
     <!-- ================================================================= -->
     <div class="section-title"><?= xl('Interpretation / Descriptive Findings') ?></div>
-    <div class="report-text"><?= htmlspecialchars(img_norm_texto($fields['interpretation'] ?? '—')) ?></div>
+    <div class="report-text"><?= htmlspecialchars(img_norm_texto(xl($fields['interpretation'] ?? '—'))) ?></div>
 
     <!-- ================================================================= -->
     <!-- CONCLUSION / DIAGNOSTIC IMPRESSION                                  -->
     <!-- ================================================================= -->
     <div class="section-title"><?= xl('Conclusion / Diagnostic Impression') ?></div>
-    <div class="report-text report-text-conclusion"><?= htmlspecialchars(img_norm_texto($fields['conclusion'] ?? '—')) ?></div>
+    <div class="report-text report-text-conclusion"><?= htmlspecialchars(img_norm_texto(xl($fields['conclusion'] ?? '—'))) ?></div>
 
     <!-- ================================================================= -->
     <!-- OBSERVATIONS                                                        -->
     <!-- ================================================================= -->
     <?php if (!empty($fields['observations'])): ?>
         <div class="section-title"><?= xl('Observations and Suggestions') ?></div>
-        <div class="report-text"><?= htmlspecialchars(img_norm_texto($fields['observations'])) ?></div>
+        <div class="report-text"><?= htmlspecialchars(img_norm_texto(xl($fields['observations']))) ?></div>
     <?php endif; ?>
 
     <!-- ================================================================= -->

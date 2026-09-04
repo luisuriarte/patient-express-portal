@@ -8,90 +8,90 @@
 const IMAGING_TEMPLATES = {
 
     RX: {
-        metodologia: "Se realizaron proyecciones estándar según la región solicitada con equipo de radiografía digital directa (DDR). Dosis optimizada según protocolo ALARA.",
-        interpretacion: `HALLAZGOS:
-- Trama ósea de densidad y arquitectura conservadas.
-- Espacios articulares de amplitud normal.
-- Partes blandas sin signos de alteración.
-- Sin evidencia de lesiones líticas, esclerosis patológica ni fracturas.
-- Alineación esquelética conservada.
-- Sin calcificaciones anómalas en el plano de la imagen.`,
-        conclusion: "Estudio radiológico dentro de límites normales para la edad y sexo del paciente. No se observan hallazgos patológicos significativos.",
-        observaciones: "Se sugiere correlación clínica. Ante persistencia de síntomas, considerar estudios complementarios."
+        metodologia: "Standard projections were obtained according to the requested region using a direct digital radiography (DDR) system. Dose optimized according to the ALARA protocol.",
+        interpretacion: `FINDINGS:
+- Normal bone density and architecture.
+- Joint spaces of normal width.
+- Soft tissues without signs of alteration.
+- No evidence of lytic lesions, pathological sclerosis or fractures.
+- Preserved skeletal alignment.
+- No abnormal calcifications in the plane of the image.`,
+        conclusion: "Radiological study within normal limits for the patient's age and sex. No significant pathological findings are observed.",
+        observaciones: "Clinical correlation is suggested. If symptoms persist, consider additional workup studies."
     },
 
     TC: {
-        metodologia: "Tomografía computada multicorte (TCMC) con adquisición helicoidal. Cortes axiales de 1-2mm de grosor con reformateos multiplanares (MPR) en planos coronal y sagital. Técnica sin/con administración de contraste yodado endovenoso según indicación clínica.",
-        interpretacion: `HALLAZGOS:
-- Estructuras óseas de densidad y morfología normales.
-- Partes blandas adyacentes sin alteraciones significativas.
-- Sin evidencia de colecciones, hematomas ni lesiones ocupantes de espacio.
-- Espacios grasos bien definidos, sin infiltración.
-- Vasculatura de calibre y densidad normales (en estudios contrastados).
-- Ganglios linfáticos regionales de tamaño y morfología dentro de parámetros normales.`,
-        conclusion: "Tomografía computada sin hallazgos patológicos significativos. Estructuras estudiadas dentro de límites normales.",
-        observaciones: "Correlación clínica recomendada. Sin contraindicaciones para seguimiento convencional."
+        metodologia: "Multi-slice computed tomography (MSCT) with helical acquisition. Axial slices 1-2 mm thick with multiplanar reformats (MPR) in coronal and sagittal planes. Technique without/with intravenous iodinated contrast administration according to clinical indication.",
+        interpretacion: `FINDINGS:
+- Normal bone density and morphology.
+- Adjacent soft tissues without significant alterations.
+- No evidence of collections, hematomas or space-occupying lesions.
+- Well-defined fat planes without infiltration.
+- Vessels of normal caliber and density (in contrast-enhanced studies).
+- Regional lymph nodes of normal size and morphology.`,
+        conclusion: "Computed tomography without significant pathological findings. Evaluated structures within normal limits.",
+        observaciones: "Clinical correlation recommended. No contraindications for conventional follow-up."
     },
 
     RMN: {
-        metodologia: "Resonancia magnética con unidad de 1.5 Tesla (o 3T). Secuencias obtenidas: T1 SE axial, T2 TSE axial/coronal/sagital, STIR coronal, DWI con mapas ADC (cuando indicado). Sin/Con administración de gadolinio endovenoso (0.1 mmol/kg) según protocolo.",
-        interpretacion: `HALLAZGOS:
-- Estructuras de señal e intensidad homogéneas, dentro de parámetros normales en todas las secuencias evaluadas.
-- Sin evidencia de lesiones con restricción a la difusión.
-- Interfaces tisulares conservadas.
-- Sin efecto de masa ni desplazamiento de estructuras.
-- Señal del hueso subcondral conservada.
-- Sin colecciones ni áreas de realce patológico post-contraste (si se administró).`,
-        conclusion: "Resonancia magnética dentro de límites normales. Sin alteraciones significativas en las secuencias evaluadas.",
-        observaciones: "Se recomienda correlación con clínica y estudios previos. Control evolutivo a criterio del médico tratante."
+        metodologia: "Magnetic resonance imaging with a 1.5 Tesla (or 3T) unit. Sequences obtained: axial T1 SE, axial/coronal/sagittal T2 TSE, coronal STIR, DWI with ADC maps (when indicated). Without/With intravenous gadolinium administration (0.1 mmol/kg) according to protocol.",
+        interpretacion: `FINDINGS:
+- Homogeneous signal and intensity of the structures, within normal parameters on all evaluated sequences.
+- No evidence of lesions with restricted diffusion.
+- Preserved tissue interfaces.
+- No mass effect or displacement of structures.
+- Preserved subchondral bone signal.
+- No collections or areas of pathological post-contrast enhancement (if administered).`,
+        conclusion: "Magnetic resonance imaging within normal limits. No significant alterations on the evaluated sequences.",
+        observaciones: "Correlation with clinical findings and prior studies is recommended. Follow-up at the treating physician's discretion."
     },
 
     US: {
-        metodologia: "Ecografía realizada con transductor multifrecuencia lineal/convex (7.5–12MHz / 3.5–5MHz según región). Técnica en tiempo real con Doppler color y espectral cuando indicado.",
-        interpretacion: `HALLAZGOS:
-- Órganos/estructuras exploradas de tamaño, ecogenicidad y morfología normales.
-- Sin evidencia de imágenes quísticas, sólidas ni mixtas.
-- Vascularización conservada al Doppler color.
-- Sin dilatación de estructuras ductuales.
-- Sin líquido libre en cavidad.
-- Ganglios regionales sin alteraciones morfológicas.`,
-        conclusion: "Estudio ecográfico sin hallazgos patológicos. Estructuras exploradas dentro de parámetros normales para la edad y sexo.",
-        observaciones: "Se sugiere correlación clínico-analítica. Seguimiento a criterio del médico tratante."
+        metodologia: "Ultrasound performed with a multifrequency linear/convex transducer (7.5-12 MHz / 3.5-5 MHz depending on the region). Real-time technique with color and spectral Doppler when indicated.",
+        interpretacion: `FINDINGS:
+- Explored organs/structures of normal size, echogenicity and morphology.
+- No evidence of cystic, solid or mixed lesions.
+- Preserved vascularization on color Doppler.
+- No dilatation of ductal structures.
+- No free fluid in the cavity.
+- Regional lymph nodes without morphological alterations.`,
+        conclusion: "Ultrasound study without pathological findings. Explored structures within normal limits for age and sex.",
+        observaciones: "Clinical-analytical correlation is suggested. Follow-up at the treating physician's discretion."
     },
 
     MG: {
-        metodologia: "Mamografía digital bilateral con proyecciones craneocaudal (CC) y oblicua mediolateral (OML) bilateral. Tomosíntesis añadida según protocolo institucional.",
-        interpretacion: `HALLAZGOS:
-ACR Composición mamaria: Tipo A — Mamas predominantemente grasas (o según corresponda).
+        metodologia: "Bilateral digital mammography with craniocaudal (CC) and mediolateral oblique (MLO) projections bilaterally. Tomosynthesis added according to institutional protocol.",
+        interpretacion: `FINDINGS:
+ACR Breast composition: Type A - predominantly fatty breasts (or as applicable).
 
-- Sin asimetría de densidad entre ambas mamas.
-- Sin microcalcificaciones sospechosas (sin agrupamiento, morfología ni distribución patológica).
-- Sin distorsión de la arquitectura glandular.
-- Sin nódulos, masas ni densidades asimétricas.
-- Piel y pezón de aspecto normal.
-- Sin adenopatías axilares sospechosas.`,
-        conclusion: "BI-RADS 1: Negativo. Estudio mamográfico sin hallazgos patológicos. Se recomienda control anual de rutina.",
-        observaciones: "Seguimiento mamográfico de rutina según protocolo de cribado. Correlación con exploración clínica."
+- No density asymmetry between both breasts.
+- No suspicious microcalcifications (no clustering, morphology or pathological distribution).
+- No distortion of the glandular architecture.
+- No nodules, masses or asymmetric densities.
+- Normal-appearing skin and nipple.
+- No suspicious axillary lymphadenopathy.`,
+        conclusion: "BI-RADS 1: Negative. Mammographic study without pathological findings. Routine annual follow-up recommended.",
+        observaciones: "Routine mammographic follow-up according to screening protocol. Correlation with clinical examination."
     },
 
     DEXA: {
-        metodologia: "Densitometría ósea por absorciometría de rayos X de doble energía (DEXA). Regiones evaluadas: columna lumbar (L1-L4) y cadera proximal (cuello femoral y total). Equipo calibrado según estándares ISCD.",
-        interpretacion: `RESULTADOS:
+        metodologia: "Bone densitometry by dual-energy X-ray absorptiometry (DEXA). Regions evaluated: lumbar spine (L1-L4) and proximal hip (femoral neck and total). Equipment calibrated according to ISCD standards.",
+        interpretacion: `RESULTS:
 
-COLUMNA LUMBAR (L1–L4):
-- Densidad mineral ósea (DMO): ___ g/cm²
+LUMBAR SPINE (L1-L4):
+- Bone mineral density (BMD): ___ g/cm²
 - T-Score: ___  /  Z-Score: ___
 
-CUELLO FEMORAL:
-- Densidad mineral ósea (DMO): ___ g/cm²
+FEMORAL NECK:
+- Bone mineral density (BMD): ___ g/cm²
 - T-Score: ___  /  Z-Score: ___
 
-TOTAL CADERA:
-- Densidad mineral ósea (DMO): ___ g/cm²
+TOTAL HIP:
+- Bone mineral density (BMD): ___ g/cm²
 - T-Score: ___  /  Z-Score: ___
 
-Valores dentro de rango esperado para el grupo etario. Sin evidencia de osteopenia ni osteoporosis.`,
-        conclusion: "Densidad mineral ósea dentro de parámetros normales según criterios OMS. T-Score ≥ -1.0 DS en todas las regiones evaluadas.",
-        observaciones: "Se recomienda mantener hábitos saludables: dieta rica en calcio y vitamina D, actividad física regular. Control en 2 años según indicación clínica."
+Values within the expected range for the age group. No evidence of osteopenia or osteoporosis.`,
+        conclusion: "Bone mineral density within normal parameters according to WHO criteria. T-Score ≥ -1.0 SD at all evaluated regions.",
+        observaciones: "Healthy habits recommended: diet rich in calcium and vitamin D, regular physical activity. Follow-up in 2 years according to clinical indication."
     }
 };

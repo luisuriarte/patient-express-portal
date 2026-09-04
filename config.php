@@ -42,25 +42,7 @@ foreach ($searchPaths as $path) {
     }
 }
 
-// 2. PACS / OHIF / OpenEMR Integration Parameters
-if (!defined('ORTHANC_URL')) {
-    define('ORTHANC_URL', getenv('ORTHANC_URL') ?: 'http://127.0.0.1:8042');
-}
-if (!defined('ORTHANC_USER')) {
-    define('ORTHANC_USER', getenv('ORTHANC_USER') ?: 'orthanc');
-}
-if (!defined('ORTHANC_PASS')) {
-    define('ORTHANC_PASS', getenv('ORTHANC_PASS') ?: 'orthanc');
-}
-if (!defined('ORTHANC_TIMEOUT')) {
-    define('ORTHANC_TIMEOUT', 4);
-}
-if (!defined('ORTHANC_WADO_URL')) {
-    define('ORTHANC_WADO_URL', getenv('ORTHANC_WADO_URL') ?: 'https://pacs.origen.ar/dicom-web');
-}
-if (!defined('OHIF_VIEWER_BASE_URL')) {
-    define('OHIF_VIEWER_BASE_URL', getenv('OHIF_VIEWER_BASE_URL') ?: 'https://imagenes.origen.ar/viewer');
-}
+// 2. OpenEMR Portal URL (the full clinical portal, used for patient links)
 if (!defined('OPENEMR_PORTAL_URL')) {
     define('OPENEMR_PORTAL_URL', getenv('OPENEMR_PORTAL_URL') ?: 'https://hcd.origen.ar/portal');
 }

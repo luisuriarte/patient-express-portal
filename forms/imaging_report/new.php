@@ -18,6 +18,7 @@ use OpenEMR\Common\Session\PatientSessionUtil;
 use OpenEMR\Common\Session\SessionWrapperFactory;
 use OpenEMR\Core\Header;
 use OpenEMR\Core\OEGlobalsBag;
+use OpenEMR\Services\Utils\TranslationService;
 
 $srcdir    = OEGlobalsBag::getInstance()->getSrcDir();
 $rootdir   = OEGlobalsBag::getInstance()->getString('rootdir');
@@ -28,6 +29,10 @@ $authUser  = $session->get('authUser');
 
 require_once("$srcdir/api.inc.php");
 require_once(__DIR__ . '/imaging_upload_functions.php');
+
+// Current user language definitions, used by the client-side i18next engine
+// to render quick templates in the user's language (see applyImagingTemplate).
+$imrLanguageDefs = TranslationService::getLanguageDefinitionsForSession();
 
 formHeader(xl("Imaging Report"));
 $returnurl = 'encounter_top.php';
@@ -164,7 +169,7 @@ $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategor
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <?php Header::setupHeader(); ?>
+    <?php Header::setupHeader(['i18next']); ?>
     <meta charset="UTF-8">
     <title><?= xlt('Imaging Report') ?></title>
     <!-- Tailwind CSS via CDN -->
@@ -499,6 +504,24 @@ $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategor
 
 <script src="<?= attr($rootdir) ?>/forms/imaging_report/assets/js/templates.js"></script>
 <script>
+    // Load the current language definitions for client-side translation.
+    // The template source is English; i18next renders it in the user's language
+    // when a quick template button is applied (see applyImagingTemplate).
+    i18next.init({
+        lng: 'selected',
+        debug: false,
+        nsSeparator: false,
+        keySeparator: false,
+        resources: {
+            selected: {
+                translation: <?= js_escape($imrLanguageDefs) ?>
+            }
+        }
+    }).catch(error => {
+        console.log(error.message);
+    });
+</script>
+<script>
 // ============================================================
 // Action buttons
 // ============================================================
@@ -644,6 +667,26 @@ const REGION_TITLES  = <?= json_encode($regionesAnatomicas) ?>;
 // ============================================================
 // Quick template buttons
 // ============================================================
+// Translate a string with the client-side i18next engine when available.
+// Falls back to the original string otherwise.
+function translateTemplateText(s) {
+    if (typeof s !== 'string' || s === '') {
+        return s;
+    }
+    const i18n = (typeof window.i18next !== 'undefined')
+        ? window.i18next
+        : ((typeof top.i18next !== 'undefined') ? top.i18next : null);
+    if (!i18n || typeof i18n.t !== 'function') {
+        return s;
+    }
+    try {
+        const tr = i18n.t(s);
+        return (tr && tr !== s) ? tr : s;
+    } catch (e) {
+        return s;
+    }
+}
+
 function applyImagingTemplate(tpl) {
     if (typeof IMAGING_TEMPLATES === 'undefined' || !IMAGING_TEMPLATES[tpl]) {
         console.warn('[imaging_report] Template not available:', tpl);
@@ -655,10 +698,10 @@ function applyImagingTemplate(tpl) {
     const modalitySelect = document.getElementById('modality');
     if (modalitySelect) modalitySelect.value = tpl;
 
-    if (t.metodologia)  document.getElementById('technique').value  = t.metodologia;
-    if (t.interpretacion) document.getElementById('interpretation').value = t.interpretacion;
-    if (t.conclusion)   document.getElementById('conclusion').value   = t.conclusion;
-    if (t.observaciones) document.getElementById('observations').value = t.observaciones;
+    if (t.metodologia)  document.getElementById('technique').value  = translateTemplateText(t.metodologia);
+    if (t.interpretacion) document.getElementById('interpretation').value = translateTemplateText(t.interpretacion);
+    if (t.conclusion)   document.getElementById('conclusion').value   = translateTemplateText(t.conclusion);
+    if (t.observaciones) document.getElementById('observations').value = translateTemplateText(t.observaciones);
 }
 
 // Event delegation: works even if buttons are re-rendered
