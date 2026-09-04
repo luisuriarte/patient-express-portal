@@ -1,7 +1,7 @@
 <?php
 /**
  * Diagnostic Imaging Management and Orthanc / OHIF Viewer Integration
- * Patient Express Portal - Integración Nativa con Funciones OpenEMR
+ * Patient Express Portal - Native Integration with OpenEMR Features
  */
 
 namespace App;
@@ -15,17 +15,17 @@ class Imaging
     private string $orthancWadoUrl;
 
     /**
-     * Proveedores de PACS configurados (procedure_providers activos).
-     * Cada estudio consultado lleva su propio provider_id, y los visores
-     * (OHIF / Stone) se construyen contra el proveedor correcto.
+     * Configured PACS providers (active procedure_providers).
+     * Each queried study carries its own provider_id, and viewers
+     * (OHIF / Stone) are built against the correct provider.
      *
      * @var PacsProvider[]
      */
     private array $providers = [];
 
     /**
-     * Mapa study_uid (StudyInstanceUID) -> PacsProvider, para resolver el
-     * visor correcto de cada estudio sin repetir consultas REST.
+     * Map of study_uid (StudyInstanceUID) -> PacsProvider, to resolve the
+     * correct viewer for each study without repeating REST queries.
      *
      * @var array<string, PacsProvider>
      */
@@ -45,10 +45,10 @@ class Imaging
     }
 
     /**
-     * Carga los proveedores de PACS activos desde procedure_providers.
-     * Se consideran proveedores "consultables" los que tienen remote_api
-     * (REST de Orthanc). Los demás (solo visor) se ignoran para query pero
-     * quedan registrados para resolver visores si se enlazan por orden.
+     * Loads active PACS providers from procedure_providers.
+     * Providers with remote_api (Orthanc REST) are considered "queryable".
+     * The rest (viewer-only) are ignored for querying but remain registered
+     * for resolving viewers if linked by order.
      */
     private function loadProviders(): void
     {
@@ -64,7 +64,7 @@ class Imaging
     }
 
     /**
-     * Devuelve el primer proveedor configurado, o null.
+     * Returns the first configured provider, or null.
      */
     private function firstProvider(): ?PacsProvider
     {
@@ -72,8 +72,8 @@ class Imaging
     }
 
     /**
-     * Resuelve el proveedor PACS de una orden usando el lab_id ya cargado
-     * (si es > 0) o consultando procedure_order.lab_id.
+     * Resolves the PACS provider for an order using the already loaded lab_id
+     * (if > 0) or by querying procedure_order.lab_id.
      */
     private function resolveOrderProvider(int $procedureOrderId, int $labId = 0): PacsProvider
     {
@@ -88,13 +88,13 @@ class Imaging
     }
 
     /**
-     * Obtiene exclusivamente los estudios y documentos de imágenes del paciente,
-     * filtrando por las categorías y subcategorías de imágenes en OpenEMR
-     * y complementando con estudios DICOM indexados en Orthanc PACS.
+     * Retrieves exclusively the patient's image studies and documents,
+     * filtering by imaging categories and subcategories in OpenEMR
+     * and supplemented with DICOM studies indexed in Orthanc PACS.
      * 
-     * @param int $pid ID de paciente en OpenEMR
-     * @param string|null $patientDni DNI / Documento del paciente
-     * @return array Lista de estudios clasificados
+     * @param int $pid Patient ID in OpenEMR
+     * @param string|null $patientDni Patient DNI / Document
+     * @return array Classified list of studies
      */
     public function getStudiesByPatient(int $pid, ?string $patientDni = null): array
     {
@@ -102,12 +102,12 @@ class Imaging
         $registeredStudyUids = [];
 
         // =========================================================================
-        // 1. Obtener IDs de todas las categorías y subcategorías de imágenes
+        // 1. Get IDs of all image categories and subcategories
         // =========================================================================
         $imageCategoryIds = $this->getImageCategoryIds();
 
         // =========================================================================
-        // 2. Consultar Documentos pertenecientes a las categorías de imágenes
+        // 2. Query documents belonging to image categories
         // =========================================================================
         if (!empty($imageCategoryIds)) {
             $placeholders = implode(',', array_fill(0, count($imageCategoryIds), '?'));
@@ -152,19 +152,19 @@ class Imaging
 
             $resDocs = sqlStatement($sqlDocs, $params);
 
-            // Acumulador de estudios DICOM agrupados por study_instance_uid real de PACS
+            // Accumulator for DICOM studies grouped by actual PACS study_instance_uid
             $groupedStudies = [];
 
-            // Informes (PDF) del formulario de imágenes por carpeta/categoría.
-            // Las imágenes JPG/PNG/DICOM y el PDF del informe viven en la MISMA
-            // carpeta del mismo encuentro, así que vinculamos cada imagen a su
-            // informe por categoría.
+            // Imaging form reports (PDF) by folder/category.
+            // JPG/PNG/DICOM images and the report PDF reside in the SAME
+            // folder of the same encounter, so we link each image to its
+            // report by category.
             $reportsByCategory = $this->getPatientReportsByCategory($pid);
 
-            // Mapa de informes por ENCUENTRO + CATEGORÍA, construido a partir de los
-            // documentos PDF de informe del formulario de imágenes del paciente.
-            // Se usa para vincular el PDF a la tarjeta de imágenes agrupadas por estudio,
-            // sin depender del estado de sincronización PACS ni del study_instance_uid.
+            // Report map by ENCOUNTER + CATEGORY, built from the patient's
+            // imaging form PDF report documents.
+            // Used to link the PDF to the imaging card grouped by study,
+            // without depending on PACS sync status or study_instance_uid.
             $reportPdfByEncCat = $this->buildReportsByEncounterCategory($pid);
             $consumedPdfDocIds = [];
 
@@ -203,8 +203,8 @@ class Imaging
                     $docDate = $dRow['docdate'] ?: ($dRow['doc_date'] ? date('Y-m-d', strtotime($dRow['doc_date'])) : date('Y-m-d'));
                     $formattedDate = date('d/m/Y', strtotime($docDate));
 
-                    // Encuentro del documento y fecha del encuentro (para mostrarlo
-                    // en el listado de forma similar a los resultados de laboratorio)
+                    // Document encounter and encounter date (for display
+                    // in the listing similar to laboratory results)
                     $encId = (int)($dRow['encounter_id'] ?? 0);
                     $encDateDisplay = '';
                     if (!empty($dRow['encounter_date']) && $dRow['encounter_date'] !== '0000-00-00') {
@@ -216,8 +216,8 @@ class Imaging
                     $downloadUrl = 'view_document.php?id=' . $dRow['doc_id'] . '&download=1';
 
                     if ($isDicom || $hasPacsSync) {
-                        // Si ya está sincronizado y tiene un study_uid real de PACS, agrupamos
-                        // todos los documentos que comparten ese mismo estudio en una sola entrada.
+                        // If already synced and has a real PACS study_uid, group
+                        // all documents sharing the same study into a single entry.
                         if ($hasPacsSync && !empty($pacsStudyUid)) {
                             if (!isset($groupedStudies[$pacsStudyUid])) {
                                 $groupedStudies[$pacsStudyUid] = [
@@ -252,7 +252,7 @@ class Imaging
                                 $groupedStudies[$pacsStudyUid]['category_id'] = (int)$dRow['category_id'];
                             }
 
-                            // Conservamos la fecha más antigua del grupo como fecha del estudio
+                            // Keep the oldest date in the group as the study date
                             if (strtotime($docDate) < strtotime($groupedStudies[$pacsStudyUid]['date_raw'])) {
                                 $groupedStudies[$pacsStudyUid]['date_raw'] = $docDate;
                                 $groupedStudies[$pacsStudyUid]['formatted_date'] = $formattedDate;
@@ -262,8 +262,8 @@ class Imaging
                             continue;
                         }
 
-                        // DICOM aún no sincronizado (pending) o sin study_uid conocido:
-                        // se muestra individualmente, como antes.
+                        // DICOM not yet synced (pending) or without known study_uid:
+                        // display individually, as before.
                         $studyUid = $pacsStudyUid ?: basename((string)$dRow['url'], '.dcm');
                         $registeredStudyUids[] = $studyUid;
 
@@ -304,8 +304,8 @@ class Imaging
                         $formatType = $isImage ? 'image' : ($isPdf ? 'pdf' : 'standard_file');
                         $viewerType = $isImage ? 'inline_image' : ($isPdf ? 'inline_pdf' : 'download');
 
-                        // Vincular al informe (PDF) de la MISMA carpeta/categoría:
-                        // imágenes y PDF del informe son del mismo encuentro.
+                        // Link to the report (PDF) from the SAME folder/category:
+                        // images and the report PDF are from the same encounter.
                         $catId = (int)($dRow['category_id'] ?? 0);
                         $report = $reportsByCategory[$catId] ?? null;
                         $isReportDocItself = ($report && (int)$report['doc_id'] === (int)$dRow['doc_id']);
@@ -347,14 +347,14 @@ class Imaging
                 }
             }
 
-            // Volcar los estudios agrupados como una sola tarjeta "Estudio" por cada
-            // study_instance_uid distinto, con todas sus series/imágenes adentro.
+            // Dump grouped studies as a single "Study" card per distinct
+            // study_instance_uid, with all its series/images inside.
             foreach ($groupedStudies as $uid => $group) {
                 $seriesCount = count($group['doc_ids']);
 
-                // Vincular el informe (PDF) a la tarjeta por ENCUENTRO + CATEGORÍA,
-                // en lugar de por nombre/study. Así el informe queda con sus imágenes
-                // del mismo encuentro, aunque aún no esté sincronizado en PACS.
+                // Link the report (PDF) to the card by ENCOUNTER + CATEGORY,
+                // instead of by name/study. This keeps the report with its images
+                // from the same encounter, even if not yet synced in PACS.
                 $repEnc = (int)($group['encounter_id'] ?? 0);
                 $repCat = (int)($group['category_id'] ?? 0);
                 $report = ($repEnc > 0 && $repCat > 0 && isset($reportPdfByEncCat[$repEnc][$repCat]))
@@ -417,8 +417,8 @@ class Imaging
             }
         }
 
-        // Quitar de la lista las filas sueltas de PDFs de informe que ya quedaron
-        // vinculadas a una tarjeta de estudio (para no mostrarlas duplicadas).
+        // Remove standalone report PDF rows from the list that are already
+        // linked to a study card (to avoid duplicates).
         if (!empty($consumedPdfDocIds)) {
             $studies = array_values(array_filter($studies, function ($s) use ($consumedPdfDocIds) {
                 $docId = (int)($s['doc_id'] ?? 0);
@@ -427,7 +427,7 @@ class Imaging
             }));
         }
         // =========================================================================
-        // 3. Consultar Órdenes e Informes Radiológicos en procedure_order
+        // 3. Query Radiology Orders and Reports in procedure_order
         // =========================================================================
         $sqlOrders = "SELECT 
                         pr.procedure_report_id,
@@ -497,7 +497,7 @@ class Imaging
                 $effectiveUid = $studyUid ?: ('1.2.840.113619.2.55.' . $row['procedure_order_id'] . '.' . $pid);
                 $registeredStudyUids[] = $effectiveUid;
 
-                // Resolver el proveedor PACS de la orden (procedure_order.lab_id).
+                // Resolve the PACS provider for the order (procedure_order.lab_id).
                 $orderProvider = $this->resolveOrderProvider((int)$row['procedure_order_id'], (int)($row['order_provider_id'] ?? 0));
                 $this->providerByStudyUid[$effectiveUid] = $orderProvider;
 
@@ -517,7 +517,7 @@ class Imaging
                     'has_report'        => !empty($row['procedure_report_id']),
                     'accession_number'  => $accessionNumber,
                     'study_uid'         => $effectiveUid,
-                    'format_type'       => 'dicom', // DICOM -> Visor OHIF
+                    'format_type'       => 'dicom', // DICOM -> OHIF Viewer
                     'viewer_type'       => 'ohif',
                     'viewer_url'        => $this->buildOhifViewerUrl($effectiveUid, $orderProvider),
                     'ohif_url'          => $this->buildOhifViewerUrl($effectiveUid, $orderProvider),
@@ -530,7 +530,7 @@ class Imaging
         }
 
         // =========================================================================
-        // 4. Consultar Orthanc PACS directamente vía REST API
+        // 4. Query Orthanc PACS directly via REST API
         // =========================================================================
         $orthancStudies = $this->fetchOrthancStudies((string)$pid, $patientDni);
         if (!empty($orthancStudies)) {
@@ -542,7 +542,7 @@ class Imaging
             }
         }
 
-        // Ordenar todos los estudios cronológicamente descendente
+        // Sort all studies in reverse chronological order
         usort($studies, function ($a, $b) {
             $timeA = strtotime((string)($a['date_raw'] ?? '1970-01-01'));
             $timeB = strtotime((string)($b['date_raw'] ?? '1970-01-01'));
@@ -553,13 +553,13 @@ class Imaging
     }
 
     /**
-     * Obtiene la lista de IDs de categorías que representan imágenes y sus subcategorías
+     * Gets the list of category IDs representing images and their subcategories
      */
     private function getImageCategoryIds(): array
     {
         $categoryIds = [];
 
-        // Consultar categorías con palabras clave o pertenecientes a las ramas de imágenes
+        // Query categories with keywords or belonging to image branches
         $sql = "SELECT id, name, parent, lft, rght FROM categories 
                 WHERE name LIKE '%Imágen%' 
                    OR name LIKE '%Imagen%' 
@@ -588,13 +588,13 @@ class Imaging
             }
         }
 
-        // Categorías predefinidas de imágenes encontradas en la estructura de OpenEMR
+        // Predefined image categories found in the OpenEMR structure
         $knownImageCategoryIds = [
             17, 18, 19, 20, 21, 22, 23, 24, 25, 26, // Eye Imaging
-            9753, 9762, 9772, 9800, 9801, 9802, 9803, // Imágenes Generales
+            9753, 9762, 9772, 9800, 9801, 9802, 9803, // General Images
             10001, 10010, 10011, 10012, 10013, 10100, 10101, 10102, 10110, 10111, 10112, 10113, 10114, 10120, 10121, 10122, 10123, 10130, 10131, 10132, // Imaging Preop
             20002, 20020, 20021, 20022, 20023, 20024, // Dental Imaging
-            21002 // SIP Ecografías
+            21002 // SIP Ultrasounds
         ];
 
         $merged = array_unique(array_merge($categoryIds, $knownImageCategoryIds));
@@ -602,15 +602,15 @@ class Imaging
     }
 
     /**
-     * Consulta REST a Orthanc PACS para encontrar estudios asociados al PatientID / DNI
+     * REST query to Orthanc PACS to find studies associated with PatientID / DNI
      */
     public function fetchOrthancStudies(string $patientId, ?string $dni = null): array
     {
         $results = [];
         $seen = [];
 
-        // Proveedores consultables (con REST de Orthanc). Si no hay ninguno
-        // configurado, se usa el fallback global (constantes ORTHANC_*).
+        // Queryable providers (with Orthanc REST). If none are configured,
+        // use the global fallback (ORTHANC_* constants).
         $queryable = array_values(array_filter($this->providers, function (PacsProvider $p) {
             return $p->remoteApi !== '';
         }));
@@ -621,7 +621,7 @@ class Imaging
         foreach ($queryable as $provider) {
             try {
                 if ($provider === null) {
-                    // Fallback: config global única (comportamiento previo).
+                    // Fallback: single global config (previous behavior).
                     $orthancStudies = $this->fetchOrthancStudiesLegacy($patientId, $dni);
                 } else {
                     $orthancStudies = PacsService::findStudies($provider, $patientId, $dni);
@@ -636,7 +636,7 @@ class Imaging
                 if ($studyUid === '') {
                     continue;
                 }
-                // Evitar duplicados: si dos proveedores tienen el mismo estudio, gana el primero.
+                // Avoid duplicates: if two providers have the same study, the first one wins.
                 if (isset($seen[$studyUid])) {
                     continue;
                 }
@@ -693,8 +693,8 @@ class Imaging
     }
 
     /**
-     * Fallback: consulta REST a una única Orthanc global (constantes ORTHANC_*),
-     * para preservar el comportamiento previo cuando no hay proveedores en BD.
+     * Fallback: REST query to a single global Orthanc (ORTHANC_* constants),
+     * to preserve previous behavior when there are no providers in the database.
      */
     private function fetchOrthancStudiesLegacy(string $patientId, ?string $dni = null): array
     {
@@ -784,8 +784,8 @@ class Imaging
     }
 
     /**
-     * Proveedor fallback construido desde las constantes globales, para resolver
-     * visores cuando no hay proveedores en BD.
+     * Fallback provider built from global constants, to resolve viewers
+     * when there are no providers in the database.
      */
     private function legacyProvider(): PacsProvider
     {
@@ -799,7 +799,7 @@ class Imaging
     }
 
     /**
-     * Obtiene el documento físico o contenido BLOB desde OpenEMR para servirlo de forma segura
+     * Gets the physical document or BLOB content from OpenEMR to serve it securely
      */
     public function getDocumentFile(int $docId, int $pid): ?array
     {
@@ -820,7 +820,7 @@ class Imaging
         $filePath = null;
         $fileContent = null;
 
-        // 1. Intentar obtención y desencriptado directo con la clase Document de OpenEMR
+        // 1. Attempt direct retrieval and decryption with OpenEMR's Document class
         if (class_exists('\Document')) {
             try {
                 $docObj = new \Document($docId);
@@ -838,11 +838,11 @@ class Imaging
                     ];
                 }
             } catch (\Throwable $e) {
-                // El archivo físico no existe en disco o está huérfano
+                // The physical file does not exist on disk or is orphaned
             }
         }
 
-        // 2. Probar ruta directa o relativa en el sistema de archivos
+        // 2. Try direct or relative path on the file system
         if (file_exists($url) && is_file($url)) {
             $filePath = $url;
         } elseif (file_exists('/' . $cleanUrl) && is_file('/' . $cleanUrl)) {
@@ -884,7 +884,7 @@ class Imaging
             }
         }
 
-        // Si se leyó de disco, verificar si requiere desencriptado
+        // If read from disk, check if decryption is required
         if ($filePath && file_exists($filePath)) {
             $rawContent = file_get_contents($filePath);
             if (!empty($rawContent)) {
@@ -906,7 +906,7 @@ class Imaging
             }
         }
 
-        // 3. Si no se encontró en disco, intentar con la clase nativa C_Document de OpenEMR
+        // 3. If not found on disk, try OpenEMR's native C_Document class
         if ($fileContent === null && class_exists('\C_Document')) {
             try {
                 $cDoc = new \C_Document();
@@ -920,7 +920,7 @@ class Imaging
             }
         }
 
-        // 4. Si es BLOB almacenado directamente en la base de datos
+        // 4. If it is a BLOB stored directly in the database
         if ($fileContent === null && !empty($doc['document_data'])) {
             $fileContent = $doc['document_data'];
         }
@@ -938,7 +938,7 @@ class Imaging
     }
 
     /**
-     * Obtiene el detalle de un informe de imagen para PDF
+     * Gets the imaging report details for PDF generation
      */
     public function getStudyReportDetails(int $reportId, int $pid): ?array
     {
@@ -991,7 +991,7 @@ class Imaging
         $accession = !empty($row['accession_number']) ? $row['accession_number'] : 'ACC-' . $row['procedure_order_id'];
         $studyUid = $this->extractStudyUidFromNotes($row['report_notes'] ?? '') ?: ('1.2.840.113619.2.55.' . $row['procedure_order_id'] . '.' . $pid);
 
-        // Resolver el proveedor PACS de la orden del informe.
+        // Resolve the PACS provider for the report's order.
         $reportProvider = $this->resolveOrderProvider((int)$row['procedure_order_id'], (int)($row['order_provider_id'] ?? 0));
         $this->providerByStudyUid[$studyUid] = $reportProvider;
 
@@ -1034,24 +1034,24 @@ class Imaging
     }
 
     /**
-     * Construye la URL exacta hacia el visor DICOM OHIF:
-     * Si se pasa un Orthanc UUID interno (con guiones), lo resuelve al StudyInstanceUID real de DICOM.
-     * El visor se resuelve por proveedor (o el que corresponda al estudio).
+     * Builds the exact URL to the OHIF DICOM viewer:
+     * If an internal Orthanc UUID (with dashes) is passed, it resolves to the actual DICOM StudyInstanceUID.
+     * The viewer is resolved by provider (or the one assigned to the study).
      */
     public function buildOhifViewerUrl(string $studyUid, ?PacsProvider $provider = null): string
     {
         $provider = $provider ?: $this->providerForStudy($studyUid);
         $realStudyUid = $this->resolveRealStudyInstanceUid($studyUid, $provider);
 
-        // OHIF v3 en la ruta /viewer usa el dataSource "dicomweb" ya configurado
-        // en app-config.js (defaultDataSourceName). No acepta un endpoint WADO-RS
-        // arbitrario vía ?url= en esta ruta — eso solo aplica a /viewer/dicomjson.
+        // OHIF v3 at the /viewer path uses the "dicomweb" dataSource already configured
+        // in app-config.js (defaultDataSourceName). It does not accept an arbitrary
+        // WADO-RS endpoint via ?url= on this path — that only applies to /viewer/dicomjson.
         return $provider->ohifBaseUrl() . '?StudyInstanceUIDs=' . urlencode($realStudyUid);
     }
 
     /**
-     * Construye la URL directa hacia el visor nativo de Orthanc (Stone WebViewer),
-     * resolviendo el host WADO por proveedor.
+     * Builds the direct URL to Orthanc's native viewer (Stone WebViewer),
+     * resolving the WADO host by provider.
      */
     public function buildStoneViewerUrl(string $studyUid, ?PacsProvider $provider = null): string
     {
@@ -1063,8 +1063,8 @@ class Imaging
     }
 
     /**
-     * Devuelve el proveedor al que pertenece un estudio (StudyInstanceUID),
-     * o el primero / fallback si no está registrado.
+     * Returns the provider that owns a study (StudyInstanceUID),
+     * or the first/fallback provider if not registered.
      */
     private function providerForStudy(string $studyUid): PacsProvider
     {
@@ -1076,8 +1076,8 @@ class Imaging
     }
 
     /**
-     * Resuelve un proveedor PACS por su ppid (procedure_providers.ppid),
-     * o null si no se encuentra entre los proveedores activos.
+     * Resolves a PACS provider by its ppid (procedure_providers.ppid),
+     * or null if not found among active providers.
      */
     private function providerForPpid(int $ppid): ?PacsProvider
     {
@@ -1093,22 +1093,22 @@ class Imaging
     }
 
     /**
-     * Resuelve un UUID interno de Orthanc a su StudyInstanceUID real de DICOM,
-     * consultando el proveedor correcto.
+     * Resolves an internal Orthanc UUID to its actual DICOM StudyInstanceUID,
+     * by querying the correct provider.
      */
     public function resolveRealStudyInstanceUid(string $uid, ?PacsProvider $provider = null): string
     {
         $uid = trim($uid);
         $provider = $provider ?: $this->providerForStudy($uid);
 
-        // Si ya es un StudyInstanceUID numérico con puntos (ej: 2.16.840...), usarlo directo
+        // If already a dotted numeric StudyInstanceUID (e.g. 2.16.840...), use it directly
         if (preg_match('/^[0-9]+(\.[0-9]+)+$/', $uid)) {
             return $uid;
         }
 
-        // Si tiene formato de UUID de Orthanc con guiones (ej: a2a05afc-3208-4995-a86a-7972256fbad6)
+        // If it has Orthanc dash-format UUID (e.g. a2a05afc-3208-4995-a86a-7972256fbad6)
         if (str_contains($uid, '-')) {
-            // 1. Intentar consultar en form_imaging_report_images si ya está registrado
+            // 1. Try querying form_imaging_report_images if already registered
             $sqlDps = "SELECT study_instance_uid FROM form_imaging_report_images 
                        WHERE (pacs_study_id = ? OR pacs_instance_id = ?) 
                          AND study_instance_uid REGEXP '^[0-9]+\\.[0-9]+'
@@ -1118,13 +1118,13 @@ class Imaging
                 return $rowDps['study_instance_uid'];
             }
 
-            // 2. Consultar directamente a la API REST del proveedor
+            // 2. Query the provider's REST API directly
             $realUid = PacsService::fetchStudyUid($provider, $uid);
             if ($realUid !== null && $realUid !== '') {
                 return $realUid;
             }
 
-            // 3. Fallback: consultar a la config global única (compatibilidad)
+            // 3. Fallback: query the single global config (backward compatibility)
             try {
                 $ch = curl_init(rtrim($this->orthancUrl, '/') . '/studies/' . $uid);
                 curl_setopt_array($ch, [
@@ -1144,7 +1144,7 @@ class Imaging
                     }
                 }
             } catch (\Throwable $e) {
-                // Silencioso
+                // Silent
             }
         }
 
@@ -1152,9 +1152,9 @@ class Imaging
     }
 
     /**
-     * Devuelve los informes (PDF) del formulario de imágenes del paciente,
-     * indexados por categoría (carpeta) destino, para poder vincular cada
-     * imagen del mismo encuentro con su informe.
+     * Gets the patient's imaging form reports (PDF),
+     * indexed by destination category (folder), to link each
+     * image from the same encounter with its report.
      *
      * @param int $pid
      * @return array<int, array{doc_id:int,title:string,date:string}>
@@ -1194,10 +1194,10 @@ class Imaging
     }
 
     /**
-     * Construye un mapa de informes (PDF) por ENCUENTRO + CATEGORÍA a partir del
-     * formulario de imágenes (form_imaging_report.pdf_document_id), usando el
-     * encounter_id del documento y la categoría del PDF. Se usa para vincular el
-     * informe a la tarjeta de imágenes agrupadas por estudio.
+     * Builds a map of reports (PDF) by ENCOUNTER + CATEGORY from the
+     * imaging form (form_imaging_report.pdf_document_id), using the
+     * document's encounter_id and the PDF category. Used to link the
+     * report to the imaging card grouped by study.
      *
      * @return array [encounter][category] => ['doc_id'=>int, 'name'=>string]
      */

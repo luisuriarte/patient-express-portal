@@ -1,7 +1,7 @@
 <?php
 /**
- * Servidor y Visor Seguro de Documentos e Imágenes Estándar de OpenEMR
- * Patient Express Portal - Permite visualización y descarga directa (JPG, PNG, PDF)
+ * Secure OpenEMR Standard Document and Image Server and Viewer
+ * Patient Express Portal - Supports direct viewing and download (JPG, PNG, PDF)
  */
 
 declare(strict_types=1);
@@ -32,7 +32,7 @@ $mimeType = $document['mimetype'] ?: 'image/jpeg';
 $fileName = $document['name'] ?: ('document_' . $docId);
 $disposition = $isDownload ? 'attachment' : 'inline';
 
-// 1. Si existe archivo físico en el servidor
+// 1. If physical file exists on the server
 if (!empty($document['file_path']) && file_exists($document['file_path']) && is_file($document['file_path'])) {
     $filePath = $document['file_path'];
     $fileSize = filesize($filePath);
@@ -49,7 +49,7 @@ if (!empty($document['file_path']) && file_exists($document['file_path']) && is_
     exit;
 }
 
-// 2. Si el contenido fue recuperado por C_Document o BLOB
+// 2. If content was retrieved by C_Document or BLOB
 if (!empty($document['file_content'])) {
     $content = $document['file_content'];
 
@@ -63,7 +63,7 @@ if (!empty($document['file_content'])) {
     exit;
 }
 
-// 3. Si no se localizó el archivo físico
+// 3. If physical file was not located
 http_response_code(404);
 echo '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' . xla('Document unavailable') . '</title><style>body{font-family:sans-serif;padding:40px;text-align:center;color:#334155;} h3{color:#0284c7;} .box{background:#f8fafc;border:1px solid #e2e8f0;padding:20px;border-radius:12px;display:inline-block;max-width:500px;}</style></head><body>';
 echo '<div class="box">';

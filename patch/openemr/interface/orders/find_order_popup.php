@@ -19,8 +19,8 @@ use OpenEMR\Core\Header;
 
 $order = (int) ($_GET['order'] ?? null);
 $labid = (int) ($_GET['labid'] ?? null);
-// Tipo de orden (imaging, laboratory_test, etc.) enviado desde el formulario.
-// Cuando es 'imaging', el buscador solo muestra el subárbol DIAGNOSTIC IMAGING.
+// Order type (imaging, laboratory_test, etc.) sent from the form.
+// When it is 'imaging', the search only shows the DIAGNOSTIC IMAGING subtree.
 $otype = trim((string) ($_REQUEST['otype'] ?? ''));
 
 //////////////////////////////////////////////////////////////////////
@@ -181,14 +181,14 @@ if (isset($_GET['typeid'])) {
                         $sub = "OR procedure_type LIKE 'pro'";
                     }
                     $search_term = '%' . $_REQUEST['search_term'] . '%';
-                    // El buscador filtra el catálogo según el tipo de orden seleccionado
+                    // The search filters the catalog according to the selected order type
                     // (procedure_type_names = procedure_type.procedure_type_name):
-                    //   - 'imaging'          -> estudios de imágenes (subárbol DIAGNOSTIC IMAGING)
-                    //   - 'laboratory_test'  -> análisis de laboratorio
-                    //   - 'procedure' y demás -> los procedimientos de ese tipo
-                    // Los ítems legacy SIN procedure_type_name cargado se siguen mostrando
-                    // con el filtro clásico por laboratorio (lab_id), para no perder nada.
-                    // Los favoritos (fgp) se dejan sin filtrar para no romper grupos personalizados.
+                    //   - 'imaging'          -> imaging studies (DIAGNOSTIC IMAGING subtree)
+                    //   - 'laboratory_test'  -> laboratory tests
+                    //   - 'procedure' and others -> procedures of that type
+                    // Legacy items WITHOUT a loaded procedure_type_name are still shown
+                    // with the classic filter by laboratory (lab_id), so nothing is lost.
+                    // Favorites (fgp) are left unfiltered so custom groups are not broken.
                     if ($otype !== '' && $ord === 'ord') {
                         $extraSql = " AND (pt.procedure_type_name = ? OR ((pt.procedure_type_name IS NULL OR pt.procedure_type_name = '') AND pt.lab_id = ?))";
                         $extraParams = [$otype, $labid];

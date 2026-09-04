@@ -14,18 +14,18 @@ namespace App;
 class Laboratory
 {
     /**
-     * Obtiene la lista de informes de laboratorio agrupados por Encuentro (encounter_id)
-     * filtrando solo los que tengan procedure_order_type = 'procedure'
-     * y tomando la fecha de la tabla procedure_result (date).
+     * Gets laboratory reports grouped by Encounter (encounter_id),
+     * filtering only those with procedure_order_type = 'procedure'
+     * and using the date from the procedure_result table (date).
      * 
-     * @param int $pid ID del paciente en OpenEMR
-     * @return array Lotes agrupados por encounter_id
+     * @param int $pid Patient ID in OpenEMR
+     * @return array Batches grouped by encounter_id
      */
     public function getReportsGroupedByEncounter(int $pid): array
     {
-        // Consulta alineada con OpenEMR 8.2.0:
-        // Vincula de forma exacta cada procedure_order_code con su procedure_report
-        // mediante procedure_order_id Y procedure_order_seq
+        // Query aligned with OpenEMR 8.2.0:
+        // Links each procedure_order_code to its procedure_report
+        // via procedure_order_id AND procedure_order_seq
         $sql = "SELECT 
                     po.encounter_id,
                     po.procedure_order_id,
@@ -89,7 +89,7 @@ class Laboratory
             $studyTitle = $row['procedure_name'] ?: xl('Lab Panel');
             $uniqueStudyKey = $row['procedure_order_id'] . '_' . $row['procedure_order_seq'] . '_' . ($row['procedure_report_id'] ?? '0');
 
-            // Evitar duplicación si hay joins redundantes
+            // Prevent duplication from redundant joins
             if (isset($seenStudiesPerEncounter[$encounterKey][$uniqueStudyKey])) {
                 continue;
             }
@@ -162,14 +162,14 @@ class Laboratory
         }
 
                 // ==========================================================================
-        // Fusionar documentos escaneados de laboratorio (PDF/JPG) con sus encuentros
+        // Merge scanned laboratory documents (PDF/JPG) with their encounters
         // ==========================================================================
         $labDocuments = $this->getDocumentLabReports($pid);
         foreach ($labDocuments as $docReport) {
             $encId = (int)$docReport['encounter_id'];
-            $encounterDateIso = null; // Fecha oficial del encuentro
+            $encounterDateIso = null; // Official encounter date
 
-            // Si el documento tiene encounter_id, obtener la fecha real del encuentro
+            // If the document has encounter_id, get the actual encounter date
             if ($encId > 0) {
                 $encRow = sqlQuery(
                     "SELECT encounter, date FROM form_encounter WHERE pid = ? AND encounter = ? LIMIT 1",
@@ -180,7 +180,7 @@ class Laboratory
                 }
             }
 
-            // Si el documento no tiene encounter_id, buscar el encuentro más cercano por fecha
+            // If the document has no encounter_id, find the closest encounter by date
             if ($encId === 0 && !empty($docReport['date_raw'])) {
                 $closestEncounter = sqlQuery(
                     "SELECT encounter, date FROM form_encounter 
@@ -197,7 +197,7 @@ class Laboratory
                 }
             }
 
-            // Usar la fecha del encuentro como principal; si no hay, usar la del documento
+            // Use the encounter date as primary; if not available, use the document date
             $primaryDateIso = $encounterDateIso ?: $docReport['date_raw'];
 
             $encounterKey = $encId > 0 ? (string)$encId : ('doc_' . $docReport['doc_id']);
@@ -221,7 +221,7 @@ class Laboratory
                     'has_documents_only' => true
                 ];
             } else {
-                // Se está fusionando dentro de un encuentro que ya tiene un panel real
+                // Merging into an encounter that already has an actual panel
                 $grouped[$encounterKey]['has_documents_only'] = false;
             }
 
@@ -240,7 +240,7 @@ class Laboratory
     }
 
     /**
-     * Alias retrocompatible
+     * Backward-compatible alias
      */
     public function getReportsGroupedByDate(int $pid): array
     {
@@ -248,15 +248,15 @@ class Laboratory
     }
 
     /**
-     * Obtiene el desglose consolidado de todos los paneles y analitos de un Encuentro
+     * Gets the consolidated breakdown of all panels and analytes in an Encounter
      * 
-     * @param int|string $encounterId ID de encuentro (o clave de orden)
-     * @param int $pid ID de paciente
+     * @param int|string $encounterId Encounter ID (or order key)
+     * @param int $pid Patient ID
      * @return array|null
      */
     public function getGroupedReportDetailsByEncounter($encounterId, int $pid): ?array
     {
-        // 1. Datos del paciente
+        // 1. Patient data
         $sqlPatient = "SELECT pid, pubpid, fname, lname, mname, DOB, sex, ss, phone_cell, email, street, city, postal_code
                        FROM patient_data 
                        WHERE pid = ? 
@@ -266,7 +266,7 @@ class Laboratory
             return null;
         }
 
-        // 2. Consulta de códigos de procedimiento y reportes del encuentro
+        // 2. Query procedure codes and reports for the encounter
         $isNumericEncounter = is_numeric($encounterId) && (int)$encounterId > 0;
         
         $whereClause = $isNumericEncounter ? "po.encounter_id = ?" : "po.procedure_order_id = ?";
@@ -332,7 +332,7 @@ class Laboratory
 
             $panelResults = [];
 
-            // 3. Obtener determinaciones de procedure_result
+            // 3. Get results from procedure_result
             if ($reportId > 0) {
                 $sqlResults = "SELECT 
                                     pres.procedure_result_id,
@@ -364,7 +364,7 @@ class Laboratory
                             }
                         }
 
-                        // Determinar nombre y valor del resultado
+                        // Determine result name and value
                         $val = ($r['result'] !== null && $r['result'] !== '') ? $r['result'] : ($r['result_text'] ?? '-');
                         $name = !empty($r['result_text']) && $r['result_text'] !== $val ? $r['result_text'] : (!empty($r['result_code']) ? $r['result_code'] : 'Determinación');
 
@@ -459,7 +459,7 @@ class Laboratory
     }
 
     /**
-     * Retrocompatibilidad para búsqueda por fecha
+     * Backward compatibility for date-based search
      */
     public function getGroupedReportDetailsByDate(string $date, int $pid): ?array
     {
@@ -480,7 +480,7 @@ class Laboratory
     }
 
     /**
-     * Obtiene el reporte individual localizando su encuentro
+     * Gets the individual report by locating its encounter
      */
     public function getReportDetails(int $reportId, int $pid): ?array
     {
@@ -561,19 +561,19 @@ class Laboratory
     }
 
     /**
-     * IDs de categorías consideradas resultados de laboratorio clínico
-     * (aunque el documento sea PDF/JPG escaneado, no un procedure_order real)
+     * Category IDs considered as clinical laboratory results
+     * (even if the document is a scanned PDF/JPG, not an actual procedure_order)
      */
     private function getLabDocumentCategoryIds(): array
     {
         return [2, 505, 10002, 21001, 20003, 20030, 20031, 20032];
         // 2=Lab Report, 505=Lab Results (Home-Based Care), 10002=Laboratory Results (Preop),
-        // 21001=Laboratorio (SIP Perinatal), 20003=Dental Laboratory + hijas (Cultivos, Biopsias, Pre-Op Blood Tests)
+        // 21001=Laboratory (SIP Perinatal), 20003=Dental Laboratory + child categories (Cultures, Biopsies, Pre-Op Blood Tests)
     }
 
     /**
-     * Obtiene documentos (PDF/JPG) subidos en categorías de laboratorio,
-     * que no pasan por procedure_order/procedure_report
+     * Gets documents (PDF/JPG) uploaded in laboratory categories,
+     * which do not go through procedure_order/procedure_report
      */
     public function getDocumentLabReports(int $pid): array
     {

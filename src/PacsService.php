@@ -2,12 +2,12 @@
 /**
  * PacsService.php
  *
- * Centraliza las operaciones contra la API REST de Orthanc para cada
- * proveedor PACS (ver PacsProvider). Reemplaza las llamadas a curl que antes
- * estaban dispersas en cron_sync_pacs.php, save.php (informe) y src/Imaging.php.
+ * Centralizes operations against the Orthanc REST API for each
+ * PACS provider (see PacsProvider). Replaces the curl calls previously
+ * scattered across cron_sync_pacs.php, save.php (report) and src/Imaging.php.
  *
- * Todas las operaciones reciben el proveedor explícitamente y usan sus
- * credenciales y endpoint REST.
+ * All operations receive the provider explicitly and use its
+ * credentials and REST endpoint.
  */
 
 namespace App;
@@ -15,17 +15,35 @@ namespace App;
 class PacsService
 {
     /**
-     * Realiza una petición HTTP contra el Orthanc del proveedor y devuelve
+     * Makes an HTTP request against the provider's Orthanc and returns
      * [httpCode, body, error].
      */
     private static function request(PacsProvider $p, string $method, string $path, ?string $body, array $headers = [], int $timeout = 45): array
     {
         $url = $p->apiUrl() . $path;
-        $defaultHeaders = ['Content-Type: application/json'];
+
+        // Normalize headers into a key => value map (last one wins),
+        // supporting both standalone keys and "Key: value" strings.
+        $hmap = ['Content-Type' => 'application/json'];
         if ($path === '/instances') {
-            $defaultHeaders = ['Content-Type: application/dicom'];
+            $hmap['Content-Type'] = 'application/dicom';
         }
-        $allHeaders = array_merge($defaultHeaders, $headers);
+        foreach ($headers as $h) {
+            if (!is_string($h)) {
+                continue;
+            }
+            $pos = strpos($h, ':');
+            if ($pos !== false) {
+                $key = trim(substr($h, 0, $pos));
+                $hmap[$key] = trim(substr($h, $pos + 1));
+            } else {
+                $hmap[$h] = '1';
+            }
+        }
+        $allHeaders = [];
+        foreach ($hmap as $k => $v) {
+            $allHeaders[] = (strtolower($k) === 'content-type') ? "Content-Type: {$v}" : "{$k}: {$v}";
+        }
 
         $ch = curl_init($url);
         $options = [
@@ -56,7 +74,7 @@ class PacsService
     }
 
     /**
-     * Sube un archivo DICOM nativo (.dcm) a Orthanc.
+     * Uploads a native DICOM file (.dcm) to Orthanc.
      *
      * @return array{success:bool, instance_id:?string, study_id:?string, series_id:?string, message:string}
      */
@@ -83,11 +101,29 @@ class PacsService
     }
 
     /**
-     * Reasigna el StudyInstanceUID de una instancia ya subida (usado para
-     * agrupar los DICOM nativos en el estudio de la orden). Orthanc crea una
-     * instancia nueva con el UID sustituido y elimina la original cuando ya no
-     * comparte estudio con otra instancia. `Force` sobrescribe el valor
-     * heredado del módulo padre.
+     * Uploads a complete compressed ZIP archive to the PACS as a single unit.
+     *
+     * Unlike a native DICOM file (which is uploaded instance by instance),
+     * the container (zip) is sent as-is; the destination PACS is responsible
+     * for extracting and importing the studies it contains.
+     *
+     * @return array{success:bool, message:string}
+     */
+    public static function uploadZipDicom(PacsProvider $p, string $zipBinary): array
+    {
+        [$code, $body, $err] = self::request($p, 'POST', '/instances', $zipBinary, ['Content-Type: application/zip'], 120);
+        if ($code >= 200 && $code < 300 && $body !== '') {
+            return ['success' => true, 'message' => xl('Zip archive uploaded to PACS')];
+        }
+        return ['success' => false, 'message' => "PACS HTTP {$code}: " . ($err ?: (string)$body)];
+    }
+
+    /**
+     * Reassigns the StudyInstanceUID of an already uploaded instance (used to
+     * group native DICOMs into the order's study). Orthanc creates a new
+     * instance with the substituted UID and removes the original when it no
+     * longer shares a study with another instance. `Force` overwrites the
+     * value inherited from the parent module.
      *
      * @return array{success:bool, instance_id:?string, study_id:?string, series_id:?string, message:string}
      */
@@ -118,14 +154,14 @@ class PacsService
     }
 
     /**
-     * Convierte una imagen estándar (JPG/PNG/WEBP) a DICOM y la sube a Orthanc.
+     * Converts a standard image (JPG/PNG/WEBP) to DICOM and uploads it to Orthanc.
      *
-     * @param array $tags Tags DICOM (PatientID, PatientName, StudyDate, Modality, ...)
+     * @param array $tags DICOM tags (PatientID, PatientName, StudyDate, Modality, ...)
      * @return array{success:bool, instance_id:?string, study_id:?string, series_id:?string, message:string}
      */
     public static function uploadImageAsDicom(PacsProvider $p, string $imageBinary, array $tags): array
     {
-        // Detectar MIME real por magic bytes
+        // Detect actual MIME type by magic bytes
         $mime = 'image/jpeg';
         if (str_starts_with($imageBinary, "\x89PNG")) {
             $mime = 'image/png';
@@ -159,10 +195,10 @@ class PacsService
     }
 
     /**
-     * Sube un PDF como "Encapsulated PDF" (modalidad OT) adjunto a un estudio
-     * existente (usando su id interno PACS como Parent). En Orthanc el id
-     * interno es el orthanc_study_id, NO el StudyInstanceUID, que dispara el
-     * error "Trying to override a value inherited from a parent module".
+     * Uploads a PDF as "Encapsulated PDF" (modality OT) attached to an
+     * existing study (using its internal PACS id as Parent). In Orthanc, the
+     * internal id is the orthanc_study_id, NOT the StudyInstanceUID, which triggers
+     * the error "Trying to override a value inherited from a parent module".
      *
      * @return array{success:bool, message:string}
      */
@@ -185,7 +221,7 @@ class PacsService
     }
 
     /**
-     * Obtiene el StudyInstanceUID real de una instancia o estudio de Orthanc.
+     * Gets the actual StudyInstanceUID from an Orthanc instance or study.
      */
     public static function fetchStudyUid(PacsProvider $p, string $id): ?string
     {
@@ -209,8 +245,8 @@ class PacsService
     }
 
     /**
-     * Lista los estudios de un paciente en Orthanc (por PatientID) y devuelve
-     * la lista normalizada. Ruta raíz /tools/find, Query PatientID.
+     * Lists a patient's studies in Orthanc (by PatientID) and returns
+     * the normalized list. Root path /tools/find, Query PatientID.
      *
      * @return array<int, array{instance_id:string, study_id:string, series_id:string, study_uid:string, study_date:string, accession:string, description:string, modality:string}>
      */

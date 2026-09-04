@@ -94,8 +94,8 @@ class C_Document extends Controller
         $this->assign("hide_encryption", OEGlobalsBag::getInstance()->getBoolean('hide_document_encryption'));
         $this->assign("patient_id", $patient_id);
 
-        // Encuestos del paciente + órdenes asociadas, para el selector
-        // "Vincular a Encuentro / Orden" de la vista de subida.
+        // Patient encounters + associated orders, for the selector
+        // "Link to Encounter / Order" of the upload view.
         $encounters = [];
         if ($patient_id > 0) {
             $sqlEnc = "SELECT fe.encounter, fe.date, " .
@@ -217,7 +217,7 @@ class C_Document extends Controller
             $patient_id = $_POST['patient_id'];
         }
 
-        // Encuentro seleccionado en la vista de subida (vinculación a Orden/Encuentro).
+        // Encounter selected in the upload view (linkage to Order/Encounter).
         $encounter_id = 0;
         if (is_numeric($_POST['encounter_id'] ?? '')) {
             $encounter_id = (int) $_POST['encounter_id'];
@@ -304,9 +304,9 @@ class C_Document extends Controller
                             }
                         }
                     }
-                    // ===== PATCH: extraer archivos de un ZIP y registrarlos individualmente =====
-                    // Cuando la subida es un zip (imágenes/DICOM comprimidos), se descomprime y cada
-                    // archivo se registra como documento propio vinculado al encuentro seleccionado.
+                    // ===== PATCH: extract files from a ZIP and register them individually =====
+                    // When the upload is a zip (compressed images/DICOM), it is unzipped and each
+                    // file is registered as its own document linked to the selected encounter.
                     if (isset($mimetype) && ($mimetype === 'application/zip' || $mimetype === 'application/dicom+zip')) {
                         $za = new ZipArchive();
                         if ($za->open($_FILES['file']['tmp_name'][$key]) === true) {
@@ -314,7 +314,7 @@ class C_Document extends Controller
                                 $zstat = $za->statIndex($zii);
                                 $zname = (string) ($zstat['name'] ?? '');
                                 if (($zstat['size'] ?? 0) == 0 || $zname === '' || $zname === '.' || $zname === '..') {
-                                    continue; // directorios / entradas vacías
+                                    continue; // directories / empty entries
                                 }
                                 // Strip directory components to prevent path traversal.
                                 $zname = basename($zname);
@@ -360,7 +360,7 @@ class C_Document extends Controller
                             }
                             $za->close();
                         }
-                        // El zip se extrae; no se guarda como documento único.
+                        // The zip is extracted; it is not saved as a single document.
                         continue;
                     }
                     $tmpfile = fopen($_FILES['file']['tmp_name'][$key], "r");

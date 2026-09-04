@@ -1,53 +1,52 @@
 -- ============================================================================
 -- images-procedures_es.sql
--- Carga masiva del catálogo de DIAGNOSTIC IMAGING en la tabla procedure_type
--- de OpenEMR. Variante en español de imágenes (mismo esquema/códigos que la
--- variante en inglés images-procedures.sql; solo cambia el texto visible de
--- los estudios).
+-- Mass load of the DIAGNOSTIC IMAGING catalog into the procedure_type
+-- table of OpenEMR. Spanish variant of imaging (same schema/codes as the
+-- English variant images-procedures.sql; only the visible text of the
+-- studies differs).
 --
--- Jerarquía creada:
---   Nivel 1 (padre = 0)   : DIAGNOSTIC IMAGING                (procedure_type = 'grp')
---   Nivel 2 (padre = raíz): RX, US, CT, MRI, MG               (procedure_type = 'grp')
---   Nivel 3 (padre = modalidad): cada estudio particular      (procedure_type = 'ord')
+-- Hierarchy created:
+--   Level 1 (parent = 0)   : DIAGNOSTIC IMAGING                (procedure_type = 'grp')
+--   Level 2 (parent = root): RX, US, CT, MRI, MG               (procedure_type = 'grp')
+--   Level 3 (parent = modality): each individual study          (procedure_type = 'ord')
 --
--- NOTA: la raíz ('DIAGNOSTIC IMAGING') y las modalidades usan los mismos
--- nombres/códigos (RX, US, CT, MRI, MG) que en la variante en inglés porque
--- son identificadores técnicos usados por el código (find_order_popup.php,
--- src/Imaging.php, etc.). Solo los estudios (procedures de tipo 'ord')
--- llevan name/description en español.
+-- NOTE: the root ('DIAGNOSTIC IMAGING') and modalities use the same
+-- names/codes (RX, US, CT, MRI, MG) as in the English variant because
+-- they are technical identifiers used by the code (find_order_popup.php,
+-- src/Imaging.php, etc.). Only the studies (procedures of type 'ord')
+-- carry name/description in Spanish.
 --
--- Todos los niveles llevan procedure_type_name = 'imaging'.
+-- All levels carry procedure_type_name = 'imaging'.
 --
--- Los estudios se cargan con:
---   - procedure_code     : código interno único e idéntico a la variante en
---                          inglés (ej. RX-CHEST-2V). NO traducir.
---   - standard_code      : código CPT4 de referencia. Reemplazable por el
---                          nomenclador local editando la columna cpt del UNION.
---   - lab_id = 3         : proveedor "Imaging Service" (procedure_providers).
+-- Studies are loaded with:
+--   - procedure_code     : unique internal code, identical to the English
+--                          variant (e.g. RX-CHEST-2V). Do NOT translate.
+--   - standard_code      : reference CPT4 code. Replaceable by the local
+--                          nomenclature by editing the cpt column of the UNION.
+--   - lab_id = 3         : provider "Imaging Service" (procedure_providers).
 --
--- El script es IDEMPOTENTE y trae un bloque MIGRACIÓN que renombra columnas
--- cargadas por versiones previas (códigos viejos -> nuevos y texto a español).
--- Ejecutar como:
+-- The script is IDEMPOTENT and includes a MIGRATION block that renames columns
+-- loaded by previous versions (old codes -> new codes and text to Spanish).
+-- Run as:
 --   mariadb -u user -p db_name < images-procedures_es.sql
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
--- MIGRACIÓN: renombra valores cargados previamente (códigos viejos -> nuevos
--- y name/description a español). Segura de re-ejecutar (WHERE sobre códigos
--- antiguos).
+-- MIGRATION: rename previously-loaded values (old codes -> new codes
+-- and name/description to Spanish). Safe to re-run (WHERE on old codes).
 -- ----------------------------------------------------------------------------
--- Raíz
+-- Root
 UPDATE procedure_type SET name = 'DIAGNOSTIC IMAGING', description = 'Diagnostic imaging: RX, US, CT, MRI, MG'
  WHERE procedure_code = 'IMG';
 
--- Modalidades (grp): name y código son el mismo código de modalidad
+-- Modalities (grp): name and code are the same modality code
 UPDATE procedure_type SET name = 'RX',  procedure_code = 'RX',  description = 'Radiología'                   WHERE procedure_code = 'RX'   AND name = 'RX';
 UPDATE procedure_type SET name = 'US',  procedure_code = 'US',  description = 'Ecografía'                    WHERE procedure_code = 'ECO'  AND name = 'ECO';
 UPDATE procedure_type SET name = 'CT',  procedure_code = 'CT',  description = 'Tomografía Axial Computada'    WHERE procedure_code = 'TAC'  AND name = 'TAC';
 UPDATE procedure_type SET name = 'MRI', procedure_code = 'MRI', description = 'Resonancia Magnética Nuclear'  WHERE procedure_code = 'RMN' AND name = 'RMN';
 UPDATE procedure_type SET name = 'MG',  procedure_code = 'MG',  description = 'Mamografía'                   WHERE procedure_code = 'MAMO' AND name = 'MAMO';
 
--- Estudios de RX
+-- Radiology (RX) studies
 UPDATE procedure_type SET procedure_code = 'RX-CHEST-2V',  name = 'RX de tórax (2 proyecciones)', description = 'RX de tórax (2 proyecciones)' WHERE procedure_code = 'RX-TORAX-2V'  AND procedure_type = 'ord';
 UPDATE procedure_type SET procedure_code = 'RX-CHEST-1V',  name = 'RX de tórax (1 proyección)',  description = 'RX de tórax (1 proyección)'  WHERE procedure_code = 'RX-TORAX-1V'  AND procedure_type = 'ord';
 UPDATE procedure_type SET procedure_code = 'RX-ABDOMEN',   name = 'RX de abdomen simple',        description = 'RX de abdomen simple'        WHERE procedure_code = 'RX-ABDOMEN'   AND procedure_type = 'ord';
@@ -66,7 +65,7 @@ UPDATE procedure_type SET procedure_code = 'RX-KNEE',      name = 'RX de rodilla
 UPDATE procedure_type SET procedure_code = 'RX-ANKLE',     name = 'RX de tobillo (mono)',        description = 'RX de tobillo (mono)'        WHERE procedure_code = 'RX-TOBILLO'   AND procedure_type = 'ord';
 UPDATE procedure_type SET procedure_code = 'RX-FOOT',      name = 'RX de pie (mono)',            description = 'RX de pie (mono)'            WHERE procedure_code = 'RX-PIE'       AND procedure_type = 'ord';
 
--- Estudios de US (ecografía)
+-- Ultrasound (US) studies
 UPDATE procedure_type SET procedure_code = 'US-ABDOMEN',      name = 'Ecografía abdominal',                  description = 'Ecografía abdominal'                  WHERE procedure_code = 'ECO-ABDOMINAL'   AND procedure_type = 'ord';
 UPDATE procedure_type SET procedure_code = 'US-ABD-SUP',      name = 'Ecografía abdominal superior',         description = 'Ecografía abdominal superior'         WHERE procedure_code = 'ECO-ABDOM-SUP'   AND procedure_type = 'ord';
 UPDATE procedure_type SET procedure_code = 'US-RENAL-UT',     name = 'Ecografía renal y vías urinarias',     description = 'Ecografía renal y vías urinarias'     WHERE procedure_code = 'ECO-RENAL'       AND procedure_type = 'ord';
@@ -81,7 +80,7 @@ UPDATE procedure_type SET procedure_code = 'US-DOPPLER-LL',   name = 'Eco dopple
 UPDATE procedure_type SET procedure_code = 'US-DOPPLER-UL',   name = 'Eco doppler de miembros superiores',   description = 'Eco doppler de miembros superiores'   WHERE procedure_code = 'ECO-DOPPLER-MS'  AND procedure_type = 'ord';
 UPDATE procedure_type SET procedure_code = 'US-DOPPLER-NECK', name = 'Eco doppler de vasos del cuello',      description = 'Eco doppler de vasos del cuello'      WHERE procedure_code = 'ECO-VASCULAR-CC' AND procedure_type = 'ord';
 
--- Estudios de CT (tomografía)
+-- Computed Tomography (CT) studies
 UPDATE procedure_type SET procedure_code = 'CT-BRAIN',        name = 'TAC de cráneo/cerebro',               description = 'TAC de cráneo/cerebro'               WHERE procedure_code = 'TAC-CEREBRO'       AND procedure_type = 'ord';
 UPDATE procedure_type SET procedure_code = 'CT-SINUSES',      name = 'TAC de senos paranasales',            description = 'TAC de senos paranasales'            WHERE procedure_code = 'TAC-SENOS-PAR'     AND procedure_type = 'ord';
 UPDATE procedure_type SET procedure_code = 'CT-NECK',         name = 'TAC de cuello',                       description = 'TAC de cuello'                       WHERE procedure_code = 'TAC-CUELLO'        AND procedure_type = 'ord';
@@ -95,7 +94,7 @@ UPDATE procedure_type SET procedure_code = 'CT-CERV-SPINE',   name = 'TAC de col
 UPDATE procedure_type SET procedure_code = 'CT-LUM-SPINE',    name = 'TAC de columna lumbar',               description = 'TAC de columna lumbar'               WHERE procedure_code = 'TAC-LUMBAR'        AND procedure_type = 'ord';
 UPDATE procedure_type SET procedure_code = 'CT-CHEST-LD',     name = 'TAC de tórax (baja dosis/screening)', description = 'TAC de tórax (baja dosis/screening)' WHERE procedure_code = 'TAC-TORAX-BT'      AND procedure_type = 'ord';
 
--- Estudios de MRI (resonancia magnética)
+-- Magnetic Resonance Imaging (MRI) studies
 UPDATE procedure_type SET procedure_code = 'MRI-BRAIN',      name = 'RMN de cráneo/cerebro',         description = 'RMN de cráneo/cerebro'         WHERE procedure_code = 'RMN-CEREBRO'   AND procedure_type = 'ord';
 UPDATE procedure_type SET procedure_code = 'MRI-NECK',       name = 'RMN de cuello',                 description = 'RMN de cuello'                 WHERE procedure_code = 'RMN-CUELLO'    AND procedure_type = 'ord';
 UPDATE procedure_type SET procedure_code = 'MRI-CERV-SPINE', name = 'RMN de columna cervical',       description = 'RMN de columna cervical'       WHERE procedure_code = 'RMN-CERVICAL'  AND procedure_type = 'ord';
@@ -111,14 +110,14 @@ UPDATE procedure_type SET procedure_code = 'MRI-KNEE',       name = 'RMN de rodi
 UPDATE procedure_type SET procedure_code = 'MRI-ANKLE',      name = 'RMN de tobillo',                description = 'RMN de tobillo'                WHERE procedure_code = 'RMN-TOBILLO'   AND procedure_type = 'ord';
 UPDATE procedure_type SET procedure_code = 'MRI-BREAST',     name = 'RMN de mamas (bilateral)',      description = 'RMN de mamas (bilateral)'      WHERE procedure_code = 'RMN-MAMARIA'   AND procedure_type = 'ord';
 
--- Estudios de MG (mamografía)
+-- Mammography (MG) studies
 UPDATE procedure_type SET procedure_code = 'MAMMO-BIL-SCREEN', name = 'Mamografía bilateral (screening)',  description = 'Mamografía bilateral (screening)'  WHERE procedure_code = 'MAMO-BIL-SCREEN' AND procedure_type = 'ord';
 UPDATE procedure_type SET procedure_code = 'MAMMO-BIL-DX',     name = 'Mamografía bilateral (diagnóstica)', description = 'Mamografía bilateral (diagnóstica)' WHERE procedure_code = 'MAMO-BIL-DX'     AND procedure_type = 'ord';
 UPDATE procedure_type SET procedure_code = 'MAMMO-UNI',        name = 'Mamografía unilateral',              description = 'Mamografía unilateral'              WHERE procedure_code = 'MAMO-UNI'        AND procedure_type = 'ord';
 UPDATE procedure_type SET procedure_code = 'MAMMO-TOMO',       name = 'Tomosíntesis mamaria (bilateral)',   description = 'Tomosíntesis mamaria (bilateral)'   WHERE procedure_code = 'MAMO-TOMO'       AND procedure_type = 'ord';
 
 -- ----------------------------------------------------------------------------
--- Nivel 1: Raíz "DIAGNOSTIC IMAGING"
+-- Level 1: Root "DIAGNOSTIC IMAGING"
 -- ----------------------------------------------------------------------------
 INSERT INTO procedure_type (parent, name, lab_id, procedure_code, procedure_type, description, standard_code, seq, activity, procedure_type_name)
 SELECT 0, 'DIAGNOSTIC IMAGING', 3, 'IMG', 'grp', 'Diagnostic imaging: RX, US, CT, MRI, MG', '', 10, 1, 'imaging'
@@ -128,7 +127,7 @@ WHERE NOT EXISTS (
 );
 
 -- ----------------------------------------------------------------------------
--- Nivel 2: Modalidades (padre = raíz)
+-- Level 2: Modalities (parent = root)
 -- ----------------------------------------------------------------------------
 INSERT INTO procedure_type (parent, name, lab_id, procedure_code, procedure_type, description, standard_code, seq, activity, procedure_type_name)
 SELECT r.procedure_type_id, m.name, 3, m.code, 'grp', m.descripcion, '', m.seq, 1, 'imaging'
@@ -147,7 +146,7 @@ WHERE NOT EXISTS (
 );
 
 -- ----------------------------------------------------------------------------
--- Nivel 3: Estudios de RX (padre = modalidad RX)
+-- Level 3: Radiology (RX) studies (parent = modality RX)
 -- ----------------------------------------------------------------------------
 INSERT INTO procedure_type (parent, name, lab_id, procedure_code, procedure_type, description, standard_code, seq, activity, procedure_type_name)
 SELECT m.procedure_type_id, s.name, 3, s.code, 'ord', s.description, CONCAT('CPT4:', s.cpt), s.seq, 1, 'imaging'
@@ -180,7 +179,7 @@ WHERE NOT EXISTS (
 );
 
 -- ----------------------------------------------------------------------------
--- Nivel 3: Estudios de US (padre = modalidad US)
+-- Level 3: Ultrasound (US) studies (parent = modality US)
 -- ----------------------------------------------------------------------------
 INSERT INTO procedure_type (parent, name, lab_id, procedure_code, procedure_type, description, standard_code, seq, activity, procedure_type_name)
 SELECT m.procedure_type_id, s.name, 3, s.code, 'ord', s.description, CONCAT('CPT4:', s.cpt), s.seq, 1, 'imaging'
@@ -209,7 +208,7 @@ WHERE NOT EXISTS (
 );
 
 -- ----------------------------------------------------------------------------
--- Nivel 3: Estudios de CT (padre = modalidad CT)
+-- Level 3: Computed Tomography (CT) studies (parent = modality CT)
 -- ----------------------------------------------------------------------------
 INSERT INTO procedure_type (parent, name, lab_id, procedure_code, procedure_type, description, standard_code, seq, activity, procedure_type_name)
 SELECT m.procedure_type_id, s.name, 3, s.code, 'ord', s.description, CONCAT('CPT4:', s.cpt), s.seq, 1, 'imaging'
@@ -237,7 +236,7 @@ WHERE NOT EXISTS (
 );
 
 -- ----------------------------------------------------------------------------
--- Nivel 3: Estudios de MRI (padre = modalidad MRI)
+-- Level 3: Magnetic Resonance Imaging (MRI) studies (parent = modality MRI)
 -- ----------------------------------------------------------------------------
 INSERT INTO procedure_type (parent, name, lab_id, procedure_code, procedure_type, description, standard_code, seq, activity, procedure_type_name)
 SELECT m.procedure_type_id, s.name, 3, s.code, 'ord', s.description, CONCAT('CPT4:', s.cpt), s.seq, 1, 'imaging'
@@ -267,7 +266,7 @@ WHERE NOT EXISTS (
 );
 
 -- ----------------------------------------------------------------------------
--- Nivel 3: Estudios de MG (padre = modalidad MG)
+-- Level 3: Mammography (MG) studies (parent = modality MG)
 -- ----------------------------------------------------------------------------
 INSERT INTO procedure_type (parent, name, lab_id, procedure_code, procedure_type, description, standard_code, seq, activity, procedure_type_name)
 SELECT m.procedure_type_id, s.name, 3, s.code, 'ord', s.description, CONCAT('CPT4:', s.cpt), s.seq, 1, 'imaging'
@@ -287,7 +286,7 @@ WHERE NOT EXISTS (
 );
 
 -- ----------------------------------------------------------------------------
--- Verificación 1: árbol completo creado (raíz, modalidades y estudios)
+-- Verification 1: full tree created (root, modalities and studies)
 -- ----------------------------------------------------------------------------
 SELECT pt2.modalidad,
        pt.name AS estudio,
@@ -316,7 +315,7 @@ WHERE pt.parent IN (
 ORDER BY pt2.modalidad, pt.seq;
 
 -- ----------------------------------------------------------------------------
--- Verificación 2: totales por modalidad
+-- Verification 2: totals per modality
 -- ----------------------------------------------------------------------------
 SELECT pt.name AS modalidad,
        COUNT(x.procedure_type_id) AS estudios

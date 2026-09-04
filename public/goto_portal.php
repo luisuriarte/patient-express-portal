@@ -1,6 +1,6 @@
 <?php
 /**
- * Redireccionador de Auto-Login (SSO) hacia el Portal Integral OpenEMR
+ * SSO Auto-Login Redirector to the Full OpenEMR Portal
  * Patient Express Portal
  */
 
@@ -14,9 +14,9 @@ $auth->requireAuth('index.php');
 $pid = $auth->getPatientPid();
 $target = isset($_GET['target']) ? trim((string)$_GET['target']) : '';
 
-// Generar URL con token OneTimeAuth de OpenEMR
+// Generate URL with OpenEMR OneTimeAuth token
 $portalUrl = \App\PortalSSO::createAutoLoginUrl((int)$pid, $target);
 
-// Redirigir al paciente ya autenticado
+// Redirect authenticated patient
 header('Location: ' . $portalUrl);
 exit;

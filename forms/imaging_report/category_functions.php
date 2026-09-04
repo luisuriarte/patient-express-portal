@@ -2,23 +2,23 @@
 /**
  * category_functions.php
  *
- * Helpers para el selector de carpeta (árbol de categorías) del formulario de
- * diagnóstico por imágenes.
+ * Helpers for the folder selector (category tree) of the imaging diagnostic
+ * form.
  *
- * Requiere: globals.php ya incluido (dispone de sqlStatement()/sqlQuery()).
+ * Requires: globals.php already included (provides sqlStatement()/sqlQuery()).
  *
- * Patrón basado en el módulo odontogram (php/odon_document_functions.php):
- *  - Sin IDs hardcodeados.
- *  - Recorrido del árbol por el campo `parent` (sin depender de lft/rght).
- *  - Todas las categorías expuestas son de pacientes (aco_spec = 'patients|docs').
+ * Pattern based on the odontogram module (php/odon_document_functions.php):
+ *  - No hardcoded IDs.
+ *  - Tree traversal via the `parent` field (not dependent on lft/rght).
+ *  - All exposed categories are patient categories (aco_spec = 'patients|docs').
  */
 
-/** aco_spec de las categorías visibles/validas para documentos de pacientes */
+/** aco_spec of visible/valid categories for patient documents */
 define('IMAGING_ACO_SPEC', 'patients|docs');
 
 /**
- * Devuelve el árbol de categorías de documentos de pacientes como lista plana
- * ordenada (id, name, parent, depth) preparada para renderizar.
+ * Returns the patient documents category tree as a flat ordered list
+ * (id, name, parent, depth) prepared for rendering.
  *
  * @return array{0:array{id:int,name:string,parent:int,depth:int}}
  */
@@ -40,18 +40,18 @@ function imaging_get_category_tree(): array
         ];
     }
 
-    // Armar las listas de hijos usando el puntero de referencia sin modificar el
-    // orden original: solo reapuntamos a los hijos.
+    // Build child lists using the reference pointer without modifying the
+    // original order: we only repoint to the children.
     foreach ($all as $id => &$node) {
         $pid = $node['parent'];
-        // Evita ciclos (parent === id) y enlaces a nodos inexistentes.
+        // Prevents cycles (parent === id) and links to non-existent nodes.
         if ($pid !== $id && isset($all[$pid])) {
             $all[$pid]['children'][] = $id;
         }
     }
     unset($node);
 
-    // Recorrido por anchura (BFS) para obtener una lista plana en orden del árbol.
+    // Breadth-first traversal (BFS) to obtain a flat list in tree order.
     $depthById = [];
     $roots = [];
     foreach ($all as $id => $node) {
@@ -87,9 +87,9 @@ function imaging_get_category_tree(): array
 }
 
 /**
- * Valida que una categoría pertenezca al árbol de documentos de pacientes
- * (aco_spec = patients|docs). Recorre la cadena de padres hasta llegar a la
- * raíz (parent 0 o parent === id).
+ * Validates that a category belongs to the patient documents tree
+ * (aco_spec = patients|docs). Traverses the parent chain up to the
+ * root (parent 0 or parent === id).
  *
  * @return bool
  */
@@ -111,7 +111,7 @@ function imaging_is_valid_document_category(int $categoryId): bool
             return false;
         }
         $parent = (int)$row['parent'];
-        // Llegamos a la raíz -> es válida.
+        // We reached the root -> it is valid.
         if ($parent === 0 || $parent === $current) {
             return true;
         }
@@ -122,8 +122,8 @@ function imaging_is_valid_document_category(int $categoryId): bool
 }
 
 /**
- * Traduce una modalidad del formulario a un nombre de subcategoría bajo
- * "Imágenes". Devuelve '' si no hay subcategoría asociada (se usa la general).
+ * Translates a form modality to a subcategory name under "Images".
+ * Returns '' if no associated subcategory (the general one is used).
  */
 function imaging_subcategory_name(string $modalidad): string
 {
@@ -135,10 +135,10 @@ function imaging_subcategory_name(string $modalidad): string
 }
 
 /**
- * Categoría por defecto para una modalidad:
- *  1. Subcategoría de modalidad bajo "Imágenes" si existe (RMN/TC).
- *  2. La categoría general "Imágenes" de nivel superior si existe.
- *  3. 0 si no hay ninguna (se usará el fallback del formulario).
+ * Default category for a modality:
+ *  1. Modality subcategory under "Images" if it exists (MRI/CT).
+ *  2. The general top-level "Images" category if it exists.
+ *  3. 0 if none (the form fallback will be used).
  */
 function imaging_default_category_id(string $modalidad): int
 {
@@ -165,11 +165,12 @@ function imaging_default_category_id(string $modalidad): int
 }
 
 /**
- * Resuelve la categoría donde guardar el informe.
+ * Resolves the category where the report should be stored.
  *
- * Si el usuario eligió una carpeta manualmente (y es válida), se usa esa.
- * En caso contrario se aplica la lógica automática por modalidad
- * (imaging_default_category_id), y si tampoco existe se crea "Imágenes".
+ * If the user manually chose a folder (and it is valid), that one is used.
+ * Otherwise, the automatic modality-based logic is applied
+ * (imaging_default_category_id), and if that also doesn't exist, "Images"
+ * is created.
  */
 function imaging_resolve_category_id(int $userCategoryId, string $modalidad): int
 {
@@ -182,8 +183,8 @@ function imaging_resolve_category_id(int $userCategoryId, string $modalidad): in
         return $auto;
     }
 
-    // Fallback: crear "Imágenes" bajo la raíz (id = 1 "Categories") usando la
-    // clase CategoryTree, que mantiene correctamente lft/rght (MPTT).
+    // Fallback: create "Images" under the root (id = 1 "Categories") using the
+    // CategoryTree class, which correctly maintains lft/rght (MPTT).
     $categoryTree = new \CategoryTree(1);
     $newId = $categoryTree->add_node(1, 'Imágenes', 'imaging', IMAGING_ACO_SPEC, '');
 
@@ -191,7 +192,7 @@ function imaging_resolve_category_id(int $userCategoryId, string $modalidad): in
 }
 
 /**
- * Devuelve el nombre de una categoría dada su lista plana, o '' si no existe.
+ * Returns the name of a category given its flat list, or '' if not found.
  */
 function imaging_category_name(array $flat, int $categoryId): string
 {
@@ -204,12 +205,12 @@ function imaging_category_name(array $flat, int $categoryId): string
 }
 
 /**
- * Renderiza el árbol de categorías como HTML colapsable.
+ * Renders the category tree as collapsible HTML.
  *
- * @param array $flat  Resultado de imaging_get_category_tree()
- * @param int   $selectedId  Categoría a preseleccionar (marca "selected")
- * @param int   $expandToId  Categoría cuyo subárbol se debe expandir (por defecto
- *                           seleccionada o la general de imágenes).
+ * @param array $flat  Result from imaging_get_category_tree()
+ * @param int   $selectedId  Category to pre-select (marks "selected")
+ * @param int   $expandToId  Category whose subtree should be expanded (defaults
+ *                           to the selected one or the general images category).
  * @return string
  */
 function imaging_render_category_tree(array $flat, int $selectedId = 0, int $expandToId = 0): string
@@ -218,7 +219,7 @@ function imaging_render_category_tree(array $flat, int $selectedId = 0, int $exp
         return '<div class="imr-tree-empty">' . xlt('No categories available.') . '</div>';
     }
 
-    // Índice por id + listas de hijos.
+    // Index by id + child lists.
     $byId = [];
     foreach ($flat as $node) {
         $byId[$node['id']] = $node + ['children' => []];
@@ -232,9 +233,9 @@ function imaging_render_category_tree(array $flat, int $selectedId = 0, int $exp
     }
     unset($node);
 
-    // Determinar qué subárbol expandir por defecto: expandimos hasta la
-    // categoría seleccionada (para que quede visible al editar) o hasta la
-    // general "Imágenes" si no hay selección.
+    // Determine which subtree to expand by default: expand to the
+    // selected category (so it is visible when editing) or to the
+    // general "Images" category if no selection.
     $expandToId = $expandToId ?: $selectedId;
     $expanded = [];
     $cur = $expandToId;

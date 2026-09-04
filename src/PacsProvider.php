@@ -2,22 +2,22 @@
 /**
  * PacsProvider.php
  *
- * Representa un proveedor de PACS configurado en OpenEMR como un "procedure
- * provider" (tabla procedure_providers). Cada proveedor posta contra su propio
- * Orthanc con credenciales propias.
+ * Represents a PACS provider configured in OpenEMR as a "procedure
+ * provider" (procedure_providers table). Each provider posts against its own
+ * Orthanc with its own credentials.
  *
- * Convención de endpoints (decisión de producto):
- *   remote_host  = URL base del visor OHIF (path completo),
- *                  ej. https://imagenes.origen.ar/viewer
- *   remote_api   = URL base de la API REST de Orthanc,
- *                  ej. https://pacs.origen.ar   (o http://<host>:8042)
- *   wado_url     = URL base DICOMweb WADO-RS,
- *                  ej. https://pacs.origen.ar/dicom-web
- *   login/password = credenciales HTTP Basic de Orthanc
+ * Endpoint convention (product decision):
+ *   remote_host  = OHIF viewer base URL (full path),
+ *                  e.g. https://imagenes.origen.ar/viewer
+ *   remote_api   = Orthanc REST API base URL,
+ *                  e.g. https://pacs.origen.ar   (or http://<host>:8042)
+ *   wado_url     = DICOMweb WADO-RS base URL,
+ *                  e.g. https://pacs.origen.ar/dicom-web
+ *   login/password = Orthanc HTTP Basic credentials
  *
- * La resolución del proveedor se hace a partir de una orden de procedimiento
- * (procedure_order.lab_id -> procedure_providers.ppid). Si la orden no tiene
- * proveedor o no es válida, se usa el primer proveedor activo como fallback.
+ * Provider resolution is based on a procedure order
+ * (procedure_order.lab_id -> procedure_providers.ppid). If the order has no
+ * provider or is invalid, the first active provider is used as fallback.
  */
 
 namespace App;
@@ -27,7 +27,7 @@ class PacsProvider
     public int $ppid = 0;
     public string $name = '';
     public string $npi = '';
-    public string $remoteHost = ''; // visor OHIF (path completo)
+    public string $remoteHost = ''; // OHIF viewer (full path)
     public string $remoteApi = '';  // Orthanc REST base
     public string $wadoUrl = '';    // WADO-RS base
     public string $user = '';
@@ -42,7 +42,7 @@ class PacsProvider
     }
 
     /**
-     * Carga los valores desde una fila de procedure_providers.
+     * Loads values from a procedure_providers row.
      */
     public function applyRow(array $row): void
     {
@@ -58,7 +58,7 @@ class PacsProvider
     }
 
     /**
-     * URL base de la API REST de Orthanc.
+     * Orthanc REST API base URL.
      */
     public function apiUrl(): string
     {
@@ -66,15 +66,15 @@ class PacsProvider
     }
 
     /**
-     * URL base WADO-RS (DICOMweb). Si no está definida, se deriva de la API
-     * REST reemplazando el puerto/path por /dicom-web sobre el mismo host.
+     * WADO-RS base URL (DICOMweb). If not defined, it is derived from the
+     * REST API by replacing the port/path with /dicom-web on the same host.
      */
     public function wadoBaseUrl(): string
     {
         if ($this->wadoUrl !== '') {
             return rtrim($this->wadoUrl, '/');
         }
-        // Derivar de remote_api (https://pacs.origen.ar -> https://pacs.origen.ar/dicom-web)
+        // Derive from remote_api (https://pacs.origen.ar -> https://pacs.origen.ar/dicom-web)
         $api = $this->apiUrl();
         $parsed = parse_url($api);
         if ($parsed && !empty($parsed['host'])) {
@@ -86,8 +86,8 @@ class PacsProvider
     }
 
     /**
-     * URL base del visor OHIF. Reutiliza remote_host (que por convención es el
-     * path completo del viewer). Fallback a la constante global.
+     * OHIF viewer base URL. Reuses remote_host (which by convention is the
+     * full viewer path). Falls back to the global constant.
      */
     public function ohifBaseUrl(): string
     {
@@ -120,7 +120,7 @@ class PacsProvider
     }
 
     /**
-     * Credenciales HTTP Basic en formato "user:pass".
+     * HTTP Basic credentials in "user:pass" format.
      */
     public function basicAuth(): string
     {
@@ -128,7 +128,7 @@ class PacsProvider
     }
 
     /**
-     * Indica si el proveedor tiene lo mínimo para operar.
+     * Indicates whether the provider has the minimum required configuration to operate.
      */
     public function isConfigured(): bool
     {
@@ -136,15 +136,15 @@ class PacsProvider
     }
 
     // =====================================================================
-    // Resolución
+    // Resolution
     // =====================================================================
 
     /**
-     * Resuelve el proveedor asociado a una orden de procedimiento.
+     * Resolves the provider associated with a procedure order.
      *
      * procedure_order.lab_id -> procedure_providers.ppid.
-     * Si la orden no existe o no tiene lab_id válido, cae al proveedor
-     * activo por defecto.
+     * If the order does not exist or has no valid lab_id, it falls back to
+     * the default active provider.
      */
     public static function resolveForOrder(?int $procedureOrderId): self
     {
@@ -169,7 +169,7 @@ class PacsProvider
     }
 
     /**
-     * Devuelve el primer proveedor activo (fallback global).
+     * Returns the first active provider (global fallback).
      */
     public static function resolveDefault(): self
     {

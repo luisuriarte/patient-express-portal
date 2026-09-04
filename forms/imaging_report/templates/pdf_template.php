@@ -1,26 +1,26 @@
 <?php
 /**
- * Plantilla HTML A4 para el PDF institucional del Informe de Diagnóstico por Imágenes.
- * Renderizada por Dompdf en save.php.
+ * A4 HTML template for the institutional Imaging Diagnostic Report PDF.
+ * Rendered by Dompdf in save.php.
  *
- * Estilo replicado de public/print_pdf.php (serie azul institucional):
- *  - Header con borde inferior azul, nombre de clínica en mayúsculas y contacto.
- *  - Título de reporte en celeste con borde azul.
- *  - Ficha de paciente en tabla clara (patient-box).
- *  - Secciones con título azul y texto justificado.
- *  - Conclusión resaltada con borde izquierdo azul.
- *  - Firma + validación electrónica institucional.
- *  - Pie de página fijo con disclaimer legal.
+ * Style replicated from public/print_pdf.php (institutional blue series):
+ *  - Header with bottom blue border, uppercase clinic name and contact.
+ *  - Report title in light blue with blue border.
+ *  - Patient info in a light table (patient-box).
+ *  - Sections with blue title and justified text.
+ *  - Conclusion highlighted with left blue border.
+ *  - Signature + institutional electronic validation.
+ *  - Fixed footer with legal disclaimer.
  *
- * Variables disponibles (provistas por save.php):
- *  - $pid, $formId, $fields (array con todos los campos del informe)
+ * Available variables (provided by save.php):
+ *  - $pid, $formId, $fields (array with all report fields)
  *  - $patientRow, $userRow, $encounterRow, $facilityRow, $logoBase64, $logoPath
  *
  * @package   OpenEMR
  * @author    Centro Médico Origen
  */
 
-// Datos del paciente con fallbacks
+// Patient data with fallbacks
 $patFname  = trim(($patientRow['fname'] ?? '') . ' ' . ($patientRow['mname'] ?? '') . ' ' . ($patientRow['lname'] ?? ''));
 $patDni    = $patientRow['ss'] ?? 'N/A';
 $patDob    = !empty($patientRow['DOB']) && $patientRow['DOB'] !== '0000-00-00'
@@ -58,7 +58,7 @@ $fechaInforme    = !empty($fields['report_date'])
     : date('d/m/Y');
 $fechaImpresion  = date('d/m/Y H:i:s');
 
-// Logo institucional en Base64 (PNG o SVG; Dompdf 3.x renderiza SVG)
+// Institutional logo in Base64 (PNG or SVG; Dompdf 3.x renders SVG)
 if (empty($logoBase64)) {
     $logoBase64 = '';
     if (!empty($logoPath) && file_exists($logoPath)) {
@@ -67,7 +67,7 @@ if (empty($logoBase64)) {
     }
 }
 
-// Datos institucionales desde la facility configurada en OpenEMR
+// Institutional data from the facility configured in OpenEMR
 $facilityRow = $facilityRow ?? [];
 $clinicName  = trim($facilityRow['name'] ?? '') ?: 'CENTRO DE SALUD';
 $clinicAddr  = trim(
@@ -79,13 +79,13 @@ $clinicAddr  = trim(
 $clinicEmail = trim($facilityRow['email'] ?? '');
 $clinicPhone = trim($facilityRow['phone'] ?? '');
 
-// Identificador de reporte
+// Report identifier
 $reportCode = 'IMG-' . str_pad($formId, 6, '0', STR_PAD_LEFT);
 $validacionId = md5($formId . '-' . $pid . '-ORIGEN' . '-IMG');
 
-// Código QR hacia el visor OHIF del estudio (si hay StudyInstanceUID y la
-// librería BaconQrCode está disponible en el vendor de OpenEMR). El QR apunta
-// directamente a imagenes.origen.ar/viewer?StudyInstanceUIDs=<uid>.
+// QR code pointing to the study's OHIF viewer (if StudyInstanceUID exists and
+// the BaconQrCode library is available in the OpenEMR vendor directory). The QR
+// points directly to imagenes.origen.ar/viewer?StudyInstanceUIDs=<uid>.
 $qrDataUri = '';
 $qrTarget  = trim((string)($fields['study_ohif_url'] ?? ''));
 if ($qrTarget === '' && !empty($fields['study_instance_uid'])) {
@@ -113,22 +113,22 @@ if ($qrTarget !== '') {
 }
 
 /**
- * Normaliza el texto libre del informe para el PDF:
- *  - Unifica fin de línea (CRLF -> LF).
- *  - Elimina la sangría común (espacios/tabs iniciales) que el textarea del
- *    formulario agrega a cada línea, alineando los ítems al margen.
- *  - Conserva los saltos de línea reales y el sangrado relativo entre líneas.
+ * Normalizes the free text of the report for the PDF:
+ *  - Standardizes line endings (CRLF -> LF).
+ *  - Removes the common indentation (leading spaces/tabs) that the form
+ *    textarea adds to each line, aligning items to the margin.
+ *  - Preserves real line breaks and relative indentation between lines.
  */
 function img_norm_texto(?string $t): string
 {
     if ($t === null || $t === '') {
         return '';
     }
-    // Unificar fin de línea
+    // Normalize line endings
     $t = str_replace(["\r\n", "\r"], "\n", $t);
-    // Separar en líneas
+    // Split into lines
     $lineas = explode("\n", $t);
-    // Calcular la menor sangría (contando sólo espacios/tabs) entre líneas con contenido
+    // Calculate the minimum indentation (counting only spaces/tabs) among lines with content
     $minIndent = null;
     foreach ($lineas as $linea) {
         if (trim($linea) === '') {
@@ -142,7 +142,7 @@ function img_norm_texto(?string $t): string
     if ($minIndent === null) {
         $minIndent = 0;
     }
-    // Quitar esa sangría común a cada línea con contenido
+    // Remove that common indentation from each line with content
     $out = [];
     foreach ($lineas as $linea) {
         if (trim($linea) === '') {
@@ -151,7 +151,7 @@ function img_norm_texto(?string $t): string
             $out[] = substr($linea, $minIndent);
         }
     }
-    // Eliminar líneas vacías repetidas al fondo (trailing blank lines)
+    // Remove repeated blank lines at the end (trailing blank lines)
     while (($out[count($out) - 1] ?? '') === '') {
         array_pop($out);
     }
@@ -250,7 +250,7 @@ function img_norm_texto(?string $t): string
             width: 32%;
         }
 
-        /* Título de sección estilo print_pdf */
+        /* Section title in print_pdf style */
         .section-title {
             font-size: 10.5px;
             font-weight: bold;
@@ -282,7 +282,7 @@ function img_norm_texto(?string $t): string
             word-break: break-word;
         }
 
-        /* Tabla de detalles del estudio (modalidad/región/solicitante) */
+        /* Study details table (modality/region/requester) */
         .study-meta {
             width: 100%;
             border: 1px solid #cbd5e1;
@@ -310,7 +310,7 @@ function img_norm_texto(?string $t): string
             color: #475569;
         }
 
-        /* Firmas y validación */
+        /* Signatures and validation */
         .signature-table {
             width: 100%;
             margin-top: 20px;
@@ -346,7 +346,7 @@ function img_norm_texto(?string $t): string
             border-top: 1px dashed #94a3b8;
         }
 
-        /* Pie de página fijo */
+        /* Fixed footer */
         .footer-disclaimer {
             position: fixed;
             bottom: -12mm;
@@ -363,7 +363,7 @@ function img_norm_texto(?string $t): string
 <body>
 
     <!-- ================================================================= -->
-    <!-- ENCABEZADO INSTITUCIONAL                                           -->
+    <!-- INSTITUTIONAL HEADER                                               -->
     <!-- ================================================================= -->
     <table class="header-table">
         <tr>
@@ -390,14 +390,14 @@ function img_norm_texto(?string $t): string
     </table>
 
     <!-- ================================================================= -->
-    <!-- TÍTULO DEL REPORTE                                                 -->
+    <!-- REPORT TITLE                                                      -->
     <!-- ================================================================= -->
     <div class="report-header-title">
         <?= xl('IMAGING DIAGNOSTIC REPORT') ?> - <?= htmlspecialchars($modalidadLabel) ?>
     </div>
 
     <!-- ================================================================= -->
-    <!-- FICHA DEL PACIENTE                                                 -->
+    <!-- PATIENT INFO                                                      -->
     <!-- ================================================================= -->
     <table class="patient-box">
         <tr>
@@ -425,7 +425,7 @@ function img_norm_texto(?string $t): string
     </table>
 
     <!-- ================================================================= -->
-    <!-- DETALLES DEL ESTUDIO (DICOM)                                       -->
+    <!-- STUDY DETAILS (DICOM)                                              -->
     <!-- ================================================================= -->
     <table class="study-meta">
         <tr>
@@ -471,7 +471,7 @@ function img_norm_texto(?string $t): string
     <?php endif; ?>
 
     <!-- ================================================================= -->
-    <!-- FIRMAS Y VALIDACIÓN ELECTRÓNICA                                    -->
+    <!-- SIGNATURES AND ELECTRONIC VALIDATION                               -->
     <!-- ================================================================= -->
     <table class="signature-table">
         <tr>
@@ -504,7 +504,7 @@ function img_norm_texto(?string $t): string
     </table>
 
     <!-- ================================================================= -->
-    <!-- PIE DE PÁGINA                                                      -->
+    <!-- FOOTER                                                            -->
     <!-- ================================================================= -->
     <div class="footer-disclaimer">
         <?= xl('This document is an official medical report issued by') ?> <?= htmlspecialchars($clinicName) ?>. <?= xl('Its validity and confidentiality are protected by current health regulations (Law 25.326 / HIPAA).') ?> <?= xl('Document generated digitally on') ?> <?= htmlspecialchars($fechaImpresion) ?> - <?= xl('Report No.:') ?> <?= htmlspecialchars($reportCode) ?> - PID: <?= htmlspecialchars((string)$pid) ?>.

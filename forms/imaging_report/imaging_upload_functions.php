@@ -2,22 +2,24 @@
 /**
  * imaging_upload_functions.php
  *
- * Funciones para la subida DIRECTA de documentos de imágenes (DICOM, JPG/PNG,
- * PDF) desde el formulario de informe de diagnóstico por imágenes.
+ * Functions for DIRECT upload of imaging documents (DICOM, JPG/PNG,
+ * PDF or a ZIP containing a study) from the imaging diagnostic
+ * report form.
  *
- * A diferencia del cron anterior (que sincronizaba Documents -> PACS en lote),
- * cada archivo se sube en el momento: se guarda en `documents` y, si hay un
- * PACS proveedor configurado, se sube de inmediato al PACS de la orden
- * (procedure_order.lab_id -> procedure_providers).
+ * Unlike the previous cron job (which synchronized Documents -> PACS
+ * in batch), each file is uploaded in real time: saved to 'documents'
+ * and, if a PACS provider is configured, immediately uploaded to the
+ * order's PACS (procedure_order.lab_id -> procedure_providers).
  *
- * Convención "mismo estudio por orden": para imágenes, PDF y DICOM nativos se
- * fuerza un StudyInstanceUID determinístico derivado de la orden, de modo que
- * todas las series de una misma orden coexisten en un único estudio DICOM en
- * el PACS. Los DICOM nativos se reasignan a ese estudio tras subirlos (con
- * Force en Orthanc); si la reasignación falla, conservan su estudio original.
+ * "Same study per order" convention: for images, PDFs and native DICOM,
+ * a deterministic StudyInstanceUID derived from the order is enforced, so
+ * all series from the same order coexist in a single DICOM study on the
+ * PACS. Native DICOM files are reassigned to that study after upload
+ * (using Force in Orthanc); if reassignment fails, they keep their
+ * original study.
  *
- * Requiere: globals.php incluido (sqlQuery/sqlStatement), y la tabla
- * `form_imaging_report_images` existente (ver forms/imaging_report/table.sql).
+ * Requires: globals.php included (sqlQuery/sqlStatement), and the
+ * `form_imaging_report_images` table existing (see forms/imaging_report/table.sql).
  */
 
 use App\PacsProvider;
@@ -25,9 +27,9 @@ use App\PacsService;
 
 require_once __DIR__ . '/category_functions.php';
 
-// Asegurar el autoload de las clases proyecto (App\...) en cualquier contexto
-// (formulario clínico de OpenEMR o ejecución standalone). Se usa un fallback
-// global por si el composer autoload del proyecto no está ya registrado.
+// Ensure autoload for project classes (App\...) in any context
+// (OpenEMR clinical form or standalone execution). A global fallback is used
+// in case the project's composer autoload is not already registered.
 if (!class_exists('App\PacsProvider')) {
     spl_autoload_register(function ($class) {
         $prefix = 'App\\';
@@ -47,9 +49,9 @@ if (!class_exists('App\PacsProvider')) {
     });
 }
 
-define('IMAGING_UPLOAD_MAX_BYTES', 50 * 1024 * 1024); // 50 MB por archivo
+define('IMAGING_UPLOAD_MAX_BYTES', 50 * 1024 * 1024); // 50 MB per file
 
-const IMAGING_UPLOAD_ALLOWED_EXT = ['jpg', 'jpeg', 'png', 'webp', 'dcm', 'dicom', 'pdf'];
+const IMAGING_UPLOAD_ALLOWED_EXT = ['jpg', 'jpeg', 'png', 'webp', 'dcm', 'dicom', 'pdf', 'zip'];
 const IMAGING_UPLOAD_ALLOWED_MIME = [
     'image/jpeg',
     'image/png',
@@ -58,12 +60,14 @@ const IMAGING_UPLOAD_ALLOWED_MIME = [
     'application/dicom',
     'image/dicom',
     'application/octet-stream',
+    'application/zip',
+    'application/x-zip-compressed',
 ];
 
 const IMAGING_UPLOAD_ROOT_NAME = 'Diagnostic Imaging';
 
 /**
- * Obtiene el encabezado de tags DICOM comunes para un paciente/modalidad.
+ * Builds common DICOM tag headers for a patient/modality.
  */
 function imaging_build_dicom_tags(int $pid, string $modality, string $studyUid): array
 {
@@ -98,8 +102,8 @@ function imaging_build_dicom_tags(int $pid, string $modality, string $studyUid):
 }
 
 /**
- * Genera un StudyInstanceUID determinístico para una orden, de modo que todos
- * los archivos de la misma orden compartan el mismo estudio en el PACS.
+ * Generates a deterministic StudyInstanceUID for an order, so that all
+ * files from the same order share the same study on the PACS.
  */
 function imaging_study_uid_for_order(int $procedureOrderId, int $providerId): string
 {
@@ -107,7 +111,7 @@ function imaging_study_uid_for_order(int $procedureOrderId, int $providerId): st
 }
 
 /**
- * Traduce la modalidad del formulario a modalidad DICOM.
+ * Translates the form modality to DICOM modality.
  */
 function imaging_modality_to_dicom(string $modalidad): string
 {
@@ -123,8 +127,8 @@ function imaging_modality_to_dicom(string $modalidad): string
 }
 
 /**
- * Devuelve la categoría destino para las imágenes (subcategoría de modalidad
- * bajo "Diagnostic Imaging", o la raíz de imágenes como fallback).
+ * Returns the destination category for images (modality subcategory
+ * under "Diagnostic Imaging", or the root images category as fallback).
  */
 function imaging_upload_category_id(string $modality): int
 {
@@ -156,7 +160,7 @@ function imaging_upload_category_id(string $modality): int
 }
 
 /**
- * Valida y devuelve la información de un archivo subido, o un mensaje de error.
+ * Validates and returns uploaded file information, or an error message.
  *
  * @return array{ok:bool, ext:string, mime:string, size:int, error?:string}
  */
@@ -180,18 +184,25 @@ function imaging_validate_upload(array $file): array
 }
 
 /**
- * Sube un archivo de imagen: lo guarda en `documents` y lo envía al PACS del
- * proveedor de la orden. Registra la operación en form_imaging_report_images.
+ * Uploads an image file: saves it to `documents` and sends it to the
+ * order provider's PACS. Logs the operation in form_imaging_report_images.
  *
- * @param array $file          Elemento de $_FILES
- * @param int   $pid           Paciente
- * @param int   $procedureOrderId Orden de procedimiento de origen
- * @param int   $formId        id de form_imaging_report (0 si aún no se guardó)
- * @param string $modality     Modalidad del informe (para tags DICOM / categoría)
- * @param int   $encounterId   Encuentro
+ * @param array $file          $_FILES element
+ * @param int   $pid           Patient
+ * @param int   $procedureOrderId Source procedure order
+ * @param int   $formId        ID of form_imaging_report (0 if not yet saved)
+ * @param string $modality     Report modality (for DICOM tags / category)
+ * @param int   $encounterId   Encounter
+ * @param bool  $skipPacsUpload If true, only saves to `documents` (and logs
+ *                              in form_imaging_report_images) without uploading
+ *                              to PACS. Used for internal files of a ZIP, which
+ *                              are uploaded compressed to PACS as a single unit.
+ * @param bool  $pacsDisabled   If true, the file must NOT go to PACS because the
+ *                              "Also upload to PACS server" checkbox is
+ *                              disabled; logged with status='skipped'.
  * @return array{success:bool, message:string, image_id:?int, document_id:?int, study_uid:?string}
  */
-function imaging_upload_document(array $file, int $pid, int $procedureOrderId, int $formId, string $modality, int $encounterId): array
+function imaging_upload_document(array $file, int $pid, int $procedureOrderId, int $formId, string $modality, int $encounterId, bool $skipPacsUpload = false, bool $pacsDisabled = false): array
 {
     $valid = imaging_validate_upload($file);
     if (!$valid['ok']) {
@@ -204,13 +215,13 @@ function imaging_upload_document(array $file, int $pid, int $procedureOrderId, i
     $mime = $valid['mime'] ?: ('application/octet-stream');
     $fileContent = file_get_contents((string)$file['tmp_name']);
 
-    // Guardar en documents
+    // Save to documents
     $categoryId = imaging_upload_category_id($modality);
     if ($categoryId <= 0) {
-        $categoryId = imaging_default_category_id($modality); // fallback form helper
+        $categoryId = imaging_default_category_id($modality); // form helper fallback
     }
     if ($categoryId <= 0) {
-        $categoryId = 3; // última red de seguridad: categoría raíz de imágenes
+        $categoryId = 3; // last resort: root images category
     }
 
     $doc = new \Document();
@@ -238,7 +249,7 @@ function imaging_upload_document(array $file, int $pid, int $procedureOrderId, i
         sqlStatement("UPDATE documents SET encounter_id = ? WHERE id = ?", [$encounterId, $documentId]);
     }
 
-    // Resolver proveedor PACS desde la orden
+    // Resolve PACS provider from the order
     $provider = PacsProvider::resolveForOrder($procedureOrderId);
     $studyUid = '';
     $pacsInstance = '';
@@ -247,12 +258,24 @@ function imaging_upload_document(array $file, int $pid, int $procedureOrderId, i
     $status = 'uploaded';
     $errorMessage = null;
 
-    if ($provider->isConfigured()) {
+    // If the "Also upload to PACS server" checkbox is disabled, the file
+    // remains in documents only and is logged as 'skipped' (not sent to PACS).
+    if ($pacsDisabled) {
+        $status = 'skipped';
+    }
+
+    if (($skipPacsUpload || $pacsDisabled) && $provider->ppid) {
+        // Files (internal to a ZIP or with the PACS checkbox disabled)
+        // are logged with the order's study in their individual record.
+        $studyUid = imaging_study_uid_for_order($procedureOrderId, $provider->ppid);
+    }
+
+    if (!$skipPacsUpload && !$pacsDisabled && $provider->isConfigured()) {
         if (in_array($ext, ['dcm', 'dicom'], true)) {
             $res = PacsService::uploadNativeDicom($provider, $fileContent);
             if ($res['success']) {
-                // Forzar el estudio de la orden para agrupar todos los archivos
-                // de la misma orden en un único estudio DICOM (igual que imágenes).
+                // Force the order's study to group all files
+                // from the same order into a single DICOM study (same as images).
                 $orderStudyUid = imaging_study_uid_for_order($procedureOrderId, $provider->ppid);
                 $mod = PacsService::modifyInstance($provider, $res['instance_id'], $orderStudyUid);
                 if ($mod['success']) {
@@ -261,8 +284,8 @@ function imaging_upload_document(array $file, int $pid, int $procedureOrderId, i
                     $pacsStudy = (string)$mod['study_id'];
                     $studyUid = $orderStudyUid;
                 } else {
-                    // Fallback: conservar el estudio original del DICOM si la
-                    // reasignación falla (el documento igual queda guardado).
+                    // Fallback: keep the original DICOM study if the
+                    // reassignment fails (the document is still saved).
                     $pacsInstance = (string)$res['instance_id'];
                     $pacsSeries = (string)$res['series_id'];
                     $pacsStudy = (string)$res['study_id'];
@@ -302,7 +325,7 @@ function imaging_upload_document(array $file, int $pid, int $procedureOrderId, i
         }
     }
 
-    // Registrar en form_imaging_report_images (aunque el PACS falle, documentamos)
+    // Log in form_imaging_report_images (even if PACS fails, we document it)
     $imageId = (int)sqlInsert(
         "INSERT INTO form_imaging_report_images
             (form_id, procedure_order_id, pid, encounter_id, document_id, provider_id,
@@ -331,11 +354,131 @@ function imaging_upload_document(array $file, int $pid, int $procedureOrderId, i
         return ['success' => false, 'message' => xl('Document saved, but PACS upload failed: ') . $errorMessage, 'image_id' => $imageId, 'document_id' => $documentId, 'study_uid' => $studyUid];
     }
 
+    if ($status === 'skipped') {
+        return ['success' => true, 'message' => xl('Document saved. PACS upload was not enabled.'), 'image_id' => $imageId, 'document_id' => $documentId, 'study_uid' => $studyUid];
+    }
+
     return ['success' => true, 'message' => xl('Document and PACS upload completed.'), 'image_id' => $imageId, 'document_id' => $documentId, 'study_uid' => $studyUid];
 }
 
 /**
- * Devuelve los archivos de imágenes vinculados a un informe (o a una orden).
+ * Uploads a ZIP file containing a study (folders with .dcm and optionally
+ * images/PDF). Behavior:
+ *   - In OpenEMR (`documents` folders): each internal file is saved
+ *     individually (separately), with its own record in
+ *     form_imaging_report_images.
+ *   - In the PACS: the ZIP is uploaded compressed as a single unit (the PACS
+ *     accepts it and handles extraction and import).
+ *
+ * @param array  $file          $_FILES element for the ZIP
+ * @param int    $pid           Patient
+ * @param int    $procedureOrderId Source procedure order
+ * @param int    $formId        ID of form_imaging_report
+ * @param string $modality      Report modality
+ * @param int    $encounterId   Encounter
+ * @param bool   $skipPacs      If true, the ZIP is NOT uploaded to PACS (the
+ *                              "Also upload to PACS server" checkbox is
+ *                              disabled); files are still extracted and saved
+ *                              individually to `documents`.
+ * @return array{success:bool, message:string, image_id:?int, document_id:?int, study_uid:?string, count_ok:int, count_fail:int}
+ */
+function imaging_upload_zip(array $file, int $pid, int $procedureOrderId, int $formId, string $modality, int $encounterId, bool $skipPacs = false): array
+{
+    $zipPath = (string)$file['tmp_name'];
+    if (!class_exists('ZipArchive')) {
+        return ['success' => false, 'message' => xl('ZIP support is not available on this server.'), 'image_id' => null, 'document_id' => null, 'study_uid' => null, 'count_ok' => 0, 'count_fail' => 0];
+    }
+
+    $zip = new \ZipArchive();
+    if ($zip->open($zipPath) !== true) {
+        return ['success' => false, 'message' => xl('Could not open the ZIP archive.'), 'image_id' => null, 'document_id' => null, 'study_uid' => null, 'count_ok' => 0, 'count_fail' => 0];
+    }
+
+    $workdir = sys_get_temp_dir() . '/imaging_zip_' . bin2hex(random_bytes(6));
+    if (!@mkdir($workdir, 0777, true) && !is_dir($workdir)) {
+        $zip->close();
+        return ['success' => false, 'message' => xl('Could not create temporary directory for the ZIP.')];
+    }
+
+    $okCount = 0;
+    $failCount = 0;
+    $lastResult = ['success' => false, 'message' => '', 'image_id' => null, 'document_id' => null, 'study_uid' => null];
+
+    for ($i = 0; $i < $zip->numFiles; $i++) {
+        $entry = $zip->getNameIndex($i);
+        if ($entry === false || substr($entry, -1) === DIRECTORY_SEPARATOR || substr($entry, -1) === '/') {
+            continue; // directory entry
+        }
+
+        $ext = strtolower(pathinfo($entry, PATHINFO_EXTENSION));
+        if (!in_array($ext, ['dcm', 'dicom', 'jpg', 'jpeg', 'png', 'webp', 'pdf'], true)) {
+            continue; // ignore non-image files (not uploaded)
+        }
+
+        // Extract to an individual temporary file and build the $_FILES element
+        $safeName = basename($entry);
+        $tmpFile = $workdir . '/' . $i . '_' . $safeName;
+        $data = $zip->getFromIndex($i);
+        if ($data === false) {
+            $failCount++;
+            continue;
+        }
+        file_put_contents($tmpFile, $data);
+
+        $subFile = [
+            'name' => $safeName,
+            'type' => mime_content_type($tmpFile) ?: 'application/octet-stream',
+            'tmp_name' => $tmpFile,
+            'error' => UPLOAD_ERR_OK,
+            'size' => strlen($data),
+        ];
+
+        // Individual save to documents + logging (without uploading to PACS: the
+        // entire ZIP is uploaded to PACS compressed, below).
+        $res = imaging_upload_document($subFile, $pid, $procedureOrderId, $formId, $modality, $encounterId, true, $skipPacs);
+        $lastResult = $res;
+        if ($res['success']) {
+            $okCount++;
+        } else {
+            $failCount++;
+        }
+        @unlink($tmpFile);
+    }
+    $zip->close();
+
+    // Upload the complete compressed ZIP to PACS as a single unit (only if the
+    // "Also upload to PACS server" checkbox is enabled).
+    $provider = PacsProvider::resolveForOrder($procedureOrderId);
+    $zipFail = null;
+    if (!$skipPacs && $okCount > 0 && $provider && $provider->isConfigured()) {
+        $zipBinary = file_get_contents($zipPath);
+        $zipRes = PacsService::uploadZipDicom($provider, $zipBinary);
+        if (!$zipRes['success']) {
+            $zipFail = $zipRes['message'];
+        }
+    }
+
+    @array_map('unlink', glob($workdir . '/*') ?: []);
+    @rmdir($workdir);
+
+    $message = xl('ZIP processed: ') . $okCount . xl(' document(s) saved individually.') .
+        ($skipPacs ? ' ' . xl('PACS upload was not enabled.') : '') .
+        ($failCount > 0 ? ' ' . $failCount . xl(' failed.') : '') .
+        ($zipFail ? ' ' . xl('PACS zip upload failed: ') . $zipFail : '');
+
+    return [
+        'success' => $okCount > 0 && !$zipFail,
+        'message' => $message,
+        'image_id' => $lastResult['image_id'],
+        'document_id' => $lastResult['document_id'],
+        'study_uid' => $lastResult['study_uid'],
+        'count_ok' => $okCount,
+        'count_fail' => $failCount + ($zipFail ? 1 : 0),
+    ];
+}
+
+/**
+ * Returns the imaging files linked to a report (or to an order).
  *
  * @return array<int, array{id:int, filename:string, modality:string, status:string, study_uid:string, document_id:int}>
  */
@@ -363,7 +506,7 @@ function imaging_get_report_images(int $formId, int $procedureOrderId = 0): arra
 }
 
 /**
- * Asocia imágenes previamente subidas (sin informa) al informe recién guardado.
+ * Links previously uploaded images (without a report) to the newly saved report.
  */
 function imaging_attach_images_to_report(int $formId, int $procedureOrderId, int $pid): void
 {
@@ -377,21 +520,24 @@ function imaging_attach_images_to_report(int $formId, int $procedureOrderId, int
 }
 
 /**
- * Devuelve una etiqueta HTML de estado para una fila de imagen subida.
+ * Returns an HTML status badge for an uploaded image row.
  */
 function imaging_status_badge(string $status): string
 {
     if ($status === 'failed') {
         return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">' . xlt('Failed') . '</span>';
     }
+    if ($status === 'skipped') {
+        return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-200 text-slate-600">' . xlt('No PACS') . '</span>';
+    }
     return '<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">' . xlt('Uploaded') . '</span>';
 }
 
 /**
- * Renderiza la fila HTML (Tailwind) de un documento de imágenes ya subido,
- * para la lista "Uploaded documents" del formulario.
+ * Renders the HTML row (Tailwind) for an already uploaded imaging document,
+ * for the "Uploaded documents" list in the form.
  *
- * @param array $img  Fila de imaging_get_report_images()
+ * @param array $img  Row from imaging_get_report_images()
  */
 function imaging_render_uploaded_row(array $img): string
 {

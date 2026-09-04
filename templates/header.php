@@ -1,6 +1,6 @@
 <?php
 /**
- * Plantilla de Cabecera Global
+ * Global Header Template
  * Patient Express Portal
  */
 declare(strict_types=1);
@@ -20,7 +20,7 @@ $pageTitle = $pageTitle ?? (xlt('Patient Express Portal') . (defined('CLINIC_NAM
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?= htmlspecialchars($pageTitle) ?></title>
     
-    <!-- Meta tags SEO y PWA -->
+    <!-- SEO and PWA Meta Tags -->
     <meta name="description" content="<?= xla('Quick access to clinical test results, diagnostic imaging reports and the DICOM viewer.') ?>">
     <meta name="theme-color" content="#0284c7">
     <meta name="robots" content="noindex, nofollow">
@@ -72,12 +72,12 @@ $pageTitle = $pageTitle ?? (xlt('Patient Express Portal') . (defined('CLINIC_NAM
 </head>
 <body class="h-full flex flex-col font-sans antialiased text-slate-900 bg-slate-50 selection:bg-sky-500 selection:text-white">
 
-    <!-- Navbar Superior -->
+    <!-- Top Navbar -->
     <header class="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200/80 shadow-xs transition-all duration-200">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-16 md:h-20">
                 
-                <!-- Logo e Identidad -->
+                <!-- Logo and Branding -->
                 <div class="flex items-center space-x-3">
                     <a href="dashboard.php" class="flex items-center group">
                         <img src="assets/img/logo-portal-pacientes.svg"
@@ -86,11 +86,11 @@ $pageTitle = $pageTitle ?? (xlt('Patient Express Portal') . (defined('CLINIC_NAM
                     </a>
                 </div>
 
-                <!-- Barra Derecha: Usuario & Acciones -->
+                <!-- Right Bar: User & Actions -->
                 <div class="flex items-center space-x-3 sm:space-x-4">
                     
                     <?php if ($isLoggedIn && $currentPatient): ?>
-                        <!-- Perfil Paciente Logueado -->
+                        <!-- Logged-In Patient Profile -->
                         <div class="hidden sm:flex items-center space-x-3 px-3.5 py-1.5 rounded-full bg-slate-100/90 border border-slate-200">
                             <div class="w-7 h-7 rounded-full bg-sky-600 text-white flex items-center justify-center text-xs font-bold font-heading">
                                 <?= strtoupper(substr($currentPatient['fname'] ?: 'P', 0, 1) . substr($currentPatient['lname'] ?: 'T', 0, 1)) ?>
@@ -105,7 +105,7 @@ $pageTitle = $pageTitle ?? (xlt('Patient Express Portal') . (defined('CLINIC_NAM
                             </div>
                         </div>
 
-                        <!-- Botón Enlace Portal Completo (Auto-Login SSO) -->
+                        <!-- Full Portal Link Button (SSO Auto-Login) -->
                         <a href="goto_portal.php" 
                            target="_blank" 
                            rel="noopener noreferrer"
@@ -115,7 +115,7 @@ $pageTitle = $pageTitle ?? (xlt('Patient Express Portal') . (defined('CLINIC_NAM
                             <span><?= xlt('OpenEMR Portal') ?></span>
                         </a>
 
-                        <!-- Botón Salir / Logout -->
+                        <!-- Logout Button -->
                         <a href="logout.php" 
                            class="inline-flex items-center space-x-1.5 text-xs font-heading font-semibold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100/80 px-3.5 py-2 rounded-xl border border-rose-200/60 transition-all shadow-xs"
                            title="<?= xla('Log out securely') ?>">
@@ -124,7 +124,7 @@ $pageTitle = $pageTitle ?? (xlt('Patient Express Portal') . (defined('CLINIC_NAM
                         </a>
 
                     <?php else: ?>
-                        <!-- Si no está logueado -->
+                        <!-- Not Logged In -->
                         <div class="flex items-center space-x-2 text-xs text-slate-500">
                             <span class="inline-flex items-center px-2.5 py-1 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">
                                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5 animate-pulse"></span>
@@ -139,5 +139,5 @@ $pageTitle = $pageTitle ?? (xlt('Patient Express Portal') . (defined('CLINIC_NAM
         </div>
     </header>
 
-    <!-- Contenido Principal -->
+    <!-- Main Content -->
     <main class="flex-grow">

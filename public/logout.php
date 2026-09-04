@@ -1,6 +1,6 @@
 <?php
 /**
- * Cierre de Sesión Seguro - Patient Express Portal
+ * Secure Session Logout - Patient Express Portal
  */
 
 declare(strict_types=1);

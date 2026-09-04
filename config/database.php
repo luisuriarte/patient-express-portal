@@ -1,18 +1,18 @@
 <?php
 /**
- * Configuración de Base de Datos y Parámetros del Sistema
- * Patient Express Portal - Conexión OpenEMR & PACS Orthanc / OHIF
+ * Database Configuration and System Parameters
+ * Patient Express Portal - OpenEMR & PACS Orthanc / OHIF Connection
  */
 
 declare(strict_types=1);
 
-// Configuración de errores para entorno de producción / desarrollo
+// Error configuration for production / development environment
 ini_set('display_errors', '0');
 ini_set('log_errors', '1');
 error_reporting(E_ALL);
 
 // ==========================================
-// 1. CONSTANTES DE BASE DE DATOS (OPENEMR)
+// 1. DATABASE CONSTANTS (OPENEMR)
 // ==========================================
 define('DB_HOST', getenv('OPENEMR_DB_HOST') ?: '127.0.0.1');
 define('DB_PORT', getenv('OPENEMR_DB_PORT') ?: '3306');
@@ -22,26 +22,26 @@ define('DB_PASS', getenv('OPENEMR_DB_PASS') ?: 'openemr');
 define('DB_CHARSET', 'utf8mb4');
 
 // ==========================================
-// 2. CONSTANTES DE INTEGRACIÓN PACS & SERVICIOS
+// 2. PACS & SERVICES INTEGRATION CONSTANTS
 // ==========================================
-// Servidor PACS Orthanc REST API
+// Orthanc PACS REST API Server
 define('ORTHANC_URL', getenv('ORTHANC_URL') ?: 'http://127.0.0.1:8042');
 define('ORTHANC_USER', getenv('ORTHANC_USER') ?: 'orthanc');
 define('ORTHANC_PASS', getenv('ORTHANC_PASS') ?: 'orthanc');
-define('ORTHANC_TIMEOUT', 5); // Segundos timeout de consulta REST
+define('ORTHANC_TIMEOUT', 5); // REST query timeout in seconds
 
-// Visor DICOM OHIF
+// OHIF DICOM Viewer
 define('OHIF_VIEWER_BASE_URL', getenv('OHIF_VIEWER_BASE_URL') ?: 'https://imagenes.origen.ar/viewer');
 define('ORTHANC_WADO_URL', getenv('ORTHANC_WADO_URL') ?: 'https://pacs.origen.ar/dicom-web');
 
-// Portal Completo OpenEMR
+// Full OpenEMR Portal
 define('OPENEMR_PORTAL_URL', getenv('OPENEMR_PORTAL_URL') ?: 'https://hcd.origen.ar/portal');
 
 // ==========================================
-// 3. DATOS INSTITUCIONALES (Para encabezados y PDFs)
-//    En este despliegue standalone no se exponen datos del centro en código:
-//    se usan valores neutros. En el despliegue nativo (config.php) estos datos
-//    se cargan automáticamente desde la tabla `facility` de OpenEMR.
+// 3. INSTITUTIONAL DATA (For headers and PDFs)
+//    In this standalone deployment, facility data is not exposed in code:
+//    neutral values are used. In the native deployment (config.php), this data
+//    is loaded automatically from the OpenEMR `facility` table.
 // ==========================================
 define('CLINIC_NAME',     'Centro de Salud');
 define('CLINIC_SUBTITLE', 'Portal del Paciente');
@@ -56,10 +56,10 @@ if (!file_exists($logoFile)) {
 define('CLINIC_LOGO_PATH', $logoFile);
 
 // ==========================================
-// 4. FUNCIÓN HELPER DE CONEXIÓN PDO
+// 4. PDO CONNECTION HELPER FUNCTION
 // ==========================================
 /**
- * Obtiene la conexión singleton a la base de datos OpenEMR
+ * Retrieves the singleton connection to the OpenEMR database
  * 
  * @return PDO
  * @throws PDOException
@@ -83,7 +83,7 @@ function getDbConnection(): PDO
             PDO::ATTR_EMULATE_PREPARES   => false,
         ];
 
-        // Compatibilidad PHP 8.5+ para ATTR_INIT_COMMAND (o fallback en versiones previas)
+        // PHP 8.5+ compatibility for ATTR_INIT_COMMAND (or fallback on earlier versions)
         if (defined('\Pdo\Mysql::ATTR_INIT_COMMAND')) {
             $options[\Pdo\Mysql::ATTR_INIT_COMMAND] = "SET NAMES " . DB_CHARSET . " COLLATE " . DB_CHARSET . "_unicode_ci";
         } elseif (defined('PDO::MYSQL_ATTR_INIT_COMMAND')) {
@@ -93,19 +93,19 @@ function getDbConnection(): PDO
         try {
             $pdo = new PDO($dsn, DB_USER, DB_PASS, $options);
         } catch (PDOException $e) {
-            error_log('Error de conexión a la Base de Datos OpenEMR: ' . $e->getMessage());
-            throw new PDOException('No fue posible establecer conexión con el servidor de historias clínicas.');
+            error_log('OpenEMR Database connection error: ' . $e->getMessage());
+            throw new PDOException('Unable to establish connection to the medical records server.');
         }
     }
 
     return $pdo;
 }
 
-// Cargar autoload de composer si existe
+// Load Composer autoload if available
 if (file_exists(dirname(__DIR__) . '/vendor/autoload.php')) {
     require_once dirname(__DIR__) . '/vendor/autoload.php';
 } else {
-    // Autoloader fallback para clases en src/
+    // Fallback autoloader for classes in src/
     spl_autoload_register(function ($class) {
         $prefix = 'App\\';
         $baseDir = dirname(__DIR__) . '/src/';

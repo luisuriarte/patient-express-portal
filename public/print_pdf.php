@@ -1,7 +1,7 @@
 <?php
 /**
- * Generador y Servidor de Informes Médicos en PDF con Dompdf
- * Patient Express Portal - Agrupación Continua por Encuentro / Fecha de Análisis
+ * Medical Report PDF Generator and Server with Dompdf
+ * Patient Express Portal - Continuous Grouping by Encounter / Analysis Date
  */
 
 declare(strict_types=1);
@@ -49,7 +49,7 @@ if (!$data) {
     die(xl('Error: Report not found or you do not have permission to access the requested document.'));
 }
 
-// Cargar Logo en base64 para Dompdf (soporta SVG y PNG)
+// Load Logo in base64 for Dompdf (supports SVG and PNG)
 $logoBase64 = '';
 $logoPathFile = defined('CLINIC_LOGO_PATH') ? CLINIC_LOGO_PATH : (dirname(__DIR__) . '/assets/img/logo-banner.svg');
 if (file_exists($logoPathFile)) {
@@ -59,7 +59,7 @@ if (file_exists($logoPathFile)) {
     $logoBase64 = 'data:' . $mime . ';base64,' . base64_encode($imgData);
 }
 
-// Estructurar el HTML para la plantilla A4
+// Structure the HTML for the A4 template
 ob_start();
 ?>
 <!DOCTYPE html>
@@ -134,7 +134,7 @@ ob_start();
             width: 32%;
         }
         
-        /* Paneles y Tablas de Laboratorio */
+        /* Laboratory Panels and Tables */
         .panel-container {
             margin-bottom: 16px;
             page-break-inside: avoid;
@@ -202,7 +202,7 @@ ob_start();
             margin-left: 2px;
         }
 
-        /* Secciones de Informe */
+        /* Report Sections */
         .section-title {
             font-size: 10.5px;
             font-weight: bold;
@@ -225,7 +225,7 @@ ob_start();
             margin-bottom: 6px;
         }
 
-        /* Firmas y Pie */
+        /* Signatures and Footer */
         .signature-table {
             width: 100%;
             margin-top: 20px;
@@ -261,7 +261,7 @@ ob_start();
 </head>
 <body>
 
-    <!-- Encabezado Institucional -->
+    <!-- Institutional Header -->
     <table class="header-table">
         <tr>
             <td style="width: 60%; vertical-align: middle;">
@@ -277,7 +277,7 @@ ob_start();
         </tr>
     </table>
 
-    <!-- Título del Reporte -->
+    <!-- Report Title -->
     <div class="report-header-title">
         <?= htmlspecialchars($reportTitle) ?>
         <?php if ($type === 'lab'): ?>
@@ -287,7 +287,7 @@ ob_start();
         <?php endif; ?>
     </div>
 
-    <!-- Ficha del Paciente -->
+    <!-- Patient Card -->
     <table class="patient-box">
         <tr>
             <td class="label"><?= xlt('Patient') ?>:</td>
@@ -317,13 +317,13 @@ ob_start();
 
     <?php if ($type === 'lab'): ?>
         <!-- ========================================================================= -->
-        <!-- CUERPO DE LABORATORIO AGRUPADO POR ENCUENTRO (LISTADO CONTINUO) -->
+        <!-- LABORATORY BODY GROUPED BY ENCOUNTER (CONTINUOUS LISTING) -->
         <!-- ========================================================================= -->
         <?php if (!empty($data['panels'])): ?>
             <?php foreach ($data['panels'] as $index => $panel): ?>
                 <div class="panel-container">
                     
-                    <!-- Encabezado del Panel de Análisis -->
+                    <!-- Analysis Panel Header -->
                     <div class="panel-header">
                         <span><?= ($index + 1) ?>. <?= htmlspecialchars($panel['panel_name']) ?></span>
                         <span class="panel-meta">
@@ -332,7 +332,7 @@ ob_start();
                         </span>
                     </div>
 
-                    <!-- Tabla de Resultados de este Panel -->
+                    <!-- Results Table for This Panel -->
                     <table class="results-table">
                         <thead>
                             <tr>
@@ -392,7 +392,7 @@ ob_start();
 
     <?php else: ?>
         <!-- ========================================================================= -->
-        <!-- CUERPO DE INFORME DE IMÁGENES (RADIOLOGÍA/TAC/RMN) -->
+        <!-- IMAGING REPORT BODY (RADIOLOGY/CT/MRI) -->
         <!-- ========================================================================= -->
         <div style="margin-bottom: 10px;">
             <table style="width: 100%; font-size: 9.5px; border-collapse: collapse;">
@@ -414,7 +414,7 @@ ob_start();
         </div>
     <?php endif; ?>
 
-    <!-- Firmas Digitales y Validación -->
+    <!-- Digital Signatures and Validation -->
     <table class="signature-table">
         <tr>
             <td class="qr-placeholder">
@@ -434,7 +434,7 @@ ob_start();
         </tr>
     </table>
 
-    <!-- Pie de página fijo -->
+    <!-- Fixed Footer -->
     <div class="footer-disclaimer">
         <?= xlt('This document is an official medical protocol issued by') ?> <?= defined('CLINIC_NAME') ? CLINIC_NAME : '' ?>. <?= xlt('Its validity and confidentiality are protected by current health regulations (Law 25.326 / HIPAA).') ?>
     </div>
@@ -444,7 +444,7 @@ ob_start();
 <?php
 $html = ob_get_clean();
 
-// Generar PDF usando Dompdf si está disponible
+// Generate PDF using Dompdf if available
 if (class_exists(\Dompdf\Dompdf::class)) {
     $options = new \Dompdf\Options();
     $options->set('isHtml5ParserEnabled', true);
@@ -459,13 +459,13 @@ if (class_exists(\Dompdf\Dompdf::class)) {
     $encounterTag = !empty($data['encounter_id']) ? ('enc_' . $data['encounter_id']) : date('Ymd');
     $fileName = sprintf('protocolo_%s_%d_%s.pdf', $type, $pid, $encounterTag);
     
-    // Servir inline para visualización directa en navegador o iframe
+    // Serve inline for direct viewing in browser or iframe
     $dompdf->stream($fileName, [
         'Attachment' => 0
     ]);
     exit;
 } else {
-    // Renderizado HTML directo para impresión si dompdf no está en el entorno
+    // Direct HTML rendering for printing if dompdf is not in the environment
     header('Content-Type: text/html; charset=UTF-8');
     echo $html;
     exit;

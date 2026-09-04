@@ -1,16 +1,16 @@
 <?php
 /**
- * Configuración Global e Integración Nativa con OpenEMR
+ * Global Configuration and Native Integration with OpenEMR
  * Patient Express Portal
  */
 
 declare(strict_types=1);
 
-// Evitar que el login estándar de OpenEMR intercepte las peticiones del portal express
+// Prevent OpenEMR's standard login from intercepting Express portal requests
 $ignoreAuth = true;
 $ignoreAuth_onsite_portal = true;
 
-// Configurar entorno CLI para bootstrap de OpenEMR
+// Configure CLI environment for OpenEMR bootstrap
 if (php_sapi_name() === 'cli' || empty($_SERVER['HTTP_HOST'])) {
     $_SERVER['HTTP_HOST']   = $_SERVER['HTTP_HOST'] ?? 'localhost';
     $_SERVER['SERVER_NAME'] = $_SERVER['SERVER_NAME'] ?? 'localhost';
@@ -23,7 +23,7 @@ if (php_sapi_name() === 'cli' || empty($_SERVER['HTTP_HOST'])) {
     $GLOBALS['oe_site_id']  = 'default';
 }
 
-// 1. Bootstrap Nativo de OpenEMR (Subiendo niveles hasta interface/globals.php)
+// 1. Native OpenEMR Bootstrap (traversing up to interface/globals.php)
 $globalsIncluded = false;
 $searchPaths = [
     __DIR__ . '/../interface/globals.php',
@@ -42,7 +42,7 @@ foreach ($searchPaths as $path) {
     }
 }
 
-// 2. Parámetros de Integración PACS / OHIF / OpenEMR
+// 2. PACS / OHIF / OpenEMR Integration Parameters
 if (!defined('ORTHANC_URL')) {
     define('ORTHANC_URL', getenv('ORTHANC_URL') ?: 'http://127.0.0.1:8042');
 }
@@ -65,10 +65,10 @@ if (!defined('OPENEMR_PORTAL_URL')) {
     define('OPENEMR_PORTAL_URL', getenv('OPENEMR_PORTAL_URL') ?: 'https://hcd.origen.ar/portal');
 }
 
-// 3. Datos Institucionales
-//    Se cargan dinámicamente desde la tabla `facility` de OpenEMR (facility
-//    de facturación/billing principal) para NO exponer datos del centro en
-//    código. El logo sí se mantiene como recurso estático local.
+// 3. Institutional Data
+//    Loaded dynamically from OpenEMR's `facility` table (primary billing
+//    facility) to avoid exposing facility data in code.
+//    The logo is kept as a local static resource.
 $facility = [];
 if ($globalsIncluded && function_exists('sqlQuery')) {
     try {
@@ -110,7 +110,7 @@ if (!defined('CLINIC_LOGO_PATH')) {
     define('CLINIC_LOGO_PATH', $logoFile);
 }
 
-// 4. Autoloading de Clases
+// 4. Class Autoloading
 if (file_exists(__DIR__ . '/vendor/autoload.php')) {
     require_once __DIR__ . '/vendor/autoload.php';
 } elseif (file_exists(dirname(__DIR__, 2) . '/vendor/autoload.php')) {

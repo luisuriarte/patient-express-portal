@@ -148,8 +148,13 @@ patient-express-portal/
 
 **No hay cron de sincronización.** Las imágenes y PDFs se suben al PACS **en el momento de guardar** desde el formulario del informe (`forms/imaging_report/`), a través del proveedor de la orden de estudio.
 
+- **Casilla "Además sube al servidor PACS"**: el formulario del informe incluye un interruptor (verde) que controla si los archivos, además de guardarse en los `documents` de OpenEMR, se suben al servidor PACS. Está **activada por defecto**:
+  - **Activada**: el archivo se guarda en `documents` **y** se sube al PACS (estado `uploaded`).
+  - **Desactivada**: solo se guarda en `documents`, no va al PACS (estado `skipped`).
+
 - Cada archivo (DICOM, JPG/PNG/WEBP, PDF) se sube directamente al PACS/Orthanc correspondiente vía `POST /instances` (DICOM nativo) o `POST /tools/create-dicom`.
 - Los archivos de una misma orden de estudio comparten un `StudyInstanceUID` determinístico (`1.2.840.113619.2.55.<orderId>.<providerId>`). Los DICOM nativos se suben por `POST /instances` y luego se reasignan a ese estudio de la orden con `Force` (vía `/instances/{id}/modify`); si la reasignación falla, conservan su estudio original.
+- **Archivos ZIP**: se acepta subir un `.zip` con un estudio (carpetas con `.dcm` y/o imágenes/PDF). Al procesarlo: en los `documents` de OpenEMR cada archivo interno se guarda **individualmente** (separado, con su registro en `form_imaging_report_images`), mientras que al **PACS se sube el ZIP comprimido como una sola unidad** (`POST /instances` con `Content-Type: application/zip`); es el PACS destino quien se encarga de descomprimir e importar los estudios que contiene.
 - Cada subida queda registrada en `form_imaging_report_images` (columnas `pacs_instance_id`, `pacs_series_id`, `pacs_study_id`, `study_instance_uid`, `provider_id`, `status`).
 - El **PDF del informe generado NO se sube a PACS**; vive solo en los documentos de OpenEMR del paciente y se vincula al estudio de las imágenes subidas (vía `study_instance_uid`).
 

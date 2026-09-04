@@ -1,9 +1,9 @@
 <?php
 /**
- * Informe de Diagnóstico por Imágenes - view.php
+ * Imaging Report - view.php
  *
- * Vista de lectura del informe dentro del encuentro clínico.
- * Muestra los datos guardados y permite editar o ver el PDF.
+ * Read-only report view within the clinical encounter.
+ * Displays saved data and allows editing or viewing the PDF.
  *
  * @package   OpenEMR
  * @author    Centro Médico Origen
@@ -46,7 +46,7 @@ if (empty($obj)) {
     exit;
 }
 
-// Documentos de imágenes vinculados al informe
+// Imaging documents linked to the report
 $uploadedImages = imaging_get_report_images($formId);
 
 $modalidadLabels = [
@@ -79,7 +79,7 @@ $modalidadLabel = $modalidadLabels[$obj['modality'] ?? ''] ?? ($obj['modality'] 
 <body>
 <div class="max-w-4xl mx-auto px-4 py-6">
 
-    <!-- Cabecera -->
+    <!-- Header -->
     <div class="bg-gradient-to-r from-slate-900 to-slate-700 text-white rounded-2xl p-6 mb-6 shadow-lg flex items-center justify-between">
         <div>
             <h1 class="text-xl font-bold"><?= xlt('Imaging Report') ?></h1>
@@ -93,7 +93,7 @@ $modalidadLabel = $modalidadLabels[$obj['modality'] ?? ''] ?? ($obj['modality'] 
         </span>
     </div>
 
-    <!-- Datos del estudio -->
+    <!-- Study data -->
     <div class="bg-white rounded-2xl border border-slate-200 p-6 mb-5 shadow-sm">
         <h2 class="text-sm font-bold text-slate-800 mb-4 uppercase tracking-wider">📋 <?= xlt('Study Data') ?></h2>
         <div class="grid grid-cols-2 md:grid-cols-3 gap-5">
@@ -157,7 +157,16 @@ $modalidadLabel = $modalidadLabels[$obj['modality'] ?? ''] ?? ($obj['modality'] 
                             <td class="py-2 pr-3 text-slate-600"><?= text($img['modality'] ?? '—') ?></td>
                             <td class="py-2 pr-3 text-xs text-slate-400"><?= text($img['study_instance_uid'] ?? '—') ?></td>
                             <td class="py-2 pr-3">
-                                <?= $img['status'] === 'failed' ? '<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">' . xlt('Failed') . '</span>' : '<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">' . xlt('Uploaded') . '</span>' ?>
+                                <?php
+                                $st = $img['status'] ?? '';
+                                if ($st === 'failed') {
+                                    echo '<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700">' . xlt('Failed') . '</span>';
+                                } elseif ($st === 'skipped') {
+                                    echo '<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-slate-200 text-slate-600">' . xlt('No PACS') . '</span>';
+                                } else {
+                                    echo '<span class="px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">' . xlt('Uploaded') . '</span>';
+                                }
+                                ?>
                             </td>
                             <td class="py-2 text-right">
                                 <?php if ($docUrl !== ''): ?>
@@ -200,7 +209,7 @@ $modalidadLabel = $modalidadLabels[$obj['modality'] ?? ''] ?? ($obj['modality'] 
     </div>
     <?php endif; ?>
 
-    <!-- Botones de acción -->
+    <!-- Action buttons -->
     <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm flex flex-wrap gap-3 justify-end">
 
         <?php if (!empty($obj['pdf_document_id'])): ?>

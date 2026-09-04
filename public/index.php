@@ -1,7 +1,7 @@
 <?php
 /**
- * Pantalla de Inicio de Sesión - Patient Express Portal
- * Acceso Rápido para Pacientes
+ * Login Screen - Patient Express Portal
+ * Quick Access for Patients
  */
 
 declare(strict_types=1);
@@ -10,7 +10,7 @@ require_once dirname(__DIR__) . '/config.php';
 
 $auth = new \App\Auth();
 
-// Si ya tiene sesión activa, enviar directamente al tablero
+// If already authenticated, redirect directly to the dashboard
 if ($auth->isAuthenticated()) {
     header('Location: dashboard.php');
     exit;
@@ -24,12 +24,12 @@ if (isset($_SESSION['flash_error'])) {
     unset($_SESSION['flash_error']);
 }
 
-// Control de logout
+// Logout control
 if (isset($_GET['logout'])) {
     $successMessage = xlt('You have securely logged out.');
 }
 
-// Procesar formulario POST
+// Process POST form
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = $_POST['username'] ?? '';
     $password = $_POST['password'] ?? '';
@@ -81,7 +81,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
 
             <form action="index.php" method="POST" class="space-y-4" id="loginForm">
                 
-                <!-- Campo Usuario / DNI / Email -->
+                <!-- Username / ID / Email Field -->
                 <div class="space-y-1.5">
                     <label for="username" class="block text-xs font-heading font-bold text-slate-700">
                         <?= xlt('Portal Username / ID / Email') ?>
@@ -101,7 +101,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
                     </div>
                 </div>
 
-                <!-- Campo Contraseña -->
+                <!-- Password Field -->
                 <div class="space-y-1.5">
                     <div class="flex items-center justify-between">
                         <label for="password" class="block text-xs font-heading font-bold text-slate-700">
@@ -126,7 +126,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
                     </div>
                 </div>
 
-                <!-- Botón de Ingreso -->
+                <!-- Sign-In Button -->
                 <div class="pt-2">
                     <button type="submit" 
                             id="submitBtn"
@@ -138,7 +138,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
 
             </form>
 
-            <!-- Acceso Alternativo al Portal Completo -->
+            <!-- Alternative Access to Full Portal -->
             <div class="pt-4 border-t border-slate-100 text-center space-y-2">
                 <p class="text-xs text-slate-500">
                     <?= xlt('Need to schedule appointments or contact your doctor?') ?>
@@ -157,7 +157,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
 
 </div>
 
-<!-- Script para Toggle de Visibilidad de Contraseña -->
+<!-- Script for Password Visibility Toggle -->
 <script>
     const toggleBtn = document.getElementById('togglePasswordBtn');
     const passwordInput = document.getElementById('password');

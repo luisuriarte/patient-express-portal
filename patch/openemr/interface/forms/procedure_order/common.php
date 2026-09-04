@@ -737,8 +737,8 @@ if (!empty($row['lab_id'])) {
 
             let title = <?php echo xlj("Find Procedure Order"); ?>;
             // This replaces the previous search for an easier/faster order picker tool.
-            // El tipo de orden (procedure_order_type) se envía al popup para que,
-            // cuando sea 'imaging', se muestre únicamente el catálogo de imágenes.
+            // The order type (procedure_order_type) is sent to the popup so that,
+            // when it is 'imaging', only the imaging catalog is shown.
             let otype = (typeof f.procedure_type_names !== 'undefined') ? f.procedure_type_names.value : '';
             const params = new URLSearchParams({
                 formid: <?php echo js_escape($formid); ?>,

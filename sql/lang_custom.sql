@@ -346,16 +346,24 @@ INSERT INTO lang_custom (lang_description, lang_code, constant_name, definition)
 ('Spanish (Latin American)', 'el', ' years', ' años'),
 ('Spanish (Latin American)', 'el', 'DIAGNOSTIC IMAGING REPORT', 'INFORME DE DIAGNÓSTICO POR IMÁGENES'),
 ('Spanish (Latin American)', 'el', 'ENCOUNTER', 'ENCUENTRO'),
-('Spanish (Latin American)', 'el', 'DATE', 'FECHA');
+('Spanish (Latin American)', 'el', 'DATE', 'FECHA'),
+('Spanish (Latin American)', 'el', 'Also upload to the PACS server', 'Además sube al servidor PACS'),
+('Spanish (Latin American)', 'el', 'When enabled, uploaded files are copied to the PACS server in addition to the patient documents folder.', 'Cuando está activada, los archivos subidos también se copian al servidor PACS además de a la carpeta de documentos del paciente.'),
+('Spanish (Latin American)', 'el', 'No PACS', 'Sin PACS'),
+('Spanish (Latin American)', 'el', 'PACS upload was not enabled.', 'La subida al PACS no está activada.'),
+('Spanish (Latin American)', 'el', 'Document saved. PACS upload was not enabled.', 'Documento guardado. La subida al PACS no está activada.'),
+('Spanish (Latin American)', 'el', 'ZIP processed: ', 'ZIP procesado: '),
+('Spanish (Latin American)', 'el', ' document(s) saved individually.', ' documento(s) guardados individualmente.'),
+('Spanish (Latin American)', 'el', 'PACS zip upload failed: ', 'Fallo en la subida del ZIP al PACS: ');
 
 -- ============================================================================
 -- SYNC: Populate lang_languages, lang_constants and lang_definitions
 -- Idempotent: safe to re-run, preserves existing entries.
 --
--- IMPORTANTE: lang_constants.constant_name usa utf8mb4_bin (case-sensitive),
--- mientras que lang_custom.constant_name usa utf8mb3_general_ci.
--- Por eso usamos CONVERT(lc.constant_name USING utf8mb4) en los JOINs
--- para que MySQL compare usando el collation utf8mb4_bin de lang_constants.
+-- IMPORTANT: lang_constants.constant_name uses utf8mb4_bin (case-sensitive),
+-- while lang_custom.constant_name uses utf8mb3_general_ci.
+-- That is why we use CONVERT(lc.constant_name USING utf8mb4) in the JOINs
+-- so MySQL compares using the utf8mb4_bin collation of lang_constants.
 -- ============================================================================
 
 -- 2. Create language if it does not exist

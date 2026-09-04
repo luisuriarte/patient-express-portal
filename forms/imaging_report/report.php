@@ -1,9 +1,9 @@
 <?php
 /**
- * Informe de Diagnóstico por Imágenes - report.php
+ * Imaging Report - report.php
  *
- * Renderiza un sumario compacto del informe para las vistas
- * históricas de encuentros en OpenEMR (Patient History).
+ * Renders a compact report summary for the encounter
+ * history views in OpenEMR (Patient History).
  *
  * @package   OpenEMR
  * @author    Centro Médico Origen
@@ -16,8 +16,8 @@ require_once(__DIR__ . '/../../globals.php');
 require_once(OEGlobalsBag::getInstance()->getSrcDir() . "/api.inc.php");
 
 /**
- * Función de reporte estándar de OpenEMR.
- * Llamada desde el historial de encuentros del paciente.
+ * Standard OpenEMR report function.
+ * Called from the patient encounter history.
  */
 function imaging_report_report(int $pid, int $encounter, int $cols, int $id): void
 {
@@ -49,7 +49,7 @@ function imaging_report_report(int $pid, int $encounter, int $cols, int $id): vo
     echo '<div style="font-family:sans-serif;font-size:13px;line-height:1.6;padding:8px 0;">';
     echo '<table style="width:100%;border-collapse:collapse;">';
 
-    // Cabecera del resumen
+    // Summary header
     echo '<tr style="background:#f1f5f9;">';
     echo '<td style="padding:6px 10px;font-weight:600;color:#334155;width:180px;">' . xlt('Modality') . '</td>';
     echo '<td style="padding:6px 10px;color:#1e293b;">' . text($modalidad) . '</td>';
@@ -93,10 +93,10 @@ function imaging_report_report(int $pid, int $encounter, int $cols, int $id): vo
         echo '</tr>';
     }
 
-    // Enlace al PDF si existe
+    // Link to PDF if available
     if (!empty($data['pdf_document_id'])) {
-        // OJO: controller.php está en la raíz del sitio, NO en /interface.
-        // Por eso se usa getWebRoot() (web root), no rootdir (que incluye /interface).
+        // NOTE: controller.php is at the site root, NOT in /interface.
+        // That's why getWebRoot() (web root) is used, not rootdir (which includes /interface).
         $webroot = OEGlobalsBag::getInstance()->getWebRoot();
         $pdfUrl  = attr($webroot . '/controller.php?document&retrieve&patient_id=' . $pid . '&document_id=' . $data['pdf_document_id']);
         echo '<tr>';

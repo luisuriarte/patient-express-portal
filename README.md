@@ -149,8 +149,13 @@ patient-express-portal/
 
 There is **no synchronization cron**. Images and PDFs are pushed to the PACS at **submit time** from the report form (`forms/imaging_report/`) through the provider of the study order.
 
+- **"Also upload to the PACS server" checkbox**: the report form includes a (green) toggle that controls whether files, in addition to being saved in the OpenEMR `documents`, are pushed to the PACS server. It is **enabled by default**:
+  - **Enabled**: the file is saved in `documents` **and** pushed to the PACS (status `uploaded`).
+  - **Disabled**: the file is only saved in `documents`, not pushed to the PACS (status `skipped`).
+
 - Each file (DICOM, JPG/PNG/WEBP, PDF) is uploaded directly to the corresponding PACS/Orthanc via `POST /instances` (native DICOM) or `POST /tools/create-dicom`.
 - Files of the same study order share a deterministic `StudyInstanceUID` (`1.2.840.113619.2.55.<orderId>.<providerId>`). Native DICOM files are uploaded via `POST /instances` and then reassigned to that order study with `Force` (via `/instances/{id}/modify`); if the reassignment fails, they keep their original study.
+- **ZIP archives**: uploading a `.zip` containing a study (folders with `.dcm` and/or images/PDF) is supported. When processed, in OpenEMR `documents` each internal file is saved **individually** (separate, with its own `form_imaging_report_images` record), while to the **PACS the ZIP is uploaded compressed as a single unit** (`POST /instances` with `Content-Type: application/zip`); the destination PACS performs the unpacking and import.
 - Each upload is recorded in `form_imaging_report_images` (columns `pacs_instance_id`, `pacs_series_id`, `pacs_study_id`, `study_instance_uid`, `provider_id`, `status`).
 - The **generated report PDF is NOT uploaded to PACS**; it lives only in the patient's OpenEMR documents and is linked to the study of the uploaded images (via `study_instance_uid`).
 

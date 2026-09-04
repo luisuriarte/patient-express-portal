@@ -2,12 +2,13 @@
 /**
  * upload.php
  *
- * Endpoint AJAX de subida directa de documentos de imágenes (DICOM, JPG/PNG,
- * PDF) para el formulario de informe de diagnóstico por imágenes.
+ * AJAX endpoint for direct upload of imaging documents (DICOM, JPG/PNG,
+ * PDF or a ZIP archive containing a study) for the imaging diagnostic
+ * report form.
  *
- * Recibe el archivo desde la vista new.php, lo guarda en `documents` y lo
- * sube al PACS del proveedor de la orden (si hay proveedor configurado),
- * registrando la operación en form_imaging_report_images.
+ * Receives the file from the new.php view, saves it to 'documents' and
+ * uploads it to the order provider's PACS (if a provider is configured),
+ * logging the operation in form_imaging_report_images.
  *
  * @package   OpenEMR
  * @author    Centro Médico Origen
@@ -30,7 +31,7 @@ require_once(__DIR__ . '/imaging_upload_functions.php');
 $session = SessionWrapperFactory::getInstance()->getActiveSession();
 $pid = PatientSessionUtil::getPid();
 
-// Endpoint de conteo (GET, solo lectura) para refrescar la etiqueta de documentos.
+// Count endpoint (GET, read-only) to refresh the document label.
 if (($_GET['action'] ?? '') === 'count') {
     $countOrderId = (int)($_GET['procedure_order_id'] ?? 0);
     $count = 0;
@@ -56,7 +57,7 @@ $response = [
     'study_uid' => null,
 ];
 
-// Verificación CSRF + autenticación OpenEMR
+// CSRF verification + OpenEMR authentication
 try {
     CsrfUtils::verifyCsrfToken($_POST['csrf_token_form'] ?? '', 'form');
 } catch (\Throwable $e) {
@@ -98,15 +99,30 @@ if (is_array($file['name'])) {
     $file = $single;
 }
 
-$result = imaging_upload_document($file, $pid, $procedureOrderId, $formId, $modality, $encounterId);
+$ext = strtolower(pathinfo((string)$file['name'], PATHINFO_EXTENSION));
+// If the "Also upload to PACS server" checkbox is disabled, files are only saved
+// to OpenEMR documents (without uploading to PACS).
+$uploadToPacs = (($_POST['upload_to_pacs'] ?? '1') !== '0');
+$skipPacs = !$uploadToPacs;
+
+if ($ext === 'zip') {
+    // A ZIP: in OpenEMR it is extracted and each file is saved individually
+    // to 'documents'; the PACS receives it compressed as a single unit (if the
+    // PACS checkbox is enabled).
+    $result = imaging_upload_zip($file, $pid, $procedureOrderId, $formId, $modality, $encounterId, $skipPacs);
+} else {
+    $result = imaging_upload_document($file, $pid, $procedureOrderId, $formId, $modality, $encounterId, $skipPacs, $skipPacs);
+}
 
 $response = [
     'success' => $result['success'],
     'message' => $result['message'],
     'request_id' => $requestId,
-    'image_id' => $result['image_id'],
-    'document_id' => $result['document_id'],
-    'study_uid' => $result['study_uid'],
+    'image_id' => $result['image_id'] ?? null,
+    'document_id' => $result['document_id'] ?? null,
+    'study_uid' => $result['study_uid'] ?? null,
+    'count_ok' => $result['count_ok'] ?? 1,
+    'count_fail' => $result['count_fail'] ?? 0,
     'modality_dicom' => imaging_modality_to_dicom($modality),
 ];
 

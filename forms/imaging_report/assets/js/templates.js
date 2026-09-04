@@ -1,8 +1,8 @@
 /**
- * templates.js — Plantillas predeterminadas de informe normal
- * para el formulario de Diagnóstico por Imágenes de OpenEMR.
+ * templates.js — Default normal report templates
+ * for the OpenEMR Imaging Diagnostic form.
  *
- * Cargadas dinámicamente al presionar los botones de plantilla en new.php
+ * Loaded dynamically when clicking the template buttons in new.php
  */
 
 const IMAGING_TEMPLATES = {

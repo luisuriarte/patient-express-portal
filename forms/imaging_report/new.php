@@ -1,9 +1,9 @@
 <?php
 /**
- * Informe de Diagnóstico por Imágenes - new.php
+ * Imaging Report - new.php
  *
- * Formulario de creación / edición de informe radiológico institucional.
- * Formulario clínico de OpenEMR (Clinical Encounter Form).
+ * Institutional radiology report creation / editing form.
+ * OpenEMR Clinical Encounter Form.
  *
  * @package   OpenEMR
  * @author    Centro Médico Origen
@@ -32,7 +32,7 @@ require_once(__DIR__ . '/imaging_upload_functions.php');
 formHeader(xl("Imaging Report"));
 $returnurl = 'encounter_top.php';
 
-// Cargar datos del médico informante actual
+// Load current reporting physician data
 $providerData = sqlQuery(
     "SELECT fname, lname, specialty, npi FROM users WHERE username = ? LIMIT 1",
     [$authUser]
@@ -41,7 +41,7 @@ $medicoInformante = trim(
     ($providerData['fname'] ?? '') . ' ' . ($providerData['lname'] ?? '')
 ) ?: $authUser;
 
-// Edición: cargar datos existentes si hay un id
+// Edit mode: load existing data if an id is provided
 $obj = [];
 $formId = (int)($_GET['id'] ?? 0);
 if ($formId > 0) {
@@ -79,10 +79,10 @@ if ($selectedOrderId <= 0) {
     $selectedOrderId = (int)($obj['procedure_order_id'] ?? 0);
 }
 
-// Documentos de imágenes ya subidos para el informe (o la orden seleccionada)
+// Imaging documents already uploaded for the report (or selected order)
 $uploadedImages = imaging_get_report_images($formId, $selectedOrderId);
 
-// Opciones de modalidad
+// Modality options
 $modalidades = [
     ''    => xl('-- Select Modality --'),
     'RX'  => xl('X-Ray (Digital Radiography)'),
@@ -94,7 +94,7 @@ $modalidades = [
     'OT'  => xl('Other / Not specified'),
 ];
 
-// Listado de Servicios Solicitantes (dropdown normalizado desde list_options)
+// Requesting services list (standardized dropdown from list_options)
 $servicios = [];
 $resServicios = sqlStatement(
     "SELECT option_id, title FROM list_options
@@ -105,7 +105,7 @@ while ($svc = sqlFetchArray($resServicios)) {
     $servicios[$svc['option_id']] = $svc['title'];
 }
 
-// Listado de Región / Área Anatómica (dropdown normalizado desde list_options)
+// Anatomical region / area list (standardized dropdown from list_options)
 $regionesAnatomicas = [];
 $resRegiones = sqlStatement(
     "SELECT option_id, title FROM list_options
@@ -134,7 +134,7 @@ if ($selectedOrderId > 0 && isset($ordersList[$selectedOrderId])) {
     }
 }
 
-// Médico Solicitante: médicos de OpenEMR habilitados para autorizar (authorized=1)
+// Requesting Physician: OpenEMR physicians enabled to authorize (authorized=1)
 $medicosOpenEMR = [];
 $resMedicos = sqlStatement(
     "SELECT id, CONCAT_WS(' ', lname, fname) AS nombre
@@ -146,13 +146,13 @@ while ($med = sqlFetchArray($resMedicos)) {
     $medicosOpenEMR[$med['id']] = trim((string)$med['nombre']);
 }
 
-// Normaliza el valor del médico: si coincide con un médico de OpenEMR, se usa el
-// nombre completo; en caso contrario (médico externo escrito a mano) se conserva tal cual.
+// Normalize the physician value: if it matches an OpenEMR physician, use the
+// full name; otherwise (externally typed physician) it is kept as-is.
 $valorMedicoSolicitante = trim((string)($obj['requesting_physician'] ?? ''));
 $keyMedicoSolicitante = array_search($valorMedicoSolicitante, $medicosOpenEMR, true);
 $esMedicoOpenEMR = ($keyMedicoSolicitante !== false);
 
-// Árbol de categorías de documentos de pacientes (selector de carpeta destino)
+// Patient documents category tree (destination folder selector)
 require_once(__DIR__ . '/category_functions.php');
 $categoryTree = imaging_get_category_tree();
 $selectedCategoryId = (int)($obj['pdf_category_id'] ?? 0);
@@ -188,7 +188,7 @@ $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategor
         .btn-finalize:hover { background: linear-gradient(135deg, #0284c7, #0369a1); }
         .badge-borrador { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; }
         .badge-finalizado { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
-        /* ---- Árbol de categorías ---- */
+        /* ---- Category tree ---- */
         .imr-tree-container { border: 1px solid #dbe2ec; border-radius: 10px; max-height: 320px; overflow-y: auto; background: #fff; }
         .imr-tree-empty { padding: 16px; color: #64748b; font-size: 13px; }
         .imr-tree-node { display: flex; align-items: center; gap: 6px; padding: 7px 12px; cursor: pointer; border-bottom: 1px solid #f1f5f9; transition: background 0.15s; font-size: 13px; color: #334155; }
@@ -199,7 +199,7 @@ $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategor
         .imr-tree-toggle.imr-hidden-toggle { visibility: hidden; }
         .imr-tree-icon { color: #f59e0b; width: 16px; text-align: center; }
         .imr-tree-children.imr-hidden { display: none; }
-        /* ---- Zona de subida de imágenes ---- */
+        /* ---- Image upload zone ---- */
         .upload-zone { border: 2px dashed #cbd5e1; border-radius: 12px; padding: 22px 16px; text-align: center; cursor: pointer; background: #f8fafc; transition: all 0.2s; position: relative; }
         .upload-zone:hover, .upload-zone.upload-dragover { border-color: #3b82f6; background: #eff6ff; }
         .upload-zone.upload-dragover { border-style: solid; }
@@ -213,12 +213,18 @@ $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategor
         .upload-progress-bar { height: 6px; border-radius: 999px; background: #e2e8f0; overflow: hidden; }
         .imr-selection-display { margin-top: 10px; padding: 8px 12px; border-radius: 8px; border: 1px dashed #cbd5e1; font-size: 13px; min-height: 38px; display: flex; align-items: center; color: #64748b; }
         .imr-selection-display.imr-has-selection { border-color: #3b82f6; background: #f0f7ff; color: #1e40af; font-weight: 500; }
+        /* ---- "Also upload to PACS server" checkbox (green toggle) ---- */
+        .toggle-pacs { width: 42px; height: 24px; border-radius: 999px; background: #cbd5e1; position: relative; transition: background 0.2s; flex-shrink: 0; }
+        .toggle-pacs::after { content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 999px; background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,0.3); transition: transform 0.2s; }
+        #uploadToPacs:checked + .toggle-pacs { background: #16a34a; }
+        #uploadToPacs:checked + .toggle-pacs::after { transform: translateX(18px); }
+        #uploadToPacs:focus-visible + .toggle-pacs { outline: 2px solid #22c55e; outline-offset: 2px; }
     </style>
 </head>
 <body>
 <div class="max-w-4xl mx-auto px-4 py-6">
 
-    <!-- Encabezado del formulario -->
+    <!-- Form header -->
     <div class="bg-gradient-to-r from-slate-900 to-slate-700 text-white rounded-2xl p-6 mb-6 shadow-lg">
         <div class="flex items-center justify-between">
             <div>
@@ -233,7 +239,7 @@ $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategor
         </div>
     </div>
 
-    <!-- Selector de plantilla rápida -->
+    <!-- Quick template selector -->
     <div class="bg-white rounded-2xl border border-slate-200 p-4 mb-5 shadow-sm">
         <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3"><?= xlt('⚡ Quick Templates — Normal Report') ?></p>
         <div class="flex flex-wrap gap-2" id="template-buttons">
@@ -246,7 +252,7 @@ $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategor
         </div>
     </div>
 
-    <!-- Formulario principal -->
+    <!-- Main form -->
     <form method="POST"
           action="<?= attr($rootdir) ?>/forms/imaging_report/save.php?mode=<?= $modoEdicion ? 'update&id=' . attr_url($formId) : 'new' ?>"
           name="my_form" id="my_form">
@@ -256,7 +262,7 @@ $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategor
         <input type="hidden" name="procedure_order_id" id="input_procedure_order_id" value="<?= attr($selectedOrderId) ?>">
         <input type="hidden" name="category_id" id="input_category_id" value="<?= attr($selectedCategoryId) ?>">
 
-        <!-- Sección 1: Datos del Estudio -->
+        <!-- Section 1: Study Data -->
         <div class="bg-white rounded-2xl border border-slate-200 p-6 mb-5 shadow-sm">
             <div class="section-header"><?= xlt('📋 Study Data') ?></div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -363,12 +369,12 @@ $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategor
             </div>
         </div>
 
-        <!-- Sección 1b: Documentos de imágenes + carpeta destino -->
+        <!-- Section 1b: Imaging documents + destination folder -->
         <div class="bg-white rounded-2xl border border-slate-200 p-6 mb-5 shadow-sm">
             <div class="section-header"><?= xlt('🖼️ Imaging Documents & Destination Folder') ?></div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <!-- Columna izquierda: árbol de carpetas de destino -->
+                <!-- Left column: destination folder tree -->
                 <div>
                     <label class="form-label"><?= xlt('Images Destination Folder') ?></label>
                     <p class="text-sm text-slate-400 mb-2"><?= xlt('Select the patient-chart folder where the images / PDF will be saved.') ?></p>
@@ -381,7 +387,7 @@ $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategor
                     <p class="text-xs text-slate-400 mt-2"><?= xlt('If no folder is selected, the automatic category will be used according to the modality (e.g.: MRI → Magnetic Resonance).') ?></p>
                 </div>
 
-                <!-- Columna derecha: subida de archivos -->
+                <!-- Right column: file upload -->
                 <div>
                     <?php if ($selectedOrderId <= 0): ?>
                         <div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700" id="upload-no-order">
@@ -395,15 +401,25 @@ $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategor
 
                     <div class="upload-zone" id="uploadZone" data-enabled="<?= $selectedOrderId > 0 ? '1' : '0' ?>">
                         <input type="file" id="imagingDocInput" name="imaging_doc" multiple
-                               accept=".jpg,.jpeg,.png,.webp,.dcm,.dicom,.pdf">
+                               accept=".jpg,.jpeg,.png,.webp,.dcm,.dicom,.pdf,.zip">
                         <div class="upload-zone-icon">📁</div>
                         <div class="upload-zone-text">
                             <strong><?= xlt('Drag & drop files here') ?></strong> <?= xlt('or click to browse') ?>
                         </div>
-                        <small class="text-slate-400 d-block mt-2">DICOM · JPG · PNG · WEBP · PDF — <?= xlt('max 50 MB each') ?></small>
+                        <small class="text-slate-400 d-block mt-2">DICOM · JPG · PNG · WEBP · PDF · ZIP — <?= xlt('max 50 MB each') ?></small>
                     </div>
 
-                    <!-- Archivos seleccionados a subir (pendientes) -->
+                    <!-- Checkbox: also upload to PACS server -->
+                    <div class="mt-3">
+                        <label for="uploadToPacs" class="inline-flex items-center gap-2 cursor-pointer select-none">
+                            <input type="checkbox" id="uploadToPacs" class="sr-only" checked>
+                            <span class="toggle-pacs" aria-hidden="true"></span>
+                            <span class="text-sm font-semibold text-slate-700"><?= xlt('Also upload to the PACS server') ?></span>
+                        </label>
+                        <p class="text-xs text-slate-400 mt-1"><?= xlt('When enabled, uploaded files are copied to the PACS server in addition to the patient documents folder.') ?></p>
+                    </div>
+
+                    <!-- Files selected for upload (pending) -->
                     <div id="pendingSection" class="mt-3 hidden">
                         <h4 class="text-sm font-bold text-slate-700 mb-2"><?= xlt('Files selected to upload') ?> (<span id="pendingCount">0</span>)</h4>
                         <div class="border border-slate-200 rounded-lg divide-y divide-slate-100" id="pendingList"></div>
@@ -433,35 +449,35 @@ $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategor
             </div>
         </div>
 
-        <!-- Sección 2: Técnica / Metodología -->
+        <!-- Section 2: Technique / Methodology -->
         <div class="bg-white rounded-2xl border border-slate-200 p-6 mb-5 shadow-sm">
             <div class="section-header"><?= xlt('🔬 Technique / Methodology') ?></div>
             <textarea name="technique" id="technique" class="form-control" rows="4"
                       placeholder="<?= xla('Describe the protocol, sequences or projections used...') ?>"><?= text($obj['technique'] ?? '') ?></textarea>
         </div>
 
-        <!-- Sección 3: Interpretación / Hallazgos -->
+        <!-- Section 3: Interpretation / Findings -->
         <div class="bg-white rounded-2xl border border-slate-200 p-6 mb-5 shadow-sm">
             <div class="section-header"><?= xlt('🩻 Interpretation / Findings') ?></div>
             <textarea name="interpretation" id="interpretation" class="form-control" rows="10"
                       placeholder="<?= xla('Describe in detail the findings observed in the study...') ?>"><?= text($obj['interpretation'] ?? '') ?></textarea>
         </div>
 
-        <!-- Sección 4: Conclusión -->
+        <!-- Section 4: Conclusion -->
         <div class="bg-white rounded-2xl border border-slate-200 p-6 mb-5 shadow-sm">
             <div class="section-header"><?= xlt('📌 Conclusion / Diagnostic Impression') ?></div>
             <textarea name="conclusion" id="conclusion" class="form-control" rows="5"
                       placeholder="<?= xla('Final diagnostic synthesis of the study...') ?>"><?= text($obj['conclusion'] ?? '') ?></textarea>
         </div>
 
-        <!-- Sección 5: Observaciones -->
+        <!-- Section 5: Observations -->
         <div class="bg-white rounded-2xl border border-slate-200 p-6 mb-5 shadow-sm">
             <div class="section-header"><?= xlt('💬 Observations and Suggestions') ?></div>
             <textarea name="observations" id="observations" class="form-control" rows="4"
                       placeholder="<?= xla('Follow-up recommendations, clinical correlation, additional studies...') ?>"><?= text($obj['observations'] ?? '') ?></textarea>
         </div>
 
-        <!-- Botones de acción -->
+        <!-- Action buttons -->
         <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
             <button type="button" class="btn-cancel inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-colors">
                 ✕ <?= xlt('Cancel') ?>
@@ -484,7 +500,7 @@ $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategor
 <script src="<?= attr($rootdir) ?>/forms/imaging_report/assets/js/templates.js"></script>
 <script>
 // ============================================================
-// Botones de acción
+// Action buttons
 // ============================================================
 document.getElementById('btn-draft').addEventListener('click', function() {
     document.getElementById('input_action').value = 'draft';
@@ -645,7 +661,7 @@ function applyImagingTemplate(tpl) {
     if (t.observaciones) document.getElementById('observations').value = t.observaciones;
 }
 
-// Delegación de eventos: funciona aunque los botones se re-rendericen
+// Event delegation: works even if buttons are re-rendered
 document.addEventListener('click', function (e) {
     const btn = e.target.closest('.template-btn');
     if (!btn) return;
@@ -653,7 +669,7 @@ document.addEventListener('click', function (e) {
 });
 
 // ============================================================
-// Selector de carpeta (árbol de categorías)
+// Folder selector (category tree)
 // ============================================================
 (function () {
     const tree = document.getElementById('categoryTree');
@@ -687,11 +703,11 @@ document.addEventListener('click', function (e) {
             }
         }
 
-        // Una carpeta con hijos también puede ser el destino seleccionado.
+        // A folder with children can also be the selected destination.
         setSelection(id, name);
     });
 
-    // Accesibilidad: permitir seleccionar con Enter/Espacio.
+    // Accessibility: allow selection with Enter/Space.
     tree.addEventListener('keydown', function (e) {
         if (e.key === 'Enter' || e.key === ' ') {
             const node = e.target.closest('.imr-tree-node');
@@ -701,7 +717,7 @@ document.addEventListener('click', function (e) {
 })();
 
 // ============================================================
-// Subida directa de documentos de imágenes (multi-file al PACS)
+// Direct upload of imaging documents (multi-file to PACS)
 // ============================================================
 (function () {
     const zone       = document.getElementById('uploadZone');
@@ -757,6 +773,7 @@ document.addEventListener('click', function (e) {
             fd.append('procedure_order_id', document.getElementById('input_procedure_order_id').value);
             fd.append('modality', document.getElementById('modality').value);
             fd.append('form_id', formId);
+            fd.append('upload_to_pacs', document.getElementById('uploadToPacs').checked ? '1' : '0');
             fd.append('imaging_doc', file);
 
             const xhr = new XMLHttpRequest();
@@ -871,7 +888,7 @@ document.addEventListener('click', function (e) {
             .catch(function () {});
     }
 
-    // Eventos de arrastre y selección de archivos
+    // Drag and file selection events
     if (zone) {
         zone.addEventListener('click', function () {
             if (isEnabled()) fileInput.click();
@@ -893,7 +910,7 @@ document.addEventListener('click', function (e) {
         updateState();
     }
 
-    // Actualizar estado cuando cambia la orden seleccionada
+    // Update state when the selected order changes
     const orderSelect = document.getElementById('procedure_order_select');
     if (orderSelect) orderSelect.addEventListener('change', updateState);
 })();

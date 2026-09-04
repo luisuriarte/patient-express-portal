@@ -1,6 +1,6 @@
 <?php
 /**
- * Dashboard Principal - Hub de Acceso Rápido para Pacientes
+ * Main Dashboard - Quick Access Hub for Patients
  * Patient Express Portal - OpenEMR Native Integration
  */
 
@@ -17,7 +17,7 @@ $pid = $auth->getPatientPid();
 $labService = new \App\Laboratory();
 $imgService = new \App\Imaging();
 
-// 1. Obtener lotes de laboratorio agrupados por Encuentro
+// 1. Get laboratory batches grouped by encounter
 $labBatches = $labService->getReportsGroupedByEncounter($pid);
 $totalLabBatches = count($labBatches);
 $totalIndividualLabs = 0;
@@ -25,11 +25,11 @@ foreach ($labBatches as $b) {
     $totalIndividualLabs += $b['total_studies'];
 }
 
-// 2. Obtener estudios de imágenes clasificados (DICOM vs estándar)
+// 2. Get classified imaging studies (DICOM vs standard)
 $imagingStudies = $imgService->getStudiesByPatient($pid, $patient['dni'] ?? null);
 $totalImages = count($imagingStudies);
 
-// Calcular edad del paciente
+// Calculate patient age
 $patientAge = 'N/A';
 if (!empty($patient['dob']) && $patient['dob'] !== '0000-00-00') {
     try {
@@ -47,16 +47,16 @@ require_once dirname(__DIR__) . '/templates/header.php';
 
 <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8 space-y-6">
     
-    <!-- Banner de Bienvenida y Ficha Rápida del Paciente -->
+    <!-- Welcome Banner and Quick Patient Card -->
     <div class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-sky-950 text-white p-6 sm:p-8 shadow-xl shadow-slate-900/10">
         
-        <!-- Elementos decorativos -->
+        <!-- Decorative elements -->
         <div class="absolute top-0 right-0 -mt-12 -mr-12 w-64 h-64 bg-sky-500/20 rounded-full blur-3xl pointer-events-none"></div>
         <div class="absolute bottom-0 right-1/4 -mb-8 w-48 h-48 bg-teal-500/20 rounded-full blur-2xl pointer-events-none"></div>
 
         <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
             
-            <!-- Datos del Paciente -->
+            <!-- Patient Data -->
             <div class="space-y-3">
                 <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-sky-500/20 border border-sky-400/30 text-sky-300 text-xs font-semibold">
                     <i data-lucide="user-check" class="w-3.5 h-3.5"></i>
@@ -72,7 +72,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
                     </p>
                 </div>
 
-                <!-- Chips Demográficos -->
+                <!-- Demographic Chips -->
                 <div class="flex flex-wrap items-center gap-2 pt-1">
                     <span class="inline-flex items-center text-xs bg-slate-800/90 border border-slate-700 px-3 py-1 rounded-lg text-slate-200">
                         <strong class="text-slate-400 font-medium mr-1.5"><?= xlt('DNI') ?>:</strong> <?= htmlspecialchars($patient['dni'] ?: xlt('Not registered')) ?>
@@ -89,7 +89,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
                 </div>
             </div>
 
-            <!-- Accesos rápidos / Estadísticas en Banner -->
+            <!-- Quick Access / Banner Statistics -->
             <div class="grid grid-cols-2 gap-3 min-w-[240px]">
                 <div class="bg-white/10 backdrop-blur-md border border-white/10 rounded-2xl p-4 text-center">
                     <span class="block text-2xl sm:text-3xl font-extrabold font-heading text-sky-300"><?= $totalLabBatches ?></span>
@@ -104,7 +104,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
         </div>
     </div>
 
-    <!-- Navegación por Pestañas / Tabs -->
+    <!-- Tab Navigation -->
     <div class="bg-white rounded-2xl p-2 shadow-xs border border-slate-200 flex flex-wrap sm:flex-nowrap gap-1">
         
         <button type="button" 
@@ -137,11 +137,11 @@ require_once dirname(__DIR__) . '/templates/header.php';
     </div>
 
     <!-- ========================================================================= -->
-    <!-- TAB 1: RESULTADOS DE LABORATORIO (AGRUPADO POR ENCUENTRO) -->
+    <!-- TAB 1: LABORATORY RESULTS (GROUPED BY ENCOUNTER) -->
     <!-- ========================================================================= -->
     <div id="tab-laboratories" class="tab-pane active space-y-4">
         
-        <!-- Barra de Búsqueda y Filtros de Laboratorio -->
+        <!-- Laboratory Search Bar and Filters -->
         <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
             <div class="relative w-full sm:w-80">
                 <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
@@ -156,7 +156,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
         </div>
 
         <?php if (empty($labBatches)): ?>
-            <!-- Estado Vacío -->
+            <!-- Empty State -->
             <div class="bg-white rounded-3xl p-12 text-center border border-slate-200 space-y-4 shadow-xs">
                 <div class="w-16 h-16 rounded-2xl bg-sky-50 text-sky-600 flex items-center justify-center mx-auto">
                     <i data-lucide="file-question" class="w-8 h-8"></i>
@@ -169,7 +169,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
                 </div>
             </div>
         <?php else: ?>
-            <!-- Listado de Lotes de Laboratorio Agrupados por Encuentro -->
+            <!-- Laboratory Batch Listing Grouped by Encounter -->
             <div class="grid grid-cols-1 gap-4" id="labReportsList">
                 <?php foreach ($labBatches as $batch): ?>
                     <?php 
@@ -185,7 +185,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
                     <div class="lab-card bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/90 hover:border-sky-300 hover:shadow-md transition-all duration-200 space-y-4"
                          data-search="<?= htmlspecialchars($searchableText) ?>">
                         
-                        <!-- Encabezado de la Tarjeta de Lote -->
+                        <!-- Batch Card Header -->
                         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-slate-100">
                             
                             <div class="flex items-center space-x-3.5">
@@ -214,7 +214,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
                                 </div>
                             </div>
 
-                            <!-- Botones de Acción de Lote Completo -->
+                            <!-- Full Batch Action Buttons -->
                             <?php if (empty($batch['has_documents_only'])): ?>
                                 <div class="flex items-center space-x-2 self-end sm:self-center">
                                     <button type="button" 
@@ -236,7 +236,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
 
                         </div>
 
-                        <!-- Desglose de Estudios Incluidos en este Encuentro -->
+                        <!-- Breakdown of Studies Included in This Encounter -->
                         <div class="space-y-2">
                             <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block"><?= xlt('Studies included in this encounter:') ?></span>
                             
@@ -277,11 +277,11 @@ require_once dirname(__DIR__) . '/templates/header.php';
     </div>
 
     <!-- ========================================================================= -->
-    <!-- TAB 2: DIAGNÓSTICO POR IMÁGENES (OHIF PARA DICOM / VISOR DIRECTO PARA JPG/PNG) -->
+    <!-- TAB 2: DIAGNOSTIC IMAGING (OHIF FOR DICOM / DIRECT VIEWER FOR JPG/PNG) -->
     <!-- ========================================================================= -->
     <div id="tab-imaging" class="tab-pane space-y-4">
         
-        <!-- Filtros y buscador de Imágenes -->
+        <!-- Image Filters and Search -->
         <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-3">
             <div class="relative w-full sm:w-80">
                 <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
@@ -296,7 +296,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
         </div>
 
         <?php if (empty($imagingStudies)): ?>
-            <!-- Estado Vacío -->
+            <!-- Empty State -->
             <div class="bg-white rounded-3xl p-12 text-center border border-slate-200 space-y-4 shadow-xs">
                 <div class="w-16 h-16 rounded-2xl bg-teal-50 text-teal-600 flex items-center justify-center mx-auto">
                     <i data-lucide="scan" class="w-8 h-8"></i>
@@ -309,7 +309,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
                 </div>
             </div>
         <?php else: ?>
-            <!-- Listado de Estudios de Imágenes (DICOM y Estándar) -->
+            <!-- Imaging Studies Listing (DICOM and Standard) -->
             <div class="grid grid-cols-1 gap-3.5" id="imagingStudiesList">
                 <?php foreach ($imagingStudies as $study): ?>
                     <?php 
@@ -320,7 +320,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
                     <div class="img-card bg-white rounded-2xl p-5 border border-slate-200/90 hover:border-teal-300 hover:shadow-md transition-all duration-200 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4"
                          data-search="<?= strtolower(htmlspecialchars($study['title'] . ' ' . $study['modality'] . ' ' . $study['provider_name'] . ' ' . $study['date_study'] . ' ' . ($study['accession_number'] ?? ''))) ?>">
                         
-                        <!-- Icono y Datos del Estudio -->
+                        <!-- Study Icon and Data -->
                         <div class="flex items-start space-x-4">
                             <div class="w-11 h-11 rounded-2xl <?= $isDicom ? 'bg-teal-50 text-teal-600 border-teal-100' : ($isStandardImg ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-rose-50 text-rose-600 border-rose-100') ?> border flex items-center justify-center flex-shrink-0 mt-0.5">
                                 <?php if ($isDicom): ?>
@@ -338,13 +338,13 @@ require_once dirname(__DIR__) . '/templates/header.php';
                                         <?= htmlspecialchars($study['title']) ?>
                                     </h4>
                                     
-                                    <!-- Modalidad Badge -->
+                                     <!-- Modality Badge -->
                                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-teal-50 text-teal-800 border border-teal-200">
                                         <i data-lucide="tag" class="w-3 h-3 mr-1 text-teal-600"></i>
                                         <?= htmlspecialchars($study['modality']) ?>
                                     </span>
 
-                                    <!-- Badge de Tipo de Archivo -->
+                                     <!-- File Type Badge -->
                                     <?php if ($isStandardImg): ?>
                                         <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
                                             <?= xlt('IMAGE (JPG/PNG)') ?>
@@ -384,11 +384,11 @@ require_once dirname(__DIR__) . '/templates/header.php';
                             </div>
                         </div>
 
-                        <!-- Botones de Acción según formato -->
+                        <!-- Action Buttons by Format -->
                         <div class="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-end pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100">
                             
                             <?php if ($isDicom): ?>
-                                <!-- Caso a) Estudio DICOM en Orthanc: Visor OHIF -->
+                                <!-- Case a) DICOM Study in Orthanc: OHIF Viewer -->
                                 <a href="<?= htmlspecialchars($study['viewer_url']) ?>" 
                                    target="_blank" 
                                    rel="noopener noreferrer"
@@ -421,7 +421,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
                                 <?php endif; ?>
 
                             <?php elseif ($isStandardImg): ?>
-                                <!-- Caso b1) Imagen Estándar (JPG/PNG): Visor directo en portal -->
+                                <!-- Case b1) Standard Image (JPG/PNG): Direct viewer in portal -->
                                 <button type="button" 
                                         onclick="openImageModal('<?= htmlspecialchars($study['viewer_url']) ?>', '<?= htmlspecialchars(addslashes($study['title'])) ?>', '<?= htmlspecialchars($study['download_url'] ?? $study['viewer_url']) ?>')"
                                         class="inline-flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white font-heading font-semibold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-all duration-150 cursor-pointer">
@@ -442,7 +442,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
                                 <?php endif; ?>
 
                                 <?php if (!empty($study['has_report']) && !empty($study['report_pdf_url'])): ?>
-                                    <!-- Informe (PDF) del mismo encuentro/carpeta: se abre en pestaña nueva -->
+                                    <!-- Report (PDF) from the same encounter/folder: opens in a new tab -->
                                     <a href="<?= htmlspecialchars($study['report_pdf_url']) ?>" 
                                        target="_blank" 
                                        rel="noopener noreferrer"
@@ -468,7 +468,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
                                 </a>
 
                             <?php elseif ($isStandardPdf): ?>
-                                <!-- Caso b2) Documento PDF: Visor PDF directo en portal sin OHIF -->
+                                <!-- Case b2) PDF Document: Direct PDF viewer in portal without OHIF -->
                                 <button type="button" 
                                         onclick="openPdfModal('<?= htmlspecialchars($study['viewer_url']) ?>', '<?= htmlspecialchars(addslashes($study['title'])) ?>')"
                                         class="inline-flex items-center space-x-2 bg-rose-600 hover:bg-rose-700 text-white font-heading font-semibold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-all duration-150 cursor-pointer">
@@ -494,7 +494,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
     </div>
 
     <!-- ========================================================================= -->
-    <!-- TAB 3: ACCESO AL PORTAL COMPLETO OPENEMR -->
+    <!-- TAB 3: ACCESS TO FULL OPENEMR PORTAL -->
     <!-- ========================================================================= -->
     <div id="tab-fullportal" class="tab-pane">
         
@@ -513,7 +513,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
                 </p>
             </div>
 
-            <!-- Grid de Características del Portal Completo -->
+            <!-- Full Portal Feature Grid -->
             <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
                 
                 <div class="p-5 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-2">
@@ -548,7 +548,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
 
             </div>
 
-            <!-- CTA Card hacia el Portal Completo -->
+            <!-- CTA Card to Full Portal -->
             <div class="p-6 rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex flex-col sm:flex-row items-center justify-between gap-6 shadow-lg">
                 <div class="space-y-1 text-center sm:text-left">
                     <h3 class="font-heading font-bold text-lg text-white"><?= xlt('Ready to access the Full Portal?') ?></h3>
@@ -570,7 +570,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
 
 </div>
 
-<!-- JavaScript para Switch de Tabs y Búsqueda en Vivo -->
+<!-- JavaScript for Tab Switching and Live Search -->
 <script>
     function switchTab(tabId, btnElement) {
         document.querySelectorAll('.tab-pane').forEach(pane => {
@@ -595,7 +595,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
         if (typeof lucide !== 'undefined') lucide.createIcons();
     }
 
-    // Buscador en vivo de Laboratorios
+    // Live search for Laboratories
     const labInput = document.getElementById('searchLabInput');
     if (labInput) {
         labInput.addEventListener('input', function() {
@@ -618,7 +618,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
         });
     }
 
-    // Buscador en vivo de Imágenes
+    // Live search for Images
     const imgInput = document.getElementById('searchImgInput');
     if (imgInput) {
         imgInput.addEventListener('input', function() {

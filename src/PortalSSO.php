@@ -1,7 +1,7 @@
 <?php
 /**
- * Servicio de Single Sign-On (SSO) hacia el Portal Completo de OpenEMR
- * Patient Express Portal - Generador de Tokens OneTimeAuth (service_auth)
+ * Single Sign-On (SSO) Service to the Full OpenEMR Portal
+ * Patient Express Portal - OneTimeAuth Token Generator (service_auth)
  */
 
 namespace App;
@@ -12,11 +12,11 @@ use Exception;
 class PortalSSO
 {
     /**
-     * Genera un token de acceso seguro OneTimeAuth en OpenEMR y devuelve la URL de auto-login
+     * Generates a secure OneTimeAuth access token in OpenEMR and returns the auto-login URL
      * 
-     * @param int $pid ID del paciente
-     * @param string $redirectTarget Ruta interna destino en OpenEMR (ej: 'home.php' o '')
-     * @return string URL completa hacia OpenEMR con service_auth
+     * @param int $pid Patient ID
+     * @param string $redirectTarget Internal destination path in OpenEMR (e.g. 'home.php' or '')
+     * @return string Full URL to OpenEMR with service_auth
      */
     public static function createAutoLoginUrl(int $pid, string $redirectTarget = ''): string
     {
@@ -27,10 +27,10 @@ class PortalSSO
         }
 
         try {
-            // 1. Generar token criptográfico único de 32 caracteres alfanuméricos
+            // 1. Generate a unique 32-character alphanumeric cryptographic token
             $token = bin2hex(random_bytes(16));
             $pin = str_pad((string)random_int(100000, 999999), 6, '0', STR_PAD_LEFT);
-            $expires = time() + 900; // Válido por 15 minutos
+            $expires = time() + 900; // Valid for 15 minutes
 
             $actions = json_encode([
                 'enforce_onetime_use' => false,
@@ -39,8 +39,8 @@ class PortalSSO
                 'max_access_count'    => 0
             ]);
 
-            // 2. Verificar que el paciente tenga credenciales en patient_access_onsite (requerido por OpenEMR)
-            // Si solo está en patient_access_offsite, sincronizar a onsite
+            // 2. Verify that the patient has credentials in patient_access_onsite (required by OpenEMR)
+            // If only in patient_access_offsite, sync to onsite
             $checkOnsite = sqlQuery("SELECT pid FROM patient_access_onsite WHERE pid = ? LIMIT 1", [$pid]);
             if (!$checkOnsite) {
                 $offsite = sqlQuery("SELECT * FROM patient_access_offsite WHERE pid = ? LIMIT 1", [$pid]);
@@ -59,7 +59,7 @@ class PortalSSO
                 }
             }
 
-            // 3. Insertar el token en la tabla onetime_auth de OpenEMR
+            // 3. Insert the token into OpenEMR's onetime_auth table
             $redirectUrl = !empty($redirectTarget) ? $redirectTarget : 'home.php';
             $sql = "INSERT INTO onetime_auth 
                     (id, pid, create_user_id, context, onetime_pin, onetime_token, redirect_url, expires, date_created, scope, profile, onetime_actions) 
@@ -74,12 +74,12 @@ class PortalSSO
                 $actions
             ]);
 
-            // 4. Construir enlace con service_auth
+            // 4. Build link with service_auth
             return $basePortalUrl . '/index.php?service_auth=' . urlencode($token);
 
         } catch (Exception $e) {
             error_log(xl('Error generating OneTimeAuth token for SSO OpenEMR') . ": " . $e->getMessage());
-            // Fallback al portal regular si falla la generación
+            // Fallback to the regular portal if token generation fails
             return $basePortalUrl;
         }
     }

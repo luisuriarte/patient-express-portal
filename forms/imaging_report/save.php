@@ -1,9 +1,9 @@
 <?php
 /**
- * Informe de Diagnóstico por Imágenes - save.php
+ * Imaging Report - save.php
  *
- * Procesador de datos, guardado SQL y generación de PDF Dompdf.
- * Indexa el PDF en la tabla documents de OpenEMR.
+ * Data processor, SQL storage and Dompdf PDF generation.
+ * Indexes the PDF in the OpenEMR documents table.
  *
  * @package   OpenEMR
  * @author    Centro Médico Origen
@@ -29,7 +29,7 @@ require_once("$srcdir/forms.inc.php");
 require_once(__DIR__ . '/category_functions.php');
 require_once(__DIR__ . '/imaging_upload_functions.php');
 
-// Verificación CSRF
+// CSRF verification
 CsrfUtils::checkCsrfInput(INPUT_POST, dieOnFail: true);
 
 $mode   = $_GET['mode'] ?? 'new';
@@ -78,7 +78,7 @@ if ($mode === 'new') {
     formUpdate('form_imaging_report', $fields, $formId, $userauthorized);
 }
 
-// Vincular imágenes previamente subidas (sin informe) a este registro.
+// Link previously uploaded images (without a report) to this record.
 $reportOrderId = (int)($fields['procedure_order_id'] ?? 0);
 if ($formId > 0 && $reportOrderId > 0) {
     imaging_attach_images_to_report($formId, $reportOrderId, $pid);
@@ -106,31 +106,31 @@ formJump();
 formFooter();
 
 // ============================================================
-// FUNCIÓN: Generar PDF y guardarlo en documentos del paciente
+// FUNCTION: Generate PDF and save it to patient documents
 // ============================================================
 function generateAndStorePdf(int $pid, int $formId, array $fields, $session): ?int
 {
     global $srcdir;
     $siteDir = OEGlobalsBag::getInstance()->getString('OE_SITE_DIR');
 
-    // Datos del paciente
+    // Patient data
     $patientRow = sqlQuery(
         "SELECT fname, lname, mname, DOB, sex, ss, phone_cell FROM patient_data WHERE pid = ? LIMIT 1",
         [$pid]
     );
 
-    // Datos del médico informante (para firma)
+    // Reporting physician data (for signature)
     $authUser = $session->get('authUser');
     $userRow  = sqlQuery("SELECT fname, lname, specialty, npi FROM users WHERE username = ? LIMIT 1", [$authUser]);
 
-    // Datos del encuentro
+    // Encounter data
     $encounter = EncounterSessionUtil::getEncounter();
     $encounterRow = sqlQuery(
         "SELECT date, facility FROM form_encounter WHERE pid = ? ORDER BY id DESC LIMIT 1",
         [$pid]
     );
 
-    // Datos institucionales (facility principal de OpenEMR) para el membrete del PDF
+    // Institutional data (main OpenEMR facility) for the PDF letterhead
     $facilityRow = sqlQuery(
         "SELECT name, street, city, state, postal_code, phone, email, fax
            FROM facility
@@ -138,8 +138,8 @@ function generateAndStorePdf(int $pid, int $formId, array $fields, $session): ?i
           ORDER BY id LIMIT 1"
     ) ?: [];
 
-    // Logo institucional: prioriza la configuración de OpenEMR si existe,
-    // con fallback a la ruta local del formulario (logo-banner.svg).
+    // Institutional logo: prioritizes OpenEMR configuration if available,
+    // with fallback to the local form path (logo-banner.svg).
     $logoPath = null;
     if (!empty($GLOBALS['images_static_absolute'])) {
         $candidate = rtrim((string)$GLOBALS['images_static_absolute'], '/') . '/logo-banner.svg';
@@ -161,11 +161,12 @@ function generateAndStorePdf(int $pid, int $formId, array $fields, $session): ?i
         }
     }
 
-    // 0. Carpeta destino + UID del estudio DICOM: se resuelven ANTES de renderizar
-    //    la plantilla para poder mostrar el StudyInstanceUID y generar el QR hacia
-    //    el visor OHIF dentro del PDF. El estudio se obtiene de las imágenes subidas
-    //    por el flujo directo (form_imaging_report_images) de la orden del informe;
-    //    el PDF en sí NO se sube a PACS (permanece en documents de OpenEMR).
+    // 0. Destination folder + DICOM StudyInstanceUID: resolved BEFORE rendering
+    //    the template so the StudyInstanceUID can be displayed and the QR to the
+    //    OHIF viewer can be generated within the PDF. The study is obtained from
+    //    the images uploaded through the direct flow (form_imaging_report_images)
+    //    for the report's order; the PDF itself is NOT uploaded to PACS (it
+    //    remains in OpenEMR documents).
     $userCategoryId = (int)($fields['pdf_category_id'] ?? 0);
     $categoryId = imaging_resolve_category_id($userCategoryId, $fields['modality'] ?? '');
     $fields['pdf_category_id'] = $categoryId;
@@ -179,12 +180,12 @@ function generateAndStorePdf(int $pid, int $formId, array $fields, $session): ?i
     }
     $fields['study_ohif_url'] = $studyOhifUrl;
 
-    // 1. Renderizar la plantilla HTML del PDF
+    // 1. Render the PDF HTML template
     ob_start();
     require __DIR__ . '/templates/pdf_template.php';
     $htmlContent = ob_get_clean();
 
-    // 2. Instanciar Dompdf
+    // 2. Instantiate Dompdf
     $dompdfAutoload = null;
     $searchPaths = [
         $GLOBALS['vendor_dir'] ?? null,
@@ -210,8 +211,8 @@ function generateAndStorePdf(int $pid, int $formId, array $fields, $session): ?i
     }
 
     $options = new \Dompdf\Options();
-    // Solo activar recursos remotos si se requiere (p.ej. fuentes externas); los
-    // assets del informe (logo) van embebidos en Base64 para evitar SSRF.
+    // Only enable remote resources if required (e.g., external fonts); the
+    // report assets (logo) are embedded in Base64 to prevent SSRF.
     $options->set('isRemoteEnabled', false);
     $options->set('defaultFont', 'DejaVu Sans');
     $options->set('isPhpEnabled', false);
@@ -224,13 +225,14 @@ function generateAndStorePdf(int $pid, int $formId, array $fields, $session): ?i
 
     $pdfOutput = $dompdf->output();
 
-    // 3. Guardar el documento usando la API nativa de OpenEMR.
-    //    \Document::createDocument() se encarga de almacenar el PDF (filesystem,
-    //    CouchDB o almacenamiento remoto según la configuración), encriptarlo si
-    //    corresponde, generar hash/uuid, e indexarlo en `documents` y
-    //    `categories_to_documents`. Devuelve '' en caso de éxito.
-    //    La carpeta destino la eligió el técnico en el formulario (category_id);
-    //    si no es válida o falta, se usa la automática según modalidad.
+    // 3. Save the document using the native OpenEMR API.
+    //    \Document::createDocument() handles storing the PDF (filesystem,
+    //    CouchDB or remote storage depending on configuration), encrypting
+    //    it if applicable, generating hash/uuid, and indexing it in `documents`
+    //    and `categories_to_documents`. Returns '' on success.
+    //    The destination folder was chosen by the technician in the form
+    //    (category_id); if invalid or missing, the automatic one based on
+    //    modality is used.
 
     $pdfFileName = 'Imaging_Report_' . $formId . '_' . date('Ymd_His') . '.pdf';
 
@@ -241,19 +243,19 @@ function generateAndStorePdf(int $pid, int $formId, array $fields, $session): ?i
         $pdfFileName,                  // filename
         'application/pdf',             // mimetype
         $pdfOutput,                    // &$data (contenido binario del PDF)
-        eid: $encounter                // vinculación al encuentro (extra)
+        eid: $encounter                // link to the encounter (extra)
     );
 
-    // createDocument() devuelve un string vacío en éxito, o un mensaje de error.
+    // createDocument() returns an empty string on success, or an error message.
     if (!empty($ret)) {
         throw new \RuntimeException(xl('Error saving document: ') . $ret);
     }
 
     $documentId = (int)$doc->get_id();
 
-    // 4. Registrar el StudyInstanceUID del estudio de imágenes subidas en el
-    //    formulario, para que el portal enlace el informe a ese estudio. El PDF
-    //    del informe NO se sube a PACS (permanece solo en documents de OpenEMR).
+    // 4. Register the StudyInstanceUID of the uploaded imaging study
+    //    in the form, so the portal links the report to that study. The report
+    //    PDF is NOT uploaded to PACS (remains only in OpenEMR documents).
     if ($documentId) {
         try {
             $studyUid = resolveReportStudyUid($formId, (int)($fields['procedure_order_id'] ?? 0), $pid);
@@ -272,16 +274,17 @@ function generateAndStorePdf(int $pid, int $formId, array $fields, $session): ?i
 }
 
 /**
- * Resuelve el StudyInstanceUID del estudio de imágenes subidas por el flujo
- * directo (Fase 2) para la orden del informe. Se prioriza la imagen vinculada
- * a este mismo informe (form_id) y, si no hay, la primera imagen subida de la
- * orden del paciente. El PDF del informe NO se sube a PACS; este UID solo se
- * usa para enlazar el informe al estudio en el portal y para el QR del PDF.
+ * Resolves the StudyInstanceUID of the imaging study uploaded through the
+ * direct flow (Phase 2) for the report's order. The image linked to this
+ * same report (form_id) is prioritized; if none, the first uploaded image
+ * from the patient's order is used. The report PDF is NOT uploaded to PACS;
+ * this UID is only used to link the report to the study in the portal and
+ * for the PDF's QR code.
  *
- * @param int $formId           ID de form_imaging_report
- * @param int $procedureOrderId ID de la orden (procedure_order_id)
- * @param int $pid              ID de paciente
- * @return string StudyInstanceUID ('' si no hay estudio asociado)
+ * @param int $formId           ID of form_imaging_report
+ * @param int $procedureOrderId ID of the order (procedure_order_id)
+ * @param int $pid              Patient ID
+ * @return string StudyInstanceUID ('' if no associated study)
  */
 function resolveReportStudyUid(int $formId, int $procedureOrderId, int $pid): string
 {
@@ -313,7 +316,7 @@ function resolveReportStudyUid(int $formId, int $procedureOrderId, int $pid): st
 }
 
 /**
- * Traduce la modalidad del formulario a modalidad DICOM (para match y tags).
+ * Translates the form modality to DICOM modality (for matching and tags).
  */
 function modalityToDicom(string $modalidad): string
 {

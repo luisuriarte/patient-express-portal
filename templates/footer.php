@@ -1,18 +1,18 @@
 <?php
 /**
- * Plantilla de Pie de Página Común
+ * Common Footer Template
  * Patient Express Portal
  */
 declare(strict_types=1);
 ?>
     </main>
 
-    <!-- Footer Institucional -->
+    <!-- Institutional Footer -->
     <footer class="bg-slate-900 text-slate-400 mt-16 border-t border-slate-800">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-12">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
                 
-                <!-- Columna 1: Datos Institucionales -->
+                <!-- Column 1: Institutional Data -->
                 <div class="space-y-3">
                     <div class="flex items-center space-x-2 text-white">
                         <div class="w-7 h-7 rounded-lg bg-sky-500 flex items-center justify-center text-white">
@@ -39,7 +39,7 @@ declare(strict_types=1);
                     </div>
                 </div>
 
-                <!-- Columna 2: Canales y Servicios -->
+                <!-- Column 2: Channels and Services -->
                 <div class="space-y-3">
                     <h4 class="font-heading font-semibold text-xs text-slate-200 uppercase tracking-wider"><?= xlt('Useful Links') ?></h4>
                     <ul class="space-y-2 text-xs">
@@ -64,7 +64,7 @@ declare(strict_types=1);
                     </ul>
                 </div>
 
-                <!-- Columna 3: Aviso Médico Importante -->
+                <!-- Column 3: Important Medical Notice -->
                 <div class="p-4 rounded-xl bg-slate-800/80 border border-slate-700/60 space-y-2">
                     <div class="flex items-center space-x-2 text-amber-400 text-xs font-semibold">
                         <i data-lucide="alert-triangle" class="w-4 h-4"></i>
@@ -77,7 +77,7 @@ declare(strict_types=1);
 
             </div>
 
-            <!-- Línea inferior -->
+            <!-- Bottom Line -->
             <div class="mt-8 pt-6 border-t border-slate-800/80 flex flex-col sm:flex-row justify-between items-center text-xs text-slate-500 gap-4">
                 <p>&copy; <?= date('Y') ?> <?= defined('CLINIC_NAME') ? CLINIC_NAME : '' ?>. <?= xlt('All rights reserved.') ?></p>
                 <p class="flex items-center space-x-1">
@@ -91,7 +91,7 @@ declare(strict_types=1);
         </div>
     </footer>
 
-    <!-- Modal Global para Vista Previa de Documentos / Informes PDF -->
+    <!-- Global Modal for Document / PDF Report Preview -->
     <div id="pdfModal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
         <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
             
@@ -100,10 +100,10 @@ declare(strict_types=1);
 
             <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
 
-            <!-- Contenido Modal -->
+            <!-- Modal Content -->
             <div class="relative inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full border border-slate-200">
                 
-                <!-- Encabezado Modal -->
+                <!-- Modal Header -->
                 <div class="bg-slate-900 px-4 py-3 sm:px-6 flex items-center justify-between">
                     <div class="flex items-center space-x-2 text-white">
                         <i data-lucide="file-text" class="w-5 h-5 text-sky-400"></i>
@@ -122,7 +122,7 @@ declare(strict_types=1);
                     </div>
                 </div>
 
-                <!-- Iframe para Renderizar PDF -->
+                <!-- PDF Rendering Iframe -->
                 <div class="relative bg-slate-100 h-[70vh]">
                     <div id="pdfLoading" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-100 z-10 space-y-3">
                         <div class="w-8 h-8 border-4 border-sky-600 border-t-transparent rounded-full animate-spin"></div>
@@ -135,7 +135,7 @@ declare(strict_types=1);
         </div>
     </div>
 
-    <!-- Modal Global para Visor de Imágenes Estándar (JPG/PNG) -->
+    <!-- Global Modal for Standard Image Viewer (JPG/PNG) -->
     <div id="imageModal" class="fixed inset-0 z-50 hidden overflow-y-auto" aria-labelledby="image-modal-title" role="dialog" aria-modal="true">
         <div class="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
             
@@ -144,10 +144,10 @@ declare(strict_types=1);
 
             <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
 
-            <!-- Contenido Modal -->
+            <!-- Modal Content -->
             <div class="relative inline-block align-bottom bg-slate-900 rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full border border-slate-700">
                 
-                <!-- Encabezado Modal -->
+                <!-- Modal Header -->
                 <div class="bg-slate-950 px-4 py-3 sm:px-6 flex items-center justify-between border-b border-slate-800">
                     <div class="flex items-center space-x-2 text-white">
                         <i data-lucide="image" class="w-5 h-5 text-teal-400"></i>
@@ -166,7 +166,7 @@ declare(strict_types=1);
                     </div>
                 </div>
 
-                <!-- Contenedor de la Imagen con autoajuste -->
+                <!-- Image Container with Auto-fit -->
                 <div class="relative bg-slate-950/90 h-[70vh] flex items-center justify-center p-4 overflow-auto">
                     <img id="imageModalImg" src="" alt="<?= xla('Imaging Study') ?>" class="max-h-full max-w-full object-contain rounded-lg shadow-lg">
                 </div>
@@ -175,16 +175,16 @@ declare(strict_types=1);
         </div>
     </div>
 
-    <!-- Inicialización de Scripts & Iconos -->
+    <!-- Script Initialization & Icons -->
     <script>
-        // Inicializar Iconos Lucide
+        // Initialize Lucide Icons
         document.addEventListener('DOMContentLoaded', () => {
             if (typeof lucide !== 'undefined') {
                 lucide.createIcons();
             }
         });
 
-        // Funciones del Modal de PDF
+        // PDF Modal Functions
         function openPdfModal(url, title = 'Informe Médico') {
             const modal = document.getElementById('pdfModal');
             const iframe = document.getElementById('pdfIframe');
@@ -218,7 +218,7 @@ declare(strict_types=1);
             }
         }
 
-        // Funciones del Modal de Imagen Estándar (JPG/PNG)
+        // Standard Image Modal Functions (JPG/PNG)
         function openImageModal(url, title = 'Estudio de Imagen', downloadUrl = null) {
             const modal = document.getElementById('imageModal');
             const img = document.getElementById('imageModalImg');
@@ -246,13 +246,13 @@ declare(strict_types=1);
             }
         }
 
-        // Listeners del modal PDF
+        // PDF Modal Listeners
         const closeBtn = document.getElementById('closeModalBtn');
         const backdrop = document.getElementById('pdfModalBackdrop');
         if (closeBtn) closeBtn.addEventListener('click', closePdfModal);
         if (backdrop) backdrop.addEventListener('click', closePdfModal);
 
-        // Listeners del modal Imagen
+        // Image Modal Listeners
         const closeImgBtn = document.getElementById('closeImageModalBtn');
         const backdropImg = document.getElementById('imageModalBackdrop');
         if (closeImgBtn) closeImgBtn.addEventListener('click', closeImageModal);
