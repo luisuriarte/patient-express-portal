@@ -1,5 +1,5 @@
 diff --git "a/..\\openemr-8.2.0\\interface\\forms\\procedure_order\\common.php" "b/patch\\openemr\\interface\\forms\\procedure_order\\common.php"
-index 6052405..3aaf694 100644
+index 6052405..9acfde0 100644
 --- "a/..\\openemr-8.2.0\\interface\\forms\\procedure_order\\common.php"
 +++ "b/patch\\openemr\\interface\\forms\\procedure_order\\common.php"
 @@ -203,7 +203,10 @@ if (($_POST['bn_save'] ?? null) || !empty($_POST['bn_xmit']) || !empty($_POST['b
@@ -28,8 +28,8 @@ index 6052405..3aaf694 100644
  
              let title = <?php echo xlj("Find Procedure Order"); ?>;
              // This replaces the previous search for an easier/faster order picker tool.
-+            // El tipo de orden (procedure_order_type) se envía al popup para que,
-+            // cuando sea 'imaging', se muestre únicamente el catálogo de imágenes.
++            // The order type (procedure_order_type) is sent to the popup so that,
++            // when it is 'imaging', only the imaging catalog is shown.
 +            let otype = (typeof f.procedure_type_names !== 'undefined') ? f.procedure_type_names.value : '';
              const params = new URLSearchParams({
                  formid: <?php echo js_escape($formid); ?>,
