@@ -92,8 +92,8 @@ if ($action === 'finalize' && $formId > 0) {
         $pdfDocumentId = generateAndStorePdf($pid, $formId, $fields, $session);
         if ($pdfDocumentId) {
             sqlStatement(
-                "UPDATE form_imaging_report SET pdf_document_id = ? WHERE id = ?",
-                [$pdfDocumentId, $formId]
+                "UPDATE form_imaging_report SET pdf_document_id = ?, study_instance_uid = COALESCE(NULLIF(?, ''), study_instance_uid) WHERE id = ?",
+                [$pdfDocumentId, $fields['study_instance_uid'] ?? '', $formId]
             );
         }
     } catch (Throwable $e) {
@@ -170,27 +170,53 @@ function generateAndStorePdf(int $pid, int $formId, array $fields, $session): ?i
     $userCategoryId = (int)($fields['pdf_category_id'] ?? 0);
     $categoryId = imaging_resolve_category_id($userCategoryId, $fields['modality'] ?? '');
     $fields['pdf_category_id'] = $categoryId;
-    $fields['study_instance_uid'] = resolveReportStudyUid($formId, (int)($fields['procedure_order_id'] ?? 0), $pid);
+
+    // Resolve PACS provider and OHIF viewer from procedure_providers table (via procedure_order.lab_id)
+    $procedureOrderId = (int)($fields['procedure_order_id'] ?? 0);
+    $pacsProvider = class_exists('App\PacsProvider') ? \App\PacsProvider::resolveForOrder($procedureOrderId) : null;
+    $studyUid = resolveReportStudyUid($formId, $procedureOrderId, $pid);
+
+    if ($studyUid === '' && $procedureOrderId > 0 && $pacsProvider && $pacsProvider->ppid > 0) {
+        $studyUid = imaging_study_uid_for_order($procedureOrderId, $pacsProvider->ppid);
+    }
+    $fields['study_instance_uid'] = $studyUid;
+
     $studyOhifUrl = '';
-    if (!empty($fields['study_instance_uid'])) {
-        $ohifBase = defined('OHIF_VIEWER_BASE_URL') ? rtrim(OHIF_VIEWER_BASE_URL, '/') : '';
-        if ($ohifBase !== '') {
-            $studyOhifUrl = $ohifBase . '?StudyInstanceUIDs=' . urlencode($fields['study_instance_uid']);
+    if (!empty($studyUid)) {
+        if ($pacsProvider && $pacsProvider->ohifBaseUrl() !== '') {
+            $studyOhifUrl = $pacsProvider->buildOhifViewerUrl($studyUid);
+        } else {
+            // Direct query to procedure_providers table
+            $provRow = $procedureOrderId > 0
+                ? sqlQuery(
+                    "SELECT pp.remote_host FROM procedure_order po
+                       JOIN procedure_providers pp ON po.lab_id = pp.ppid
+                      WHERE po.procedure_order_id = ? AND pp.active = 1 LIMIT 1",
+                    [$procedureOrderId]
+                )
+                : null;
+            if (empty($provRow['remote_host'])) {
+                $provRow = sqlQuery(
+                    "SELECT remote_host FROM procedure_providers
+                      WHERE active = 1 AND remote_host IS NOT NULL AND remote_host != ''
+                      ORDER BY ppid ASC LIMIT 1"
+                );
+            }
+            $ohifBase = !empty($provRow['remote_host'])
+                ? rtrim((string)$provRow['remote_host'], '/')
+                : (defined('OHIF_VIEWER_BASE_URL') && OHIF_VIEWER_BASE_URL ? rtrim(OHIF_VIEWER_BASE_URL, '/') : 'https://imagenes.origen.ar/viewer');
+            $studyOhifUrl = $ohifBase . '?StudyInstanceUIDs=' . urlencode($studyUid);
         }
     }
     $fields['study_ohif_url'] = $studyOhifUrl;
 
-    // 1. Render the PDF HTML template
-    ob_start();
-    require __DIR__ . '/templates/pdf_template.php';
-    $htmlContent = ob_get_clean();
-
-    // 2. Instantiate Dompdf
+    // Load composer vendor autoloader first (so BaconQrCode and Dompdf are both loaded for the template)
     $dompdfAutoload = null;
     $searchPaths = [
         $GLOBALS['vendor_dir'] ?? null,
         dirname(__DIR__, 4) . '/vendor',
         dirname(__DIR__, 3) . '/vendor',
+        dirname(__DIR__, 2) . '/vendor',
         '/var/www/html/origen.ar/hcd/vendor',
     ];
 
@@ -201,10 +227,19 @@ function generateAndStorePdf(int $pid, int $formId, array $fields, $session): ?i
         }
     }
 
+    if ($dompdfAutoload) {
+        require_once $dompdfAutoload;
+    }
+
+    // 1. Render the PDF HTML template
+    ob_start();
+    require __DIR__ . '/templates/pdf_template.php';
+    $htmlContent = ob_get_clean();
+
+    // 2. Instantiate Dompdf
     if (!$dompdfAutoload) {
         throw new \RuntimeException(xl('Dompdf not found. Please verify composer install.'));
     }
-    require_once $dompdfAutoload;
 
     if (!class_exists(\Dompdf\Dompdf::class)) {
         throw new \RuntimeException(xl('The Dompdf\\Dompdf class is not available.'));
@@ -288,10 +323,25 @@ function generateAndStorePdf(int $pid, int $formId, array $fields, $session): ?i
  */
 function resolveReportStudyUid(int $formId, int $procedureOrderId, int $pid): string
 {
+    if (!empty($_POST['study_instance_uid'])) {
+        return trim((string)$_POST['study_instance_uid']);
+    }
+
+    if ($formId > 0) {
+        $row = sqlQuery(
+            "SELECT study_instance_uid FROM form_imaging_report
+              WHERE id = ? AND study_instance_uid IS NOT NULL AND study_instance_uid != '' LIMIT 1",
+            [$formId]
+        );
+        if (!empty($row['study_instance_uid'])) {
+            return (string)$row['study_instance_uid'];
+        }
+    }
+
     if ($formId > 0) {
         $row = sqlQuery(
             "SELECT study_instance_uid FROM form_imaging_report_images
-              WHERE form_id = ? AND status = 'uploaded'
+              WHERE form_id = ?
                 AND study_instance_uid IS NOT NULL AND study_instance_uid != ''
               ORDER BY id ASC LIMIT 1",
             [$formId]
@@ -300,16 +350,28 @@ function resolveReportStudyUid(int $formId, int $procedureOrderId, int $pid): st
             return (string)$row['study_instance_uid'];
         }
     }
+
     if ($procedureOrderId > 0) {
         $row = sqlQuery(
             "SELECT study_instance_uid FROM form_imaging_report_images
-              WHERE procedure_order_id = ? AND pid = ? AND status = 'uploaded'
+              WHERE procedure_order_id = ? AND pid = ?
                 AND study_instance_uid IS NOT NULL AND study_instance_uid != ''
               ORDER BY id ASC LIMIT 1",
             [$procedureOrderId, $pid]
         );
         if (!empty($row['study_instance_uid'])) {
             return (string)$row['study_instance_uid'];
+        }
+
+        $rowOrder = sqlQuery(
+            "SELECT study_instance_uid FROM form_imaging_report_images
+              WHERE procedure_order_id = ?
+                AND study_instance_uid IS NOT NULL AND study_instance_uid != ''
+              ORDER BY id ASC LIMIT 1",
+            [$procedureOrderId]
+        );
+        if (!empty($rowOrder['study_instance_uid'])) {
+            return (string)$rowOrder['study_instance_uid'];
         }
     }
     return '';

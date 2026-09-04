@@ -65,10 +65,14 @@ $estado = $obj['status'] ?? 'draft';
 $ordersList = [];
 $ordersRes = sqlStatement(
     "SELECT po.procedure_order_id, po.date_ordered, po.order_status,
-            po.requesting_service, po.anatomical_region,
+            po.requesting_service, po.anatomical_region, po.lab_id,
+            pp.name AS pacs_provider_name,
+            pp.remote_host AS pacs_viewer_url,
+            pp.remote_api AS pacs_server_url,
             CONCAT_WS(' ', u.lname, u.fname) AS provider_name
        FROM procedure_order po
        LEFT JOIN users u ON po.provider_id = u.id
+       LEFT JOIN procedure_providers pp ON po.lab_id = pp.ppid
       WHERE po.patient_id = ?
         AND po.procedure_order_type = 'imaging'
       ORDER BY po.date_ordered DESC, po.procedure_order_id DESC",
@@ -278,7 +282,7 @@ $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategor
                         <option value=""><?= xlt('-- Select originating study order... --') ?></option>
                         <?php foreach ($ordersList as $oid => $ord): ?>
                             <option value="<?= attr($oid) ?>" <?= ($selectedOrderId === $oid) ? 'selected' : '' ?>>
-                                <?= text('#' . $oid . ' — ' . ($ord['date_ordered'] ?? '') . ': ' . ($ord['provider_name'] ?? xl('No provider'))) ?>
+                                <?= text('#' . $oid . ' — ' . ($ord['date_ordered'] ?? '') . ': ' . ($ord['provider_name'] ?? xl('No provider')) . (!empty($ord['pacs_provider_name']) ? ' [' . $ord['pacs_provider_name'] . ']' : '')) ?>
                             </option>
                         <?php endforeach; ?>
                     </select>

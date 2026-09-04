@@ -83,33 +83,77 @@ $clinicPhone = trim($facilityRow['phone'] ?? '');
 $reportCode = 'IMG-' . str_pad($formId, 6, '0', STR_PAD_LEFT);
 $validacionId = md5($formId . '-' . $pid . '-ORIGEN' . '-IMG');
 
-// QR code pointing to the study's OHIF viewer (if StudyInstanceUID exists and
-// the BaconQrCode library is available in the OpenEMR vendor directory). The QR
-// points directly to imagenes.origen.ar/viewer?StudyInstanceUIDs=<uid>.
+// QR code pointing to the study's OHIF viewer (or electronic validation).
+// Uses OpenEMR's native BaconQrCode library in pure PHP (SvgImageBackEnd) so GD is NOT required.
 $qrDataUri = '';
 $qrTarget  = trim((string)($fields['study_ohif_url'] ?? ''));
 if ($qrTarget === '' && !empty($fields['study_instance_uid'])) {
-    $ohifBase = defined('OHIF_VIEWER_BASE_URL') ? rtrim(OHIF_VIEWER_BASE_URL, '/') : '';
-    if ($ohifBase !== '') {
+    $procedureOrderId = (int)($fields['procedure_order_id'] ?? 0);
+    $pacsProvider = class_exists('App\PacsProvider') ? \App\PacsProvider::resolveForOrder($procedureOrderId) : null;
+    if ($pacsProvider && $pacsProvider->ohifBaseUrl() !== '') {
+        $qrTarget = $pacsProvider->buildOhifViewerUrl($fields['study_instance_uid']);
+    } else {
+        $provRow = $procedureOrderId > 0
+            ? sqlQuery(
+                "SELECT pp.remote_host FROM procedure_order po
+                   JOIN procedure_providers pp ON po.lab_id = pp.ppid
+                  WHERE po.procedure_order_id = ? AND pp.active = 1 LIMIT 1",
+                [$procedureOrderId]
+            )
+            : null;
+        if (empty($provRow['remote_host'])) {
+            $provRow = sqlQuery(
+                "SELECT remote_host FROM procedure_providers
+                  WHERE active = 1 AND remote_host IS NOT NULL AND remote_host != ''
+                  ORDER BY ppid ASC LIMIT 1"
+            );
+        }
+        $ohifBase = !empty($provRow['remote_host'])
+            ? rtrim((string)$provRow['remote_host'], '/')
+            : (defined('OHIF_VIEWER_BASE_URL') && OHIF_VIEWER_BASE_URL ? rtrim(OHIF_VIEWER_BASE_URL, '/') : 'https://imagenes.origen.ar/viewer');
         $qrTarget = $ohifBase . '?StudyInstanceUIDs=' . urlencode($fields['study_instance_uid']);
     }
 }
+
+$isStudyQr = ($qrTarget !== '');
+if (!$isStudyQr) {
+    // Fallback: validate authenticity of report
+    $clinicWeb = defined('CLINIC_WEB') ? trim(CLINIC_WEB) : '';
+    if ($clinicWeb !== '') {
+        $qrTarget = rtrim($clinicWeb, '/') . '/validate?id=' . urlencode($validacionId) . '&code=' . urlencode($reportCode);
+    } else {
+        $qrTarget = 'REPORT:' . $reportCode . '|AUTH:' . $validacionId;
+    }
+}
+
 if ($qrTarget !== '') {
-    if (class_exists('BaconQrCode\Writer') && extension_loaded('gd')) {
+    if (class_exists('\BaconQrCode\Writer')) {
         try {
-            $renderer = new \BaconQrCode\Renderer\GDLibRenderer(480, 4, 'png', 9);
-            $writer   = new \BaconQrCode\Writer($renderer);
-            $qrPng    = $writer->writeString($qrTarget);
-            $qrDataUri = 'data:image/png;base64,' . base64_encode($qrPng);
+            // Priority 1: SVG backend via ImageRenderer (pure PHP, zero dependencies, no GD required, vector crisp in Dompdf)
+            if (class_exists('\BaconQrCode\Renderer\ImageRenderer') && class_exists('\BaconQrCode\Renderer\Image\SvgImageBackEnd')) {
+                $renderer = new \BaconQrCode\Renderer\ImageRenderer(
+                    new \BaconQrCode\Renderer\RendererStyle\RendererStyle(200, 2),
+                    new \BaconQrCode\Renderer\Image\SvgImageBackEnd()
+                );
+                $writer   = new \BaconQrCode\Writer($renderer);
+                $svg      = $writer->writeString($qrTarget);
+                $qrDataUri = 'data:image/svg+xml;base64,' . base64_encode($svg);
+            } elseif (class_exists('\BaconQrCode\Renderer\GDLibRenderer') && extension_loaded('gd')) {
+                // Priority 2: GDLibRenderer (PNG fallback if GD is loaded)
+                $renderer = new \BaconQrCode\Renderer\GDLibRenderer(200, 2, 'png', 9);
+                $writer   = new \BaconQrCode\Writer($renderer);
+                $qrPng    = $writer->writeString($qrTarget);
+                $qrDataUri = 'data:image/png;base64,' . base64_encode($qrPng);
+            } else {
+                error_log("[imaging_report/pdf] No suitable BaconQrCode renderer found.");
+            }
         } catch (\Throwable $e) {
             error_log("[imaging_report/pdf] QR falló: " . $e->getMessage());
             $qrDataUri = '';
         }
     } else {
-        error_log("[imaging_report/pdf] QR no generado. BaconQrCode: " . (class_exists('BaconQrCode\Writer') ? 'ok' : 'NO') . " | GD: " . (extension_loaded('gd') ? 'ok' : 'NO'));
+        error_log("[imaging_report/pdf] QR no generado: BaconQrCode\\Writer class not found in vendor.");
     }
-} else {
-    error_log("[imaging_report/pdf] QR sin destino (study_instance_uid vacío)");
 }
 
 /**
@@ -493,10 +537,14 @@ function img_norm_texto(?string $t): string
         </tr>
         <?php if ($qrDataUri): ?>
         <tr>
-            <td colspan="3" style="text-align: center; padding-top: 16px;">
-                <img src="<?= $qrDataUri ?>" alt="QR Estudio" style="width: 120px; height: 120px; display: inline-block;">
+            <td colspan="3" style="text-align: center; padding-top: 14px;">
+                <img src="<?= $qrDataUri ?>" alt="QR" style="width: 100px; height: 100px; display: inline-block;">
                 <div style="font-size: 8px; color: #64748b; margin-top: 3px;">
-                    <?= xl('Scan to view the study in the DICOM viewer (OHIF)') ?>
+                    <?php if ($isStudyQr): ?>
+                        <?= xl('Scan to view the study in the DICOM viewer (OHIF)') ?>
+                    <?php else: ?>
+                        <?= xl('Scan to verify electronic document authenticity') ?>
+                    <?php endif; ?>
                 </div>
             </td>
         </tr>
