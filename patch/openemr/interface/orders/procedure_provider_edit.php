@@ -100,7 +100,8 @@ $info_msg = "";
         $sets = "name = ?, lab_director = ?, npi = ?, send_app_id = ?, " .
             "send_fac_id = ?, recv_app_id = ?, recv_fac_id = ?, DorP = ?, " .
             "direction = ?, protocol = ?, remote_host = ?, remote_api = ?, wado_url = ?, login = ?, " .
-            "password = ?, orders_path = ?, results_path = ?, notes = ?, active = ?";
+            "password = ?, orders_path = ?, results_path = ?, notes = ?, active = ?, " .
+            "mod_openelis_catalog_login = ?, mod_openelis_catalog_password = ?";
         $params = [$org_name];
         $postFields = [
             'form_name', 'form_npi', 'form_send_app_id', 'form_send_fac_id',
@@ -114,6 +115,19 @@ $info_msg = "";
             $params[] = is_string($val) ? trim($val) : '';
         }
         $params[] = (($_POST['form_active'] ?? '') == 'on') ? '1' : '0';
+
+        // OpenELIS catalog credentials (module columns). The password keeps
+        // its stored value when left blank so unrelated edits never erase it.
+        $params[] = trim((string)($_POST['form_catalog_login'] ?? ''));
+        $catalogPassword = (string)($_POST['form_catalog_password'] ?? '');
+        if ($catalogPassword === '' && $ppid) {
+            $savedCatalog = sqlQuery(
+                "SELECT mod_openelis_catalog_password FROM procedure_providers WHERE ppid = ?",
+                [$ppid]
+            );
+            $catalogPassword = (string)($savedCatalog['mod_openelis_catalog_password'] ?? '');
+        }
+        $params[] = $catalogPassword;
 
         if ($ppid) {
             $params[] = $ppid;
@@ -402,6 +416,29 @@ $info_msg = "";
                             <a href="#login_info" data-toggle="collapse" class="oe-pull-away"><i class="fa fa-times oe-help-x" aria-hidden="true"></i></a>
                             <p><?php echo xlt("Login - details are only required if you are connecting to a facility using the SFTP protocol "); ?></p>
                             <p><?php echo xlt("Type in the username and password provided by the facility"); ?></p>
+                        </div>
+                    </div>
+                </div>
+                <div class="row mt-3">
+                    <div class="col-12">
+                        <div class="clearfix">
+                            <div class="col-sm-12 label-div">
+                                <label for="form_catalog_login"><?php echo xlt('OpenELIS Catalog Login'); ?>:</label> <a href="#catalog_login_info" class="info-anchor icon-tooltip" data-toggle="collapse"><i class="fa fa-question-circle" aria-hidden="true"></i></a>
+                            </div>
+                            <div class="row col-12">
+                                <div class="col-sm-6">
+                                    <input type='text' name='form_catalog_login' id='form_catalog_login' maxlength='100' value='<?php echo attr($row['mod_openelis_catalog_login'] ?? ''); ?>' placeholder='<?php echo xla('OpenELIS ADMIN user'); ?>' class='form-control' />
+                                </div>
+                                <div class="col-sm-6">
+                                    <input type='password' name='form_catalog_password' id='form_catalog_password' maxlength='255' value='' placeholder='<?php echo xla('Leave blank to keep the stored password'); ?>' autocomplete='new-password' class='form-control' />
+                                </div>
+                            </div>
+                        </div>
+                        <div id="catalog_login_info" class="collapse">
+                            <a href="#catalog_login_info" data-toggle="collapse" class="oe-pull-away"><i class="fa fa-times oe-help-x" aria-hidden="true"></i></a>
+                            <p><?php echo xlt("OpenELIS ADMIN user for the REST test-catalog API - different from the operational user used to send orders (Login/Password above)."); ?></p>
+                            <p><?php echo xlt("This second credential set is used by the module's bulk catalog import (catalog_import.php). Assign the ADMIN role to this OpenELIS user in the OpenELIS admin UI."); ?></p>
+                            <p><?php echo xlt("The password is never sent back to the browser: leave the field blank to keep the stored value."); ?></p>
                         </div>
                     </div>
                 </div>

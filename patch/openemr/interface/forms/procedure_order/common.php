@@ -1201,6 +1201,47 @@ if (!empty($row['lab_id'])) {
             $(".wait").removeClass('d-none');
             return true;
         }
+
+        function sendOrderToOpenELIS(btn, orderId) {
+            if (!confirm(<?php echo xlj("Send this order to OpenELIS?"); ?>)) return;
+
+            var origText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> ' + <?php echo xlj("Sending..."); ?>;
+
+            var formData = new FormData();
+            formData.append('order_id', orderId);
+            formData.append('csrf_token_form', <?php echo js_escape(CsrfUtils::collectCsrfToken(session: $session)); ?>);
+            formData.append('action', 'send');
+
+            fetch(<?php echo js_escape($GLOBALS['webroot'] . '/public/modules/openelis/send_order_action.php'); ?>, {
+                method: 'POST',
+                body: formData,
+                credentials: 'same-origin'
+            })
+            .then(function(r) {
+                if (!r.ok) {
+                    return r.json().catch(function() { throw new Error('HTTP ' + r.status); });
+                }
+                return r.json();
+            })
+            .then(function(data) {
+                if (data.success) {
+                    btn.outerHTML = '<button type="button" class="btn btn-outline-info" disabled>✓ ' + <?php echo xlj("Sent to OpenELIS"); ?> + '</button>';
+                    alert(data.message);
+                } else {
+                    alert(<?php echo xlj("Error:"); ?> + ' ' + data.message);
+                    btn.disabled = false;
+                    btn.innerHTML = origText;
+                }
+            })
+            .catch(function(err) {
+                alert('Error de envío: ' + (err && err.message ? err.message : 'desconocido'));
+                console.error('OpenELIS send error:', err);
+                btn.disabled = false;
+                btn.innerHTML = origText;
+            });
+        }
     </script>
     <style>
       @media only screen and (max-width: 768px) {
@@ -1922,6 +1963,25 @@ $reasonCodeStatii[ReasonStatusCodes::NONE]['description'] = xl("Select a status 
                                         title='<?php echo xla('Click to transmit the order. Order will be saved prior to sending.'); ?>'
                                         onclick='top.restoreSession();transmitting = true;'><?php echo xlt('Transmit Order'); ?>
                                     </button>
+                                    <?php if ($viewmode && empty($row['date_transmitted'])) { ?>
+                                    <a href="<?php echo $GLOBALS['webroot']; ?>/public/modules/openelis/send_order_action.php?order_id=<?php echo attr($formid); ?>"
+                                       class="btn btn-info btn-openelis-send"
+                                       onclick="event.preventDefault(); sendOrderToOpenELIS(this, <?php echo attr($formid); ?>);"
+                                       title="<?php echo xla('Send this order to OpenELIS via FHIR'); ?>">
+                                        <?php echo xlt('Send to OpenELIS'); ?>
+                                    </a>
+                                    <?php } elseif ($viewmode && ($row['mod_openelis_sync_status'] ?? '') === 'sent') { ?>
+                                    <button type="button" class="btn btn-outline-info" disabled>
+                                        ✓ <?php echo xlt('Sent to OpenELIS'); ?>
+                                    </button>
+                                    <?php } elseif ($viewmode && ($row['mod_openelis_sync_status'] ?? '') === 'error') { ?>
+                                    <a href="<?php echo $GLOBALS['webroot']; ?>/public/modules/openelis/send_order_action.php?order_id=<?php echo attr($formid); ?>"
+                                       class="btn btn-warning btn-openelis-send"
+                                       onclick="event.preventDefault(); sendOrderToOpenELIS(this, <?php echo attr($formid); ?>);"
+                                       title="<?php echo xla('Retry sending to OpenELIS'); ?>">
+                                        <?php echo xlt('Retry OpenELIS'); ?>
+                                    </a>
+                                    <?php } ?>
                                     <button type="button" class="btn btn-secondary btn-cancel"
                                         onclick="top.restoreSession();location='<?php echo OEGlobalsBag::getInstance()->get('form_exit_url'); ?>'"><?php echo xlt('Cancel/Exit'); ?>
                                     </button>
