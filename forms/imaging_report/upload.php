@@ -59,7 +59,7 @@ $response = [
 
 // CSRF verification + OpenEMR authentication
 try {
-    CsrfUtils::verifyCsrfToken($_POST['csrf_token_form'] ?? '', 'form');
+    CsrfUtils::verifyCsrfToken($_POST['csrf_token_form'] ?? '', $session);
 } catch (\Throwable $e) {
     $response['message'] = xl('Invalid security token.');
     header('Content-Type: application/json');
