@@ -37,14 +37,12 @@ if (!class_exists('App\PacsProvider')) {
             return;
         }
         $rel = substr($class, strlen($prefix)) . '.php';
-        $dir = __DIR__;
-        for ($i = 0; $i < 6; $i++) {
-            $candidate = rtrim($dir, '/\\') . '/src/' . $rel;
-            if (is_file($candidate)) {
-                require_once $candidate;
-                return;
-            }
-            $dir = dirname($dir);
+        // Ubicación real conocida: <raíz OpenEMR>/express_portal/src/...
+        // (desde interface/forms/imaging_report/ hay que subir 3 niveles
+        // hasta la raíz de OpenEMR, y bajar a express_portal/src/)
+        $candidate = __DIR__ . '/../../../express_portal/src/' . $rel;
+        if (is_file($candidate)) {
+            require_once $candidate;
         }
     });
 }
