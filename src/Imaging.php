@@ -604,52 +604,13 @@ class Imaging
     }
 
     /**
-     * Gets the list of category IDs representing images and their subcategories
+     * Category IDs belonging to the "imaging" section, resolved dynamically
+     * from express_portal_category_mapping (with inheritance) instead of a
+     * hardcoded list. See App\CategoryClassifier.
      */
     private function getImageCategoryIds(): array
     {
-        $categoryIds = [];
-
-        // Query categories with keywords or belonging to image branches
-        $sql = "SELECT id, name, parent, lft, rght FROM categories 
-                WHERE name LIKE '%Imágen%' 
-                   OR name LIKE '%Imagen%' 
-                   OR name LIKE '%Imaging%' 
-                   OR name LIKE '%Ecograf%' 
-                   OR name LIKE '%Radiolog%' 
-                   OR name LIKE '%Resonancia%' 
-                   OR name LIKE '%Tomograf%' 
-                   OR name LIKE '%X-Ray%' 
-                   OR name LIKE '%Rayos%' 
-                   OR name LIKE '%Doppler%' 
-                   OR name LIKE '%Cardiología%' 
-                   OR name LIKE '%Electrocardiograma%'
-                   OR name LIKE '%Ecocardiograma%'
-                   OR name LIKE '%Photos%'
-                   OR name LIKE '%Photographs%'
-                   OR name LIKE '%SIP Perinatal%'
-                   OR parent IN (9753, 17, 10001, 20002, 21002, 9800, 10010, 10011, 10012, 10013)
-                   OR (lft >= 69 AND rght <= 94)
-                   OR (lft >= 32 AND rght <= 51)";
-
-        $res = sqlStatement($sql);
-        if ($res) {
-            while ($row = sqlFetchArray($res)) {
-                $categoryIds[] = (int)$row['id'];
-            }
-        }
-
-        // Predefined image categories found in the OpenEMR structure
-        $knownImageCategoryIds = [
-            17, 18, 19, 20, 21, 22, 23, 24, 25, 26, // Eye Imaging
-            9753, 9762, 9772, 9800, 9801, 9802, 9803, // General Images
-            10001, 10010, 10011, 10012, 10013, 10100, 10101, 10102, 10110, 10111, 10112, 10113, 10114, 10120, 10121, 10122, 10123, 10130, 10131, 10132, // Imaging Preop
-            20002, 20020, 20021, 20022, 20023, 20024, // Dental Imaging
-            21002 // SIP Ultrasounds
-        ];
-
-        $merged = array_unique(array_merge($categoryIds, $knownImageCategoryIds));
-        return array_values($merged);
+        return \App\CategoryClassifier::getCategoryIdsForSection('imaging');
     }
 
     /**

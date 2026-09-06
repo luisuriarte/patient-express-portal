@@ -119,3 +119,26 @@ CREATE TABLE IF NOT EXISTS `form_imaging_report_images` (
   KEY `idx_pid`   (`pid`),
   KEY `idx_doc`   (`document_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- express_portal_category_mapping
+--
+-- Purpose: lets clinic staff classify each OpenEMR document category
+-- (from the `categories` table) into one of the express portal's
+-- sections: imaging, laboratory, or other. Only "root" categories of a
+-- branch need to be mapped explicitly — child categories inherit the
+-- classification from the nearest mapped ancestor via `categories.parent`
+-- (resolved at runtime by App\CategoryClassifier, not stored here).
+--
+-- Intentionally has NO foreign key to `categories.id`: this table is
+-- owned entirely by the express-portal module, so deleting an OpenEMR
+-- category should never be blocked or cascade based on our own mapping.
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS `express_portal_category_mapping` (
+    `category_id` INT NOT NULL COMMENT 'References categories.id in OpenEMR core (no FK by design, see header)',
+    `section` ENUM('imaging','laboratory','other') NOT NULL COMMENT 'Which express-portal tab/section this category (and its unmapped children) belongs to',
+    `updated_by` INT DEFAULT NULL COMMENT 'users.id of the last person who set/changed this mapping',
+    `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Last time this row was inserted or changed',
+    PRIMARY KEY (`category_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
+  COMMENT='Maps OpenEMR document categories to express-portal sections (imaging/laboratory/other); unmapped categories inherit from their nearest mapped ancestor.';

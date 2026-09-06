@@ -561,14 +561,13 @@ class Laboratory
     }
 
     /**
-     * Category IDs considered as clinical laboratory results
-     * (even if the document is a scanned PDF/JPG, not an actual procedure_order)
+     * Category IDs belonging to the "laboratory" section, resolved
+     * dynamically from express_portal_category_mapping (with inheritance)
+     * instead of a hardcoded list. See App\CategoryClassifier.
      */
     private function getLabDocumentCategoryIds(): array
     {
-        return [2, 505, 10002, 21001, 20003, 20030, 20031, 20032];
-        // 2=Lab Report, 505=Lab Results (Home-Based Care), 10002=Laboratory Results (Preop),
-        // 21001=Laboratory (SIP Perinatal), 20003=Dental Laboratory + child categories (Cultures, Biopsies, Pre-Op Blood Tests)
+        return \App\CategoryClassifier::getCategoryIdsForSection('laboratory');
     }
 
     /**

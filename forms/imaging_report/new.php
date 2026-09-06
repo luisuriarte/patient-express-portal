@@ -488,9 +488,11 @@ $categoryTreeHtml = imaging_render_category_tree($categoryTree, $selectedCategor
 
         <!-- Action buttons -->
         <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
-            <button type="button" class="btn-cancel inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-colors">
-                ✕ <?= xlt('Cancel') ?>
-            </button>
+            <div class="flex items-center gap-3">
+                <button type="button" class="btn-cancel inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 border border-slate-200 transition-colors">
+                    ✕ <?= xlt('Cancel') ?>
+                </button>
+            </div>
             <div class="flex items-center gap-3">
                 <button type="button" id="btn-draft"
                         class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold btn-save-draft transition-all">
