@@ -132,7 +132,10 @@ class Imaging
                             c.name AS category_name,
                             cp.name AS parent_category_name,
                             fir.study_instance_uid AS pacs_study_uid,
-                            fir.status AS pacs_status,
+                            CASE
+                                WHEN fir.status = 'uploaded' THEN 'synced'
+                                ELSE fir.status
+                            END AS pacs_status,
                             fir.pacs_instance_id,
                             fir.pacs_series_id,
                             fir.pacs_study_id,
@@ -175,7 +178,7 @@ class Imaging
                     $urlLower = strtolower((string)$dRow['url']);
                     $nameLower = strtolower($docName);
 
-                    $hasPacsSync = !empty($dRow['pacs_study_uid']) && ($dRow['pacs_status'] === 'uploaded');
+                    $hasPacsSync = !empty($dRow['pacs_study_uid']) && ($dRow['pacs_status'] === 'synced');
                     $pacsStudyUid = $dRow['pacs_study_uid'] ?? null;
 
                     $isDicom = ($mime === 'application/dicom') 

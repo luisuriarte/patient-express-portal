@@ -193,10 +193,9 @@ function imaging_validate_upload(array $file): array
  * @param int   $formId        ID of form_imaging_report (0 if not yet saved)
  * @param string $modality     Report modality (for DICOM tags / category)
  * @param int   $encounterId   Encounter
- * @param bool  $skipPacsUpload If true, only saves to `documents` (and logs
- *                              in form_imaging_report_images) without uploading
- *                              to PACS. Used for internal files of a ZIP, which
- *                              are uploaded compressed to PACS as a single unit.
+ * @param bool  $skipPacsUpload If true, saves to `documents` (and logs in
+ *                              form_imaging_report_images) without uploading
+ *                              to PACS.
  * @param bool  $pacsDisabled   If true, the file must NOT go to PACS because the
  *                              "Also upload to PACS server" checkbox is
  *                              disabled; logged with status='skipped'.
@@ -367,8 +366,12 @@ function imaging_upload_document(array $file, int $pid, int $procedureOrderId, i
  *   - In OpenEMR (`documents` folders): each internal file is saved
  *     individually (separately), with its own record in
  *     form_imaging_report_images.
- *   - In the PACS: the ZIP is uploaded compressed as a single unit (the PACS
- *     accepts it and handles extraction and import).
+ *   - In the PACS: each internal file follows the exact same path as the
+ *     standalone file upload. Every native .dcm is uploaded individually
+ *     (uploadNativeDicom) and then force-reassigned to the order's study
+ *     (modifyInstance), so all series from the ZIP (however many folders it
+ *     contains) end up grouped under a single study. Non-DICOM files use the
+ *     standard image/PDF conversion. No compressed ZIP is sent to the PACS.
  *
  * @param array  $file          $_FILES element for the ZIP
  * @param int    $pid           Patient
@@ -399,6 +402,11 @@ function imaging_upload_zip(array $file, int $pid, int $procedureOrderId, int $f
         $zip->close();
         return ['success' => false, 'message' => xl('Could not create temporary directory for the ZIP.')];
     }
+
+    // A batch can contain a full study (an MRI series with 100+ instances).
+    // Each file now requires upload + reassignment against the PACS, so lift
+    // the PHP execution limit for the whole batch to avoid being cut off.
+    @set_time_limit(0);
 
     $okCount = 0;
     $failCount = 0;
@@ -433,9 +441,13 @@ function imaging_upload_zip(array $file, int $pid, int $procedureOrderId, int $f
             'size' => strlen($data),
         ];
 
-        // Individual save to documents + logging (without uploading to PACS: the
-        // entire ZIP is uploaded to PACS compressed, below).
-        $res = imaging_upload_document($subFile, $pid, $procedureOrderId, $formId, $modality, $encounterId, true, $skipPacs);
+        // Individual save to documents + logging + PACS, following the exact
+        // same per-file path as the standalone upload. Each native DICOM is
+        // uploaded individually (uploadNativeDicom) and force-reassigned to the
+        // order's study (modifyInstance), so all series from every folder of the
+        // ZIP end up in a single study. A failure in one file does not stop the
+        // rest of the batch.
+        $res = imaging_upload_document($subFile, $pid, $procedureOrderId, $formId, $modality, $encounterId, false, $skipPacs);
         $lastResult = $res;
         if ($res['success']) {
             $okCount++;
@@ -446,34 +458,21 @@ function imaging_upload_zip(array $file, int $pid, int $procedureOrderId, int $f
     }
     $zip->close();
 
-    // Upload the complete compressed ZIP to PACS as a single unit (only if the
-    // "Also upload to PACS server" checkbox is enabled).
-    $provider = PacsProvider::resolveForOrder($procedureOrderId);
-    $zipFail = null;
-    if (!$skipPacs && $okCount > 0 && $provider && $provider->isConfigured()) {
-        $zipBinary = file_get_contents($zipPath);
-        $zipRes = PacsService::uploadZipDicom($provider, $zipBinary);
-        if (!$zipRes['success']) {
-            $zipFail = $zipRes['message'];
-        }
-    }
-
     @array_map('unlink', glob($workdir . '/*') ?: []);
     @rmdir($workdir);
 
     $message = xl('ZIP processed: ') . $okCount . xl(' document(s) saved individually.') .
         ($skipPacs ? ' ' . xl('PACS upload was not enabled.') : '') .
-        ($failCount > 0 ? ' ' . $failCount . xl(' failed.') : '') .
-        ($zipFail ? ' ' . xl('PACS zip upload failed: ') . $zipFail : '');
+        ($failCount > 0 ? ' ' . $failCount . xl(' failed.') : '');
 
     return [
-        'success' => $okCount > 0 && !$zipFail,
+        'success' => $okCount > 0,
         'message' => $message,
         'image_id' => $lastResult['image_id'],
         'document_id' => $lastResult['document_id'],
         'study_uid' => $lastResult['study_uid'],
         'count_ok' => $okCount,
-        'count_fail' => $failCount + ($zipFail ? 1 : 0),
+        'count_fail' => $failCount,
     ];
 }
 
