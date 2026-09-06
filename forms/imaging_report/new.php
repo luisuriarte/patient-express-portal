@@ -802,7 +802,7 @@ document.addEventListener('click', function (e) {
         const modal = modality || 'OT';
         let uidHtml = uid ? '<span class="text-xs text-slate-400">' + uid + '</span>'
                           : '<span class="text-xs text-slate-400">' + <?= json_encode(xlt('No study UID')) ?> + '</span>';
-        let noteHtml = message ? '<div class="text-xs text-red-600">' + message + '</div>' : '';
+        let noteHtml = message ? '<div class="text-xs ' + (ok ? 'text-slate-500' : 'text-red-600') + '">' + message + '</div>' : '';
         rowEl.innerHTML =
             '<div class="min-w-0">' +
                 '<div class="text-sm font-medium text-slate-700 truncate">' + filename + '</div>' +
@@ -916,10 +916,11 @@ document.addEventListener('click', function (e) {
 
             const res = await uploadFile(f);
             line.remove();
+            const emptyMsg = listEl.querySelector('#uploadedEmpty');
+            if (emptyMsg) emptyMsg.remove();
             const row = makeRow(f.name, res.modality_dicom || modality, res.study_uid || '', res.success, res.message || '');
             if (!res.success) fetchUploadedCount();
             listEl.insertBefore(row, listEl.firstChild);
-            if (listEl.firstChild.id === 'uploadedEmpty') listEl.firstChild.remove();
         }
         progressEl.classList.add('hidden');
         fetchUploadedCount();
