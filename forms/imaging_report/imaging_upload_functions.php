@@ -28,8 +28,11 @@ use App\PacsService;
 require_once __DIR__ . '/category_functions.php';
 
 // Ensure autoload for project classes (App\...) in any context
-// (OpenEMR clinical form or standalone execution). A global fallback is used
-// in case the project's composer autoload is not already registered.
+// (OpenEMR clinical form or standalone execution).
+// Known layout: this file lives at interface/forms/imaging_report/ and the
+// project's src/ lives at express_portal/src/ (sibling of interface/ at the
+// OpenEMR root). We check that path first, then fall back to a broader
+// upward search.
 if (!class_exists('App\PacsProvider')) {
     spl_autoload_register(function ($class) {
         $prefix = 'App\\';
@@ -37,13 +40,28 @@ if (!class_exists('App\PacsProvider')) {
             return;
         }
         $rel = substr($class, strlen($prefix)) . '.php';
-        // Ubicación real conocida: <raíz OpenEMR>/express_portal/src/...
-        // (desde interface/forms/imaging_report/ hay que subir 3 niveles
-        // hasta la raíz de OpenEMR, y bajar a express_portal/src/)
-        $candidate = __DIR__ . '/../../../express_portal/src/' . $rel;
-        if (is_file($candidate)) {
-            require_once $candidate;
+
+        // Fast path: the known server layout
+        // interface/forms/imaging_report/ → ../../../ → OpenEMR root
+        $known = __DIR__ . '/../../../express_portal/src/' . $rel;
+        if (is_file($known)) {
+            require_once $known;
+            return;
         }
+
+        // Broader fallback: walk up looking for any src/ that contains the file
+        $dir = dirname(__DIR__);
+        for ($i = 0; $i < 6; $i++) {
+            $base = rtrim($dir, '/\\');
+            $candidate = $base . '/src/' . $rel;
+            if (is_file($candidate)) {
+                require_once $candidate;
+                return;
+            }
+            $dir = dirname($dir);
+        }
+
+        error_log("[imaging_report] Autoload failed for {$class} (tried {$rel})");
     });
 }
 
@@ -273,27 +291,32 @@ function imaging_upload_document(array $file, int $pid, int $procedureOrderId, i
         if (in_array($ext, ['dcm', 'dicom'], true)) {
             $res = PacsService::uploadNativeDicom($provider, $fileContent);
             if ($res['success']) {
+                // The StudyInstanceUID as stored by Orthanc (from the DICOM tags).
+                $dicomStudyUid = (string)($res['study_uid'] ?? '');
                 // Force the order's study to group all files
                 // from the same order into a single DICOM study (same as images).
                 $orderStudyUid = imaging_study_uid_for_order($procedureOrderId, $provider->ppid);
                 $mod = PacsService::modifyInstance($provider, $res['instance_id'], $orderStudyUid);
-                if ($mod['success']) {
+                if ($mod['success'] && $mod['instance_id']) {
                     $pacsInstance = (string)$mod['instance_id'];
-                    $pacsSeries = (string)$mod['series_id'];
-                    $pacsStudy = (string)$mod['study_id'];
+                    $pacsSeries = (string)($mod['series_id'] ?? '');
+                    $pacsStudy = (string)($mod['study_id'] ?? '');
                     $studyUid = $orderStudyUid;
                 } else {
-                    // Fallback: keep the original DICOM study if the
-                    // reassignment fails (the document is still saved).
-                    $pacsInstance = (string)$res['instance_id'];
-                    $pacsSeries = (string)$res['series_id'];
-                    $pacsStudy = (string)$res['study_id'];
-                    $studyUid = $pacsStudy ? (PacsService::fetchStudyUid($provider, $pacsStudy) ?? '') : '';
+                    // modifyInstance failed or returned no IDs — the file is
+                    // still in Orthanc under the original study UID.  Keep
+                    // status 'uploaded' so the portal can open the study.
+                    $pacsInstance = (string)($res['instance_id'] ?? '');
+                    $pacsSeries = (string)($res['series_id'] ?? '');
+                    $pacsStudy = (string)($res['study_id'] ?? '');
+                    $studyUid = $dicomStudyUid;
+                    if ($studyUid === '' && $pacsStudy) {
+                        $studyUid = PacsService::fetchStudyUid($provider, $pacsStudy) ?? '';
+                    }
                     if ($studyUid === '' && $pacsInstance) {
                         $studyUid = PacsService::fetchStudyUid($provider, $pacsInstance) ?? '';
                     }
-                    $status = 'failed';
-                    $errorMessage = $mod['message'];
+                    $errorMessage = $mod['message'] ?: null;
                 }
             } else {
                 $status = 'failed';
@@ -418,19 +441,33 @@ function imaging_upload_zip(array $file, int $pid, int $procedureOrderId, int $f
             continue; // directory entry
         }
 
+        $data = $zip->getFromIndex($i);
+        if ($data === false || $data === '') {
+            $failCount++;
+            continue;
+        }
+
         $ext = strtolower(pathinfo($entry, PATHINFO_EXTENSION));
-        if (!in_array($ext, ['dcm', 'dicom', 'jpg', 'jpeg', 'png', 'webp', 'pdf'], true)) {
-            continue; // ignore non-image files (not uploaded)
+        $isKnownExt = in_array($ext, ['dcm', 'dicom', 'jpg', 'jpeg', 'png', 'webp', 'pdf'], true);
+
+        // DICOM detection by magic bytes: "DICM" at offset 128 (PS3.3).
+        // PACS-exported ZIPs often contain DICOM files WITHOUT .dcm extension.
+        if (!$isKnownExt && strlen($data) >= 132 && substr($data, 128, 4) === 'DICM') {
+            $ext = 'dcm';
+            $isKnownExt = true;
+        }
+
+        if (!$isKnownExt) {
+            continue; // skip non-imaging files (e.g., .DS_Store, Thumbs.db)
         }
 
         // Extract to an individual temporary file and build the $_FILES element
         $safeName = basename($entry);
-        $tmpFile = $workdir . '/' . $i . '_' . $safeName;
-        $data = $zip->getFromIndex($i);
-        if ($data === false) {
-            $failCount++;
-            continue;
+        // Append .dcm if DICOM was detected by magic bytes but the file has no extension
+        if ($ext === 'dcm' && pathinfo($safeName, PATHINFO_EXTENSION) === '') {
+            $safeName .= '.dcm';
         }
+        $tmpFile = $workdir . '/' . $i . '_' . $safeName;
         file_put_contents($tmpFile, $data);
 
         $subFile = [
@@ -489,6 +526,13 @@ function imaging_upload_zip(array $file, int $pid, int $procedureOrderId, int $f
  */
 function imaging_get_report_images(int $formId, int $procedureOrderId = 0): array
 {
+    // Only meaningful when the caller targets a report or an order; with no
+    // context (new form, no order selected yet) return nothing instead of
+    // leaking every image row of the patient.
+    if ($formId <= 0 && $procedureOrderId <= 0) {
+        return [];
+    }
+
     $sql = "SELECT id, document_id, study_instance_uid, modality, filename, status, error_message
             FROM form_imaging_report_images
             WHERE 1=1";
@@ -496,7 +540,7 @@ function imaging_get_report_images(int $formId, int $procedureOrderId = 0): arra
     if ($formId > 0) {
         $sql .= " AND form_id = ?";
         $bind[] = $formId;
-    } elseif ($procedureOrderId > 0) {
+    } else {
         $sql .= " AND procedure_order_id = ? AND (form_id IS NULL OR form_id = 0)";
         $bind[] = $procedureOrderId;
     }

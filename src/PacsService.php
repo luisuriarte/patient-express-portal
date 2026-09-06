@@ -83,11 +83,13 @@ class PacsService
         [$code, $body, $err] = self::request($p, 'POST', '/instances', $binary);
         if ($code === 200 && $body) {
             $data = json_decode($body, true) ?: [];
+            $mainTags = $data['MainDicomTags'] ?? [];
             return [
                 'success' => true,
                 'instance_id' => $data['ID'] ?? null,
                 'study_id' => $data['ParentStudy'] ?? null,
                 'series_id' => $data['ParentSeries'] ?? null,
+                'study_uid' => $mainTags['StudyInstanceUID'] ?? null,
                 'message' => xl('DICOM uploaded successfully'),
             ];
         }

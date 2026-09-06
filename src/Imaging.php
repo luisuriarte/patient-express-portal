@@ -31,6 +31,26 @@ class Imaging
      */
     private array $providerByStudyUid = [];
 
+    /**
+     * In-request cache of detected StudyInstanceUID for DICOM documents that
+     * have no form_imaging_report_images record yet. doc_id => StudyInstanceUID.
+     *
+     * @var array<int, string>
+     */
+    private array $dicomStudyCache = [];
+
+    /**
+     * Count of orphan DICOM files opened for StudyInstanceUID detection in the
+     * current request (resets per getStudiesByPatient() call).
+     */
+    private int $orphanDicomReads = 0;
+
+    /**
+     * Budget of orphan DICOM documents per request that may be opened to
+     * detect their StudyInstanceUID (protects against pathological cases).
+     */
+    private const ORPHAN_DICOM_READ_BUDGET = 300;
+
     public function __construct()
     {
         $this->loadProviders();
@@ -100,6 +120,7 @@ class Imaging
     {
         $studies = [];
         $registeredStudyUids = [];
+        $this->orphanDicomReads = 0;
 
         // =========================================================================
         // 1. Get IDs of all image categories and subcategories
@@ -169,6 +190,11 @@ class Imaging
             // Used to link the PDF to the imaging card grouped by study,
             // without depending on PACS sync status or study_instance_uid.
             $reportPdfByEncCat = $this->buildReportsByEncounterCategory($pid);
+
+            // Direct link report -> study card by StudyInstanceUID, so the
+            // report PDF appears in the same card/line as its OHIF button
+            // regardless of the folder (category) where each was stored.
+            $reportByStudyUid = $this->getReportsByStudyUid($pid);
             $consumedPdfDocIds = [];
 
             if ($resDocs) {
@@ -219,6 +245,20 @@ class Imaging
                     $downloadUrl = 'view_document.php?id=' . $dRow['doc_id'] . '&download=1';
 
                     if ($isDicom || $hasPacsSync) {
+                        // BEST-EFFORT: orphaned DICOM documents (no record in
+                        // form_imaging_report_images) are grouped by the real
+                        // StudyInstanceUID read from the stored file itself, so
+                        // a multi-instance study is never shown as one card per
+                        // file. Detected UIDs follow the same grouped path as
+                        // fir-synced studies below.
+                        if (!$hasPacsSync && $this->orphanDicomReads < self::ORPHAN_DICOM_READ_BUDGET) {
+                            $this->orphanDicomReads++;
+                            $detectedUid = $this->detectDicomStudyUid((int)$dRow['doc_id'], (int)$pid);
+                            if ($detectedUid !== '') {
+                                $pacsStudyUid = $detectedUid;
+                                $hasPacsSync = true;
+                            }
+                        }
                         // If already synced and has a real PACS study_uid, group
                         // all documents sharing the same study into a single entry.
                         if ($hasPacsSync && !empty($pacsStudyUid)) {
@@ -363,6 +403,14 @@ class Imaging
                 $report = ($repEnc > 0 && $repCat > 0 && isset($reportPdfByEncCat[$repEnc][$repCat]))
                     ? $reportPdfByEncCat[$repEnc][$repCat]
                     : null;
+                // Direct fallback: link the report by its registered
+                // StudyInstanceUID, so the PDF button appears right next to
+                // the OHIF button regardless of category/encounter mismatch.
+                if (!$report && isset($reportByStudyUid[$uid])) {
+                    $report = $reportByStudyUid[$uid];
+                    $report['requesting_physician'] = $report['requesting_physician'] ?? '';
+                    $report['reporting_physician'] = $report['reporting_physician'] ?? '';
+                }
                 $hasReportPdf = false;
                 $reportDocId = null;
                 $reportUrl = null;
@@ -941,6 +989,130 @@ class Imaging
     }
 
     /**
+     * Detects the real DICOM StudyInstanceUID (tag 0020,000D) of a stored
+     * document. Used to group orphaned DICOM uploads (documents without a
+     * matching form_imaging_report_images record) by their actual study,
+     * so a multi-instance study is not exploded into one card per file.
+     *
+     * Results are cached per request.
+     */
+    private function detectDicomStudyUid(int $docId, int $pid): string
+    {
+        if (array_key_exists($docId, $this->dicomStudyCache)) {
+            return $this->dicomStudyCache[$docId];
+        }
+        $this->dicomStudyCache[$docId] = '';
+        $file = $this->getDocumentFile($docId, $pid);
+        if (!$file || empty($file['file_content'])) {
+            return '';
+        }
+        $this->dicomStudyCache[$docId] = self::parseDicomStudyUid($file['file_content']);
+        return $this->dicomStudyCache[$docId];
+    }
+
+    /**
+     * Minimal DICOM parser that returns the StudyInstanceUID (0020,000D)
+     * from a DICOM byte string. Supports Explicit and Implicit VR, little
+     * endian (the standard transfer syntaxes used by PACS exports).
+     *
+     * Returns '' when the bytes are not a parseable DICOM stream.
+     */
+    private static function parseDicomStudyUid(string $bin): string
+    {
+        $len = strlen($bin);
+        if ($len < 132 || substr($bin, 128, 4) !== 'DICM') {
+            return '';
+        }
+
+        $explicit = true;
+        $off = 132;
+
+        for ($i = 0; $i < 4000; $i++) {
+            if ($off + 8 > $len) {
+                break;
+            }
+            $tag = unpack('vgroup/velem', substr($bin, $off, 4));
+            $g = $tag['group'];
+            $e = $tag['elem'];
+
+            if ($g === 0xFFFE) {
+                // Item / sequence delimiter: fixed 8-byte element (VL=0).
+                $off += 8;
+                continue;
+            }
+
+            $hdr = 0;
+            $vlen = 0;
+            $isEncapsulated = false;
+
+            if ($explicit) {
+                $vr = substr($bin, $off + 4, 2);
+                if (self::isValidDicomVr($vr)) {
+                    if (in_array($vr, ['OB', 'OD', 'OF', 'OL', 'OV', 'OW', 'SQ', 'UC', 'UN', 'UR', 'UT'], true)) {
+                        // Special VR: 2 reserved bytes + 4-byte length
+                        // (little-endian, same byte order as the transfer syntax)
+                        if ($off + 12 > $len) {
+                            break;
+                        }
+                        $vlen = unpack('V', substr($bin, $off + 8, 4))[1];
+                        $hdr = 12;
+                        $isEncapsulated = ($vr === 'SQ' || $vr === 'OB' || $vr === 'OW');
+                    } else {
+                        if ($off + 8 > $len) {
+                            break;
+                        }
+                        $vlen = unpack('v', substr($bin, $off + 6, 2))[1];
+                        $hdr = 8;
+                    }
+                } else {
+                    // Not a valid VR -> the stream is actually Implicit VR.
+                    $explicit = false;
+                    continue;
+                }
+            } else {
+                if ($off + 8 > $len) {
+                    break;
+                }
+                $vlen = unpack('V', substr($bin, $off + 4, 4))[1];
+                $hdr = 8;
+            }
+
+            if ($g === 0x0020 && $e === 0x000D) {
+                if ($vlen > 0 && $vlen <= 64 && ($off + $hdr + $vlen) <= $len) {
+                    $val = rtrim(substr($bin, $off + $hdr, $vlen), " \0");
+                    if ($val !== '') {
+                        return $val;
+                    }
+                }
+            }
+
+            $off += $hdr + $vlen;
+            if ($off % 2 === 1) {
+                $off++;
+            }
+            if ($off >= $len) {
+                break;
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * Valid VRs per DICOM PS3.5 Table 6.2-1.
+     */
+    private static function isValidDicomVr(string $vr): bool
+    {
+        static $vrs = null;
+        if ($vrs === null) {
+            $vrs = array_flip(['AE','AS','AT','CS','DA','DS','DT','FL','FD','IS','LO',
+                'LT','OB','OD','OF','OI','OL','OV','OW','PN','SH','SL','SQ','SS','ST',
+                'TM','UC','UI','UL','UN','UR','US','UT','UV']);
+        }
+        return isset($vrs[$vr]);
+    }
+
+    /**
      * Gets the imaging report details for PDF generation
      */
     public function getStudyReportDetails(int $reportId, int $pid): ?array
@@ -1243,6 +1415,51 @@ class Imaging
                     'name'                 => (string)($row['doc_name'] ?? ''),
                     'requesting_physician' => trim((string)($row['requesting_physician'] ?? '')),
                     'reporting_physician'  => trim((string)($row['reporting_physician'] ?? '')),
+                ];
+            }
+        }
+        return $map;
+    }
+
+    /**
+     * Builds a map of reports (PDF) by the report's StudyInstanceUID, to link
+     * the report PDF to its study card (same line as the OHIF button)
+     * regardless of the folder where each document was stored.
+     *
+     * @return array<string, array{doc_id:int, name:string}>
+     */
+    private function getReportsByStudyUid(int $pid): array
+    {
+        $map = [];
+        $result = sqlStatement(
+            "SELECT fir.study_instance_uid AS study_uid,
+                    fir.pdf_document_id AS doc_id,
+                    d.name AS doc_name
+               FROM form_imaging_report fir
+               JOIN documents d ON d.id = fir.pdf_document_id
+              WHERE fir.pid = ?
+                AND fir.study_instance_uid IS NOT NULL
+                AND fir.study_instance_uid != ''
+                AND fir.pdf_document_id IS NOT NULL
+                AND fir.pdf_document_id > 0
+                AND (fir.activity = 1 OR fir.activity IS NULL)
+                AND (d.deleted = 0 OR d.deleted IS NULL)
+              ORDER BY fir.id DESC",
+            [$pid]
+        );
+        if (!$result) {
+            return $map;
+        }
+        while ($row = sqlFetchArray($result)) {
+            $uid = (string)($row['study_uid'] ?? '');
+            $docId = (int)($row['doc_id'] ?? 0);
+            if ($uid === '' || $docId <= 0) {
+                continue;
+            }
+            if (!isset($map[$uid])) {
+                $map[$uid] = [
+                    'doc_id' => $docId,
+                    'name'   => (string)($row['doc_name'] ?? ''),
                 ];
             }
         }

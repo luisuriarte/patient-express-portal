@@ -123,8 +123,25 @@ function generateAndStorePdf(int $pid, int $formId, array $fields, $session): ?i
     $authUser = $session->get('authUser');
     $userRow  = sqlQuery("SELECT fname, lname, specialty, npi FROM users WHERE username = ? LIMIT 1", [$authUser]);
 
-    // Encounter data
-    $encounter = EncounterSessionUtil::getEncounter();
+    // Encounter data. The destination encounter is the one of the uploaded
+    // imaging study (form_imaging_report_images) when available, so the PDF
+    // lands in the SAME encounter/folder as the images; fallback to the
+    // current session encounter.
+    $authEncounter = EncounterSessionUtil::getEncounter();
+    $encounter = (int)($authEncounter ?? 0);
+    $procedureOrderIdUpfront = (int)($fields['procedure_order_id'] ?? 0);
+    if ($procedureOrderIdUpfront > 0) {
+        $studyEncRow = sqlQuery(
+            "SELECT encounter_id FROM form_imaging_report_images
+              WHERE procedure_order_id = ? AND pid = ?
+                AND encounter_id IS NOT NULL AND encounter_id > 0
+              ORDER BY id DESC LIMIT 1",
+            [$procedureOrderIdUpfront, $pid]
+        );
+        if (!empty($studyEncRow['encounter_id'])) {
+            $encounter = (int)$studyEncRow['encounter_id'];
+        }
+    }
     $encounterRow = sqlQuery(
         "SELECT date, facility FROM form_encounter WHERE pid = ? ORDER BY id DESC LIMIT 1",
         [$pid]
@@ -149,8 +166,8 @@ function generateAndStorePdf(int $pid, int $formId, array $fields, $session): ?i
     }
     if (!$logoPath) {
         $searches = [
-            dirname(__DIR__, 4) . '/public/assets/img/logo-banner.svg',
-            dirname(__DIR__, 4) . '/assets/img/logo-banner.svg',
+            dirname(__DIR__, 2) . '/public/assets/img/logo-banner.svg',
+            dirname(__DIR__, 2) . '/assets/img/logo-banner.svg',
             $siteDir . '/assets/img/logo-banner.svg',
         ];
         foreach ($searches as $candidate) {

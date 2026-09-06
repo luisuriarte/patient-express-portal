@@ -110,7 +110,7 @@ CREATE TABLE IF NOT EXISTS `form_imaging_report_images` (
   `pacs_study_id`     VARCHAR(128) DEFAULT NULL COMMENT 'PACS internal study id',
   `modality`           VARCHAR(31)  DEFAULT NULL,
   `filename`           VARCHAR(255) DEFAULT NULL,
-  `status`             ENUM('uploaded','failed') DEFAULT 'uploaded',
+  `status`             ENUM('uploaded','failed','skipped') DEFAULT 'uploaded',
   `error_message`      TEXT,
   `created_at`         DATETIME     DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
