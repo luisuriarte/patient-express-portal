@@ -203,6 +203,8 @@ function imaging_validate_upload(array $file): array
  */
 function imaging_upload_document(array $file, int $pid, int $procedureOrderId, int $formId, string $modality, int $encounterId, bool $skipPacsUpload = false, bool $pacsDisabled = false): array
 {
+    global $session;
+
     $valid = imaging_validate_upload($file);
     if (!$valid['ok']) {
         return ['success' => false, 'message' => $valid['error'], 'image_id' => null, 'document_id' => null, 'study_uid' => null];
@@ -232,7 +234,7 @@ function imaging_upload_document(array $file, int $pid, int $procedureOrderId, i
         $fileContent,
         '',
         1,
-        (int)($session->get('authUserID', 1)),
+        (int)($session?->get('authUserID', 1) ?: 1),
         $file['tmp_name'],
         null,
         $procedureOrderId,
@@ -447,12 +449,18 @@ function imaging_upload_zip(array $file, int $pid, int $procedureOrderId, int $f
         // order's study (modifyInstance), so all series from every folder of the
         // ZIP end up in a single study. A failure in one file does not stop the
         // rest of the batch.
-        $res = imaging_upload_document($subFile, $pid, $procedureOrderId, $formId, $modality, $encounterId, false, $skipPacs);
-        $lastResult = $res;
-        if ($res['success']) {
-            $okCount++;
-        } else {
+        try {
+            $res = imaging_upload_document($subFile, $pid, $procedureOrderId, $formId, $modality, $encounterId, false, $skipPacs);
+            $lastResult = $res;
+            if ($res['success']) {
+                $okCount++;
+            } else {
+                $failCount++;
+            }
+        } catch (\Throwable $e) {
+            error_log('[imaging_report/zip] Error procesando "' . $safeName . '": ' . $e->getMessage());
             $failCount++;
+            $lastResult = ['success' => false, 'message' => $e->getMessage(), 'image_id' => null, 'document_id' => null, 'study_uid' => null];
         }
         @unlink($tmpFile);
     }

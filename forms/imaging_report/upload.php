@@ -105,13 +105,26 @@ $ext = strtolower(pathinfo((string)$file['name'], PATHINFO_EXTENSION));
 $uploadToPacs = (($_POST['upload_to_pacs'] ?? '1') !== '0');
 $skipPacs = !$uploadToPacs;
 
-if ($ext === 'zip') {
-    // A ZIP: in OpenEMR it is extracted and each file is saved individually
-    // to 'documents'; the PACS receives it compressed as a single unit (if the
-    // PACS checkbox is enabled).
-    $result = imaging_upload_zip($file, $pid, $procedureOrderId, $formId, $modality, $encounterId, $skipPacs);
-} else {
-    $result = imaging_upload_document($file, $pid, $procedureOrderId, $formId, $modality, $encounterId, $skipPacs, $skipPacs);
+try {
+    if ($ext === 'zip') {
+        // A ZIP: in OpenEMR it is extracted and each internal file is saved
+        // individually to 'documents' and uploaded to the PACS following the
+        // same per-file path as a standalone upload (if the checkbox is enabled).
+        $result = imaging_upload_zip($file, $pid, $procedureOrderId, $formId, $modality, $encounterId, $skipPacs);
+    } else {
+        $result = imaging_upload_document($file, $pid, $procedureOrderId, $formId, $modality, $encounterId, $skipPacs, $skipPacs);
+    }
+} catch (\Throwable $e) {
+    error_log('[imaging_report/upload] Error: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
+    $result = [
+        'success' => false,
+        'message' => xl('An unexpected error occurred: ') . $e->getMessage(),
+        'image_id' => null,
+        'document_id' => null,
+        'study_uid' => null,
+        'count_ok' => 0,
+        'count_fail' => 0,
+    ];
 }
 
 $response = [
