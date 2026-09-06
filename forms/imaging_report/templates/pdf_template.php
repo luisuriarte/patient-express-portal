@@ -225,13 +225,14 @@ function img_norm_texto(?string $t): string
             padding-bottom: 10px;
             margin-bottom: 12px;
         }
-        .header-logo-cell {
-            width: 240px;
-            vertical-align: middle;
+        .header-logo-wrap {
+            text-align: center;
+            margin-bottom: 8px;
         }
         .header-logo-img {
             max-height: 52px;
             max-width: 230px;
+            display: inline-block;
         }
         .clinic-name {
             font-size: 15px;
@@ -407,23 +408,23 @@ function img_norm_texto(?string $t): string
 <body>
 
     <!-- ================================================================= -->
+    <!-- INSTITUTIONAL LOGO (centered on top)                              -->
+    <!-- ================================================================= -->
+    <?php if ($logoBase64): ?>
+        <div class="header-logo-wrap">
+            <img src="<?= $logoBase64 ?>" class="header-logo-img" alt="Logo">
+        </div>
+    <?php endif; ?>
+
+    <!-- ================================================================= -->
     <!-- INSTITUTIONAL HEADER                                               -->
     <!-- ================================================================= -->
     <table class="header-table">
         <tr>
-            <td class="header-logo-cell">
-                <?php if ($logoBase64): ?>
-                    <img src="<?= $logoBase64 ?>" class="header-logo-img" alt="Logo">
-                <?php endif; ?>
-            </td>
             <td style="vertical-align: middle;">
-                <div class="clinic-name"><?= htmlspecialchars($clinicName) ?></div>
-                <div class="clinic-sub"><?= xl('Imaging and Diagnostic Services') ?></div>
-                <div class="clinic-sub">
-                    <?= htmlspecialchars($clinicAddr) ?>
-                    <?php if ($clinicPhone): ?> | Tel: <?= htmlspecialchars($clinicPhone) ?><?php endif; ?>
-                    <?php if ($clinicEmail): ?> | Email: <?= htmlspecialchars($clinicEmail) ?><?php endif; ?>
-                </div>
+                <div class="clinic-name"><?= defined('CLINIC_NAME') && CLINIC_NAME ? htmlspecialchars(CLINIC_NAME) : htmlspecialchars($clinicName) ?></div>
+                <div class="clinic-sub"><?= defined('CLINIC_ADDRESS') && CLINIC_ADDRESS ? htmlspecialchars(CLINIC_ADDRESS) : htmlspecialchars($clinicAddr) ?><?= defined('CLINIC_PHONE') && CLINIC_PHONE ? ' | ' . xlt('Tel') . ': ' . htmlspecialchars(CLINIC_PHONE) : '' ?></div>
+                <div class="clinic-sub"><?= defined('CLINIC_EMAIL') && CLINIC_EMAIL ? xlt('Email') . ': ' . htmlspecialchars(CLINIC_EMAIL) : '' ?><?= defined('CLINIC_WEB') && CLINIC_WEB ? ' | ' . xlt('Web') . ': ' . htmlspecialchars(CLINIC_WEB) : '' ?></div>
             </td>
             <td style="width: 34%; text-align: right; vertical-align: middle;">
                 <div class="header-right"><?= xl('IMAGING DIAGNOSTIC REPORT') ?></div>

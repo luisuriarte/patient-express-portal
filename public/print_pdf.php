@@ -49,12 +49,15 @@ if (!$data) {
     die(xl('Error: Report not found or you do not have permission to access the requested document.'));
 }
 
-// Load Logo in base64 for Dompdf (supports SVG and PNG)
+// Load Logo in base64 for Dompdf (supports SVG and PNG; PNG preferred since
+// php-svg-lib does not render <text> elements inside SVG files)
 $logoBase64 = '';
 $logoPathFile = defined('CLINIC_LOGO_PATH') ? CLINIC_LOGO_PATH : '';
 if (!$logoPathFile || !file_exists($logoPathFile)) {
     $logoCandidates = [
+        dirname(__DIR__) . '/public/assets/img/logo-banner.png',
         dirname(__DIR__) . '/public/assets/img/logo-banner.svg',
+        dirname(__DIR__) . '/assets/img/logo-banner.png',
         dirname(__DIR__) . '/assets/img/logo-banner.svg',
     ];
     foreach ($logoCandidates as $candidate) {
@@ -66,7 +69,7 @@ if (!$logoPathFile || !file_exists($logoPathFile)) {
 }
 if ($logoPathFile && file_exists($logoPathFile)) {
     $ext = strtolower(pathinfo($logoPathFile, PATHINFO_EXTENSION));
-    $mime = ($ext === 'svg') ? 'image/svg+xml' : 'image/' . $ext;
+    $mime = ($ext === 'svg') ? 'image/svg+xml' : ($ext === 'png' ? 'image/png' : 'image/' . $ext);
     $imgData = file_get_contents($logoPathFile);
     $logoBase64 = 'data:' . $mime . ';base64,' . base64_encode($imgData);
 }
@@ -273,20 +276,22 @@ ob_start();
 </head>
 <body>
 
+    <!-- Institutional Logo (centered on top) -->
+    <?php if ($logoBase64): ?>
+        <div style="text-align: center; margin-bottom: 8px;">
+            <img src="<?= $logoBase64 ?>" style="max-height: 52px; max-width: 220px; height: auto; display: inline-block;" alt="Logo">
+        </div>
+    <?php endif; ?>
+
     <!-- Institutional Header -->
     <table class="header-table">
         <tr>
-            <?php if ($logoBase64): ?>
-                <td style="width: 20%; vertical-align: middle;">
-                    <img src="<?= $logoBase64 ?>" style="max-height: 44px; max-width: 100px; height: auto;" alt="Logo">
-                </td>
-            <?php endif; ?>
-            <td style="<?= $logoBase64 ? 'width: 40%' : 'width: 60%' ?>; vertical-align: middle;">
+            <td style="width: 60%; vertical-align: middle;">
                 <div class="clinic-name"><?= defined('CLINIC_NAME') ? CLINIC_NAME : '' ?></div>
                 <div class="clinic-sub"><?= defined('CLINIC_ADDRESS') ? CLINIC_ADDRESS : '' ?><?= defined('CLINIC_PHONE') && CLINIC_PHONE ? ' | ' . xlt('Tel') . ': ' . CLINIC_PHONE : '' ?></div>
                 <div class="clinic-sub"><?= defined('CLINIC_EMAIL') && CLINIC_EMAIL ? xlt('Email') . ': ' . CLINIC_EMAIL : '' ?><?= defined('CLINIC_WEB') && CLINIC_WEB ? ' | ' . xlt('Web') . ': ' . CLINIC_WEB : '' ?></div>
             </td>
-            <td style="<?= $logoBase64 ? 'width: 40%' : 'width: 40%' ?>; text-align: right; vertical-align: middle;">
+            <td style="width: 40%; text-align: right; vertical-align: middle;">
                 <div style="font-size: 10.5px; font-weight: bold; color: #0284c7;"><?= xlt('BIOCHEMISTRY & DIAGNOSTIC SERVICE') ?></div>
                 <div style="font-size: 8.5px; color: #64748b;"><?= xlt('Unified Electronic Protocol') ?></div>
                 <div style="font-size: 8px; color: #94a3b8; margin-top: 2px;"><?= xlt('Issue Date') ?>: <?= date('d/m/Y H:i:s') ?></div>

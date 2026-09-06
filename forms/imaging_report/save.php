@@ -156,18 +156,31 @@ function generateAndStorePdf(int $pid, int $formId, array $fields, $session): ?i
     ) ?: [];
 
     // Institutional logo: prioritizes OpenEMR configuration if available,
-    // with fallback to the local form path (logo-banner.svg).
+    // with fallback to the local public asset path. PNG is preferred over SVG
+    // because php-svg-lib does not render <text> elements inside SVG files.
     $logoPath = null;
-    if (!empty($GLOBALS['images_static_absolute'])) {
-        $candidate = rtrim((string)$GLOBALS['images_static_absolute'], '/') . '/logo-banner.svg';
+    if (defined('CLINIC_LOGO_PATH') && CLINIC_LOGO_PATH && file_exists(CLINIC_LOGO_PATH)) {
+        $logoPath = CLINIC_LOGO_PATH;
+    }
+    if (!$logoPath && !empty($GLOBALS['images_static_absolute'])) {
+        $candidate = rtrim((string)$GLOBALS['images_static_absolute'], '/') . '/logo-banner.png';
         if (file_exists($candidate)) {
             $logoPath = $candidate;
+        }
+        if (!$logoPath) {
+            $candidate = rtrim((string)$GLOBALS['images_static_absolute'], '/') . '/logo-banner.svg';
+            if (file_exists($candidate)) {
+                $logoPath = $candidate;
+            }
         }
     }
     if (!$logoPath) {
         $searches = [
+            dirname(__DIR__, 2) . '/public/assets/img/logo-banner.png',
             dirname(__DIR__, 2) . '/public/assets/img/logo-banner.svg',
+            dirname(__DIR__, 2) . '/assets/img/logo-banner.png',
             dirname(__DIR__, 2) . '/assets/img/logo-banner.svg',
+            $siteDir . '/assets/img/logo-banner.png',
             $siteDir . '/assets/img/logo-banner.svg',
         ];
         foreach ($searches as $candidate) {

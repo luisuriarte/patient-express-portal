@@ -217,12 +217,14 @@ require_once dirname(__DIR__) . '/templates/header.php';
                             <!-- Full Batch Action Buttons -->
                             <?php if (empty($batch['has_documents_only'])): ?>
                                 <div class="flex items-center space-x-2 self-end sm:self-center">
-                                    <button type="button" 
-                                            onclick="openPdfModal('print_pdf.php?type=lab&encounter=<?= urlencode((string)$batch['encounter_key']) ?>', '<?= htmlspecialchars(addslashes(xlt('Laboratory Protocol') . ' - ' . $batch['encounter_label'])) ?>')"
-                                            class="inline-flex items-center space-x-2 bg-sky-600 hover:bg-sky-700 text-white font-heading font-semibold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-all duration-150 cursor-pointer">
+                                    <a href="print_pdf.php?type=lab&encounter=<?= urlencode((string)$batch['encounter_key']) ?>" 
+                                    target="_blank" 
+                                    rel="noopener noreferrer"
+                                    title="<?= xla('Open PDF in a separate tab') ?>"
+                                    class="inline-flex items-center space-x-2 bg-sky-600 hover:bg-sky-700 text-white font-heading font-semibold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-all duration-150 cursor-pointer">
                                         <i data-lucide="file-text" class="w-4 h-4"></i>
                                         <span><?= xlt('View / Download PDF') ?></span>
-                                    </button>
+                                    </a>
 
                                     <a href="print_pdf.php?type=lab&encounter=<?= urlencode((string)$batch['encounter_key']) ?>" 
                                     target="_blank" 
@@ -469,12 +471,15 @@ require_once dirname(__DIR__) . '/templates/header.php';
 
                             <?php elseif ($isStandardPdf): ?>
                                 <!-- Case b2) PDF Document: Direct PDF viewer in portal without OHIF -->
-                                <button type="button" 
-                                        onclick="openPdfModal('<?= htmlspecialchars($study['viewer_url']) ?>', '<?= htmlspecialchars(addslashes($study['title'])) ?>')"
-                                        class="inline-flex items-center space-x-2 bg-rose-600 hover:bg-rose-700 text-white font-heading font-semibold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-all duration-150 cursor-pointer">
+                                <a href="<?= htmlspecialchars($study['viewer_url']) ?>" 
+                                   target="_blank" 
+                                   rel="noopener noreferrer"
+                                   title="<?= xla('Open the PDF in a new tab') ?>"
+                                   class="inline-flex items-center space-x-2 bg-rose-600 hover:bg-rose-700 text-white font-heading font-semibold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-all duration-150 cursor-pointer">
                                     <i data-lucide="file-text" class="w-4 h-4"></i>
                                     <span><?= xlt('View PDF Document') ?></span>
-                                </button>
+                                    <i data-lucide="arrow-up-right" class="w-3.5 h-3.5"></i>
+                                </a>
 
                                 <a href="<?= htmlspecialchars($study['download_url'] ?? $study['viewer_url']) ?>" 
                                    download
