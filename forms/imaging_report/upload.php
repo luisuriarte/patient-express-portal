@@ -25,7 +25,7 @@ use OpenEMR\Core\OEGlobalsBag;
 
 $requestId = (string)($_POST['request_id'] ?? '');
 
-require_once(__DIR__ . "/../../library/api.inc.php");
+require_once("$srcdir/api.inc.php");
 require_once(__DIR__ . '/imaging_upload_functions.php');
 
 $session = SessionWrapperFactory::getInstance()->getActiveSession();
