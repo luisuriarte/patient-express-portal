@@ -47,6 +47,30 @@ if (!defined('OPENEMR_PORTAL_URL')) {
     define('OPENEMR_PORTAL_URL', getenv('OPENEMR_PORTAL_URL') ?: 'https://hcd.origen.ar/portal');
 }
 
+// Source of truth for the full OpenEMR portal URL: the `globals` table
+// (gl_name = 'portal_onsite_two_address'), falling back to the
+// OPENEMR_PORTAL_URL constant / environment / default.
+if (!function_exists('openemr_portal_url')) {
+    function openemr_portal_url(): string
+    {
+        $fallback = defined('OPENEMR_PORTAL_URL') && OPENEMR_PORTAL_URL !== ''
+            ? OPENEMR_PORTAL_URL
+            : 'https://hcd.origen.ar/portal';
+        if (function_exists('sqlQuery')) {
+            try {
+                $row = sqlQuery("SELECT gl_value FROM globals WHERE gl_name = 'portal_onsite_two_address' LIMIT 1");
+                $value = trim((string)($row['gl_value'] ?? ''));
+                if ($value !== '') {
+                    return $value;
+                }
+            } catch (\Throwable $e) {
+                // fall through to the fallback
+            }
+        }
+        return $fallback;
+    }
+}
+
 // 3. Institutional Data
 //    Loaded dynamically from OpenEMR's `facility` table (primary billing
 //    facility) to avoid exposing facility data in code.

@@ -20,7 +20,7 @@ class PortalSSO
      */
     public static function createAutoLoginUrl(int $pid, string $redirectTarget = ''): string
     {
-        $basePortalUrl = defined('OPENEMR_PORTAL_URL') ? rtrim(OPENEMR_PORTAL_URL, '/') : 'https://hcd.origen.ar/portal';
+        $basePortalUrl = rtrim(openemr_portal_url(), '/');
 
         if ($pid <= 0) {
             return $basePortalUrl;

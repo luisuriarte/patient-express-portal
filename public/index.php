@@ -143,7 +143,7 @@ require_once dirname(__DIR__) . '/templates/header.php';
                 <p class="text-xs text-slate-500">
                     <?= xlt('Need to schedule appointments or contact your doctor?') ?>
                 </p>
-                <a href="<?= defined('OPENEMR_PORTAL_URL') ? OPENEMR_PORTAL_URL : 'https://hcd.origen.ar/portal' ?>" 
+                <a href="<?= htmlspecialchars(openemr_portal_url()) ?>" 
                    target="_blank" 
                    rel="noopener noreferrer"
                    class="inline-flex items-center space-x-1.5 text-xs font-heading font-bold text-sky-600 hover:text-sky-700 hover:underline">

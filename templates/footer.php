@@ -44,7 +44,7 @@ declare(strict_types=1);
                     <h4 class="font-heading font-semibold text-xs text-slate-200 uppercase tracking-wider"><?= xlt('Useful Links') ?></h4>
                     <ul class="space-y-2 text-xs">
                         <li>
-                            <a href="<?= defined('OPENEMR_PORTAL_URL') ? OPENEMR_PORTAL_URL : 'https://hcd.origen.ar/portal' ?>" target="_blank" rel="noopener noreferrer" class="hover:text-sky-400 transition-colors flex items-center space-x-1.5">
+                            <a href="<?= htmlspecialchars(openemr_portal_url()) ?>" target="_blank" rel="noopener noreferrer" class="hover:text-sky-400 transition-colors flex items-center space-x-1.5">
                                 <i data-lucide="arrow-right" class="w-3 h-3 text-sky-500"></i>
                                 <span><?= xlt('Full OpenEMR Portal (Appointments and Messaging)') ?></span>
                             </a>
