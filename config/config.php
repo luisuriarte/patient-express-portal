@@ -23,13 +23,16 @@ if (php_sapi_name() === 'cli' || empty($_SERVER['HTTP_HOST'])) {
     $GLOBALS['oe_site_id']  = 'default';
 }
 
+// Project root: patient-express-portal (config/config.php lives one level below)
+$projectRoot = dirname(__DIR__);
+
 // 1. Native OpenEMR Bootstrap (traversing up to interface/globals.php)
 $globalsIncluded = false;
 $searchPaths = [
-    __DIR__ . '/../interface/globals.php',
-    __DIR__ . '/../../interface/globals.php',
-    __DIR__ . '/../../../interface/globals.php',
+    $projectRoot . '/interface/globals.php',
     dirname(__DIR__, 2) . '/interface/globals.php',
+    dirname(__DIR__, 3) . '/interface/globals.php',
+    dirname(__DIR__, 4) . '/interface/globals.php',
     '/var/www/html/origen.ar/hcd/interface/globals.php',
     '/var/www/html/openemr/interface/globals.php'
 ];
@@ -109,29 +112,29 @@ if (!defined('CLINIC_PHONE'))    define('CLINIC_PHONE',    $facPhone);
 if (!defined('CLINIC_EMAIL'))    define('CLINIC_EMAIL',    $facEmail);
 if (!defined('CLINIC_WEB'))      define('CLINIC_WEB',      $facWeb);
 if (!defined('CLINIC_LOGO_PATH')) {
-    $logoFile = __DIR__ . '/public/assets/img/logo-banner.png';
+    $logoFile = $projectRoot . '/public/assets/img/logo-banner.png';
     if (!file_exists($logoFile)) {
-        $logoFile = __DIR__ . '/assets/img/logo-banner.png';
+        $logoFile = $projectRoot . '/assets/img/logo-banner.png';
     }
     if (!file_exists($logoFile)) {
-        $logoFile = __DIR__ . '/public/assets/img/logo-banner.svg';
+        $logoFile = $projectRoot . '/public/assets/img/logo-banner.svg';
     }
     if (!file_exists($logoFile)) {
-        $logoFile = __DIR__ . '/assets/img/logo-banner.svg';
+        $logoFile = $projectRoot . '/assets/img/logo-banner.svg';
     }
     define('CLINIC_LOGO_PATH', $logoFile);
 }
 
 // 4. Class Autoloading
-if (file_exists(__DIR__ . '/vendor/autoload.php')) {
-    require_once __DIR__ . '/vendor/autoload.php';
-} elseif (file_exists(dirname(__DIR__, 2) . '/vendor/autoload.php')) {
-    require_once dirname(__DIR__, 2) . '/vendor/autoload.php';
+if (file_exists($projectRoot . '/vendor/autoload.php')) {
+    require_once $projectRoot . '/vendor/autoload.php';
+} elseif (file_exists(dirname(__DIR__, 3) . '/vendor/autoload.php')) {
+    require_once dirname(__DIR__, 3) . '/vendor/autoload.php';
 }
 
-spl_autoload_register(function ($class) {
+spl_autoload_register(function ($class) use ($projectRoot) {
     $prefix = 'App\\';
-    $baseDir = __DIR__ . '/src/';
+    $baseDir = $projectRoot . '/src/';
     $len = strlen($prefix);
     if (strncmp($prefix, $class, $len) !== 0) {
         return;
