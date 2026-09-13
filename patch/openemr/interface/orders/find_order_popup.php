@@ -181,17 +181,26 @@ if (isset($_GET['typeid'])) {
                         $sub = "OR procedure_type LIKE 'pro'";
                     }
                     $search_term = '%' . $_REQUEST['search_term'] . '%';
+                    // Provider (lab) scoping: with a lab selected (labid > 0) results
+                    // are limited to THAT provider's tests only — strict, no mixing
+                    // with the generic unassigned lab (lab_id = 0). With labid = 0 /
+                    // absent (no provider chosen yet) no lab filter is applied at all.
+                    $labSql = ($labid > 0) ? " AND lab_id = ?" : '';
+                    $labParams = ($labid > 0) ? [$labid] : [];
                     // The search filters the catalog according to the selected order type
                     // (procedure_type_names = procedure_type.procedure_type_name):
                     //   - 'imaging'          -> imaging studies (DIAGNOSTIC IMAGING subtree)
                     //   - 'laboratory_test'  -> laboratory tests
                     //   - 'procedure' and others -> procedures of that type
                     // Legacy items WITHOUT a loaded procedure_type_name are still shown
-                    // with the classic filter by laboratory (lab_id), so nothing is lost.
+                    // when they belong to the selected lab, so nothing is lost.
                     // Favorites (fgp) are left unfiltered so custom groups are not broken.
                     if ($otype !== '' && $ord === 'ord') {
-                        $extraSql = " AND (pt.procedure_type_name = ? OR ((pt.procedure_type_name IS NULL OR pt.procedure_type_name = '') AND pt.lab_id = ?))";
-                        $extraParams = [$otype, $labid];
+                        // Lab scoping is handled once by $labSql (strict lab_id = ?).
+                        // The imaging OR is grouped INSIDE this condition so the
+                        // lab_id filter applies to both routes (AND, not OR-escape).
+                        $otypeGroup = "(pt.procedure_type_name = ? OR pt.procedure_type_name IS NULL OR pt.procedure_type_name = '')";
+                        $extraParams = [$otype];
                         if ($otype === 'imaging') {
                             $imageRoot = sqlQuery(
                                 "SELECT procedure_type_id FROM procedure_type " .
@@ -200,25 +209,25 @@ if (isset($_GET['typeid'])) {
                             );
                             $imageRootId = (int) ($imageRoot['procedure_type_id'] ?? 0);
                             if ($imageRootId > 0) {
-                                $extraSql .= " OR pt.parent IN (SELECT procedure_type_id FROM procedure_type WHERE parent = ? AND activity = 1)";
+                                $otypeGroup .= " OR pt.parent IN (SELECT procedure_type_id FROM procedure_type WHERE parent = ? AND activity = 1)";
                                 $extraParams[] = $imageRootId;
                             }
                         }
+                        $extraSql = " AND ($otypeGroup)";
                         $query = "SELECT pt.procedure_type_id, pt.procedure_code, pt.procedure_type, pt.name " .
                             "FROM procedure_type pt WHERE " .
-                            "(pt.procedure_type LIKE ? $sub) AND pt.activity = 1 $extraSql AND " .
+                            "(pt.procedure_type LIKE ? $sub) AND pt.activity = 1 $labSql $extraSql AND " .
                             "(pt.procedure_code LIKE ? OR pt.name LIKE ?) " .
                             "ORDER BY pt.seq, pt.procedure_code";
-                        $res = sqlStatement($query, array_merge([$ord], $extraParams, [$search_term, $search_term]));
+                        $res = sqlStatement($query, array_merge([$ord], $labParams, $extraParams, [$search_term, $search_term]));
                     } else {
                         $query = "SELECT procedure_type_id, procedure_code, procedure_type, name " .
                             "FROM procedure_type WHERE " .
-                            "lab_id = ? AND " .
+                            "activity = 1 $labSql AND " .
                             "(procedure_type LIKE ? $sub) AND " .
-                            "activity = 1 AND " .
                             "(procedure_code LIKE ? OR name LIKE ?) " .
                             "ORDER BY seq, procedure_code";
-                        $res = sqlStatement($query, [$labid, $ord, $search_term, $search_term]);
+                        $res = sqlStatement($query, array_merge($labParams, [$ord, $search_term, $search_term]));
                     }
 
                     while ($row = sqlFetchArray($res)) {
