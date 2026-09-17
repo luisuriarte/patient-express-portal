@@ -64,7 +64,8 @@ class Laboratory
                 LEFT JOIN users u ON po.provider_id = u.id
                 LEFT JOIN procedure_result pres ON pr.procedure_report_id = pres.procedure_report_id
                 WHERE po.patient_id = ?
-                  AND po.procedure_order_type = 'procedure'
+                  AND po.procedure_order_type IN ('procedure', 'laboratory_test')
+                  AND pr.report_status IN ('final', 'complete', 'reviewed')
                 GROUP BY po.encounter_id, po.procedure_order_id, pc.procedure_order_seq, pr.procedure_report_id
                 ORDER BY result_date_iso DESC, po.encounter_id DESC, pc.procedure_order_seq ASC";
 
@@ -307,7 +308,7 @@ class Laboratory
                        LEFT JOIN users u ON po.provider_id = u.id
                        WHERE po.patient_id = ? 
                          AND {$whereClause}
-                         AND po.procedure_order_type = 'procedure'
+                         AND po.procedure_order_type IN ('procedure', 'laboratory_test')
                        ORDER BY pc.procedure_order_seq ASC, pr.procedure_report_id ASC";
 
         $resReports = sqlStatement($sqlReports, [$pid, $paramVal]);
@@ -468,7 +469,7 @@ class Laboratory
                 INNER JOIN procedure_report pr ON po.procedure_order_id = pr.procedure_order_id
                 LEFT JOIN procedure_result pres ON pr.procedure_report_id = pres.procedure_report_id
                 WHERE po.patient_id = ?
-                  AND po.procedure_order_type = 'procedure'
+                  AND po.procedure_order_type IN ('procedure', 'laboratory_test')
                   AND DATE(COALESCE(pres.date, pr.date_report, po.date_ordered)) = ?
                 LIMIT 1";
         $row = sqlQuery($sql, [$pid, $date]);
@@ -487,7 +488,7 @@ class Laboratory
         $sql = "SELECT po.encounter_id, po.procedure_order_id
                 FROM procedure_report pr
                 INNER JOIN procedure_order po ON pr.procedure_order_id = po.procedure_order_id
-                WHERE pr.procedure_report_id = ? AND po.patient_id = ? AND po.procedure_order_type = 'procedure'
+                WHERE pr.procedure_report_id = ? AND po.patient_id = ? AND po.procedure_order_type IN ('procedure', 'laboratory_test')
                 LIMIT 1";
 
         $row = sqlQuery($sql, [$reportId, $pid]);
