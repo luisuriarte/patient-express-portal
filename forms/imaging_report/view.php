@@ -224,7 +224,7 @@ $modalidadLabel = $modalidadLabels[$obj['modality'] ?? ''] ?? ($obj['modality'] 
                     📂 <?= xlt('Folder:') ?> <?= xlt('automatic') ?>
                 <?php endif; ?>
             </span>
-            <a href="<?= attr($webroot) ?>/controller.php?document&retrieve&patient_id=<?= attr_url($pid) ?>&document_id=<?= attr_url($obj['pdf_document_id']) ?>"
+            <a href="<?= attr($webroot) ?>/controller.php?document&retrieve&patient_id=<?= attr_url($pid) ?>&document_id=<?= attr_url($obj['pdf_document_id']) ?>&as_file=false"
                target="_blank"
                class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold bg-teal-600 hover:bg-teal-700 text-white transition-colors shadow-sm">
                 📄 <?= xlt('View PDF') ?>

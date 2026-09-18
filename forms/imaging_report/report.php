@@ -98,7 +98,7 @@ function imaging_report_report(int $pid, int $encounter, int $cols, int $id): vo
         // NOTE: controller.php is at the site root, NOT in /interface.
         // That's why getWebRoot() (web root) is used, not rootdir (which includes /interface).
         $webroot = OEGlobalsBag::getInstance()->getWebRoot();
-        $pdfUrl  = attr($webroot . '/controller.php?document&retrieve&patient_id=' . $pid . '&document_id=' . $data['pdf_document_id']);
+        $pdfUrl  = attr($webroot . '/controller.php?document&retrieve&patient_id=' . $pid . '&document_id=' . $data['pdf_document_id'] . '&as_file=false');
         echo '<tr>';
         echo '<td colspan="4" style="padding:8px 10px;">';
         echo '<a href="' . $pdfUrl . '" target="_blank" style="color:#0ea5e9;font-weight:600;font-size:12px;">📄 ' . xlt('View Full PDF Report') . '</a>';
