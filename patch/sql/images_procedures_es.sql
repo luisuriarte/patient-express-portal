@@ -28,7 +28,7 @@
 -- The script is IDEMPOTENT and includes a MIGRATION block that renames columns
 -- loaded by previous versions (old codes -> new codes and text to Spanish).
 -- Run as:
---   mariadb -u user -p db_name < images-procedures_es.sql
+--   mariadb -u user -p db_name < images_procedures_es.sql
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
