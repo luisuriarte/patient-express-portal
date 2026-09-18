@@ -175,7 +175,10 @@ function generateAndStorePdf(int $pid, int $formId, array $fields, $session): ?i
         }
     }
     if (!$logoPath) {
+        $serverRoot = dirname(__DIR__, 3);
         $searches = [
+            $serverRoot . '/public/images/logos/express_portal/logo-banner.png',
+            $serverRoot . '/public/images/logos/express_portal/logo-banner.svg',
             dirname(__DIR__, 2) . '/public/assets/img/logo-banner.png',
             dirname(__DIR__, 2) . '/public/assets/img/logo-banner.svg',
             dirname(__DIR__, 2) . '/assets/img/logo-banner.png',

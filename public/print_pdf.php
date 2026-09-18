@@ -55,6 +55,8 @@ $logoBase64 = '';
 $logoPathFile = defined('CLINIC_LOGO_PATH') ? CLINIC_LOGO_PATH : '';
 if (!$logoPathFile || !file_exists($logoPathFile)) {
     $logoCandidates = [
+        dirname(dirname(__DIR__)) . '/public/images/logos/express_portal/logo-banner.png',
+        dirname(dirname(__DIR__)) . '/public/images/logos/express_portal/logo-banner.svg',
         dirname(__DIR__) . '/public/assets/img/logo-banner.png',
         dirname(__DIR__) . '/public/assets/img/logo-banner.svg',
         dirname(__DIR__) . '/assets/img/logo-banner.png',

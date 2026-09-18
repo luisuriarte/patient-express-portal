@@ -112,15 +112,21 @@ if (!defined('CLINIC_PHONE'))    define('CLINIC_PHONE',    $facPhone);
 if (!defined('CLINIC_EMAIL'))    define('CLINIC_EMAIL',    $facEmail);
 if (!defined('CLINIC_WEB'))      define('CLINIC_WEB',      $facWeb);
 if (!defined('CLINIC_LOGO_PATH')) {
-    $logoFile = $projectRoot . '/public/assets/img/logo-banner.png';
-    if (!file_exists($logoFile)) {
-        $logoFile = $projectRoot . '/assets/img/logo-banner.png';
-    }
-    if (!file_exists($logoFile)) {
-        $logoFile = $projectRoot . '/public/assets/img/logo-banner.svg';
-    }
-    if (!file_exists($logoFile)) {
-        $logoFile = $projectRoot . '/assets/img/logo-banner.svg';
+    $serverRoot = dirname($projectRoot);
+    $logoCandidates = [
+        $serverRoot . '/public/images/logos/express_portal/logo-banner.png',
+        $serverRoot . '/public/images/logos/express_portal/logo-banner.svg',
+        $projectRoot . '/public/assets/img/logo-banner.png',
+        $projectRoot . '/assets/img/logo-banner.png',
+        $projectRoot . '/public/assets/img/logo-banner.svg',
+        $projectRoot . '/assets/img/logo-banner.svg',
+    ];
+    $logoFile = '';
+    foreach ($logoCandidates as $_candidate) {
+        if ($_candidate !== '' && file_exists($_candidate)) {
+            $logoFile = $_candidate;
+            break;
+        }
     }
     define('CLINIC_LOGO_PATH', $logoFile);
 }
