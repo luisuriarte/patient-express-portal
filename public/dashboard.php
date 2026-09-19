@@ -423,13 +423,16 @@ require_once dirname(__DIR__) . '/templates/header.php';
                                 <?php endif; ?>
 
                             <?php elseif ($isStandardImg): ?>
-                                <!-- Case b1) Standard Image (JPG/PNG): Direct viewer in portal -->
-                                <button type="button" 
-                                        onclick="openImageModal('<?= htmlspecialchars($study['viewer_url']) ?>', '<?= htmlspecialchars(addslashes($study['title'])) ?>', '<?= htmlspecialchars($study['download_url'] ?? $study['viewer_url']) ?>')"
-                                        class="inline-flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white font-heading font-semibold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-all duration-150 cursor-pointer">
+                                <!-- Case b1) Standard Image (JPG/PNG): Direct view in browser tab -->
+                                <a href="<?= htmlspecialchars($study['viewer_url']) ?>" 
+                                   target="_blank" 
+                                   rel="noopener noreferrer"
+                                   title="<?= xla('Open image in a new tab') ?>"
+                                   class="inline-flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 text-white font-heading font-semibold text-xs px-4 py-2.5 rounded-xl shadow-xs transition-all duration-150 cursor-pointer">
                                     <i data-lucide="eye" class="w-4 h-4"></i>
                                     <span><?= xlt('View Image') ?></span>
-                                </button>
+                                    <i data-lucide="arrow-up-right" class="w-3.5 h-3.5 opacity-80"></i>
+                                </a>
 
                                 <?php if (!empty($study['has_ohif']) && !empty($study['ohif_url'])): ?>
                                     <a href="<?= htmlspecialchars($study['ohif_url']) ?>" 
