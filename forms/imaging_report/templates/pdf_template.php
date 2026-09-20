@@ -89,8 +89,10 @@ $qrDataUri = '';
 $qrTarget  = trim((string)($fields['study_ohif_url'] ?? ''));
 if ($qrTarget === '' && !empty($fields['study_instance_uid'])) {
     $procedureOrderId = (int)($fields['procedure_order_id'] ?? 0);
-    $pacsProvider = class_exists('App\PacsProvider') ? \App\PacsProvider::resolveForOrder($procedureOrderId) : null;
-    if ($pacsProvider && $pacsProvider->ohifBaseUrl() !== '') {
+    $pacsProvider = class_exists('App\\PacsProvider') ? \App\PacsProvider::resolveForOrder($procedureOrderId) : null;
+    // Check remoteHost directly — ohifBaseUrl() always returns a non-empty string
+    // (falls back to a hardcoded constant), so it is useless as a guard here.
+    if ($pacsProvider && $pacsProvider->remoteHost !== '') {
         $qrTarget = $pacsProvider->buildOhifViewerUrl($fields['study_instance_uid']);
     } else {
         $provRow = $procedureOrderId > 0
@@ -101,17 +103,10 @@ if ($qrTarget === '' && !empty($fields['study_instance_uid'])) {
                 [$procedureOrderId]
             )
             : null;
-        if (empty($provRow['remote_host'])) {
-            $provRow = sqlQuery(
-                "SELECT remote_host FROM procedure_providers
-                  WHERE active = 1 AND remote_host IS NOT NULL AND remote_host != ''
-                  ORDER BY ppid ASC LIMIT 1"
-            );
+        if (!empty($provRow['remote_host'])) {
+            $qrTarget = rtrim((string)$provRow['remote_host'], '/') . '?StudyInstanceUIDs=' . urlencode($fields['study_instance_uid']);
         }
-        $ohifBase = !empty($provRow['remote_host'])
-            ? rtrim((string)$provRow['remote_host'], '/')
-            : (defined('OHIF_VIEWER_BASE_URL') && OHIF_VIEWER_BASE_URL ? rtrim(OHIF_VIEWER_BASE_URL, '/') : 'https://imagenes.origen.ar/viewer');
-        $qrTarget = $ohifBase . '?StudyInstanceUIDs=' . urlencode($fields['study_instance_uid']);
+        // $qrTarget stays '' → falls through to the report-validation QR below.
     }
 }
 

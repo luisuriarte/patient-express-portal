@@ -216,10 +216,15 @@ function generateAndStorePdf(int $pid, int $formId, array $fields, $session): ?i
 
     $studyOhifUrl = '';
     if (!empty($studyUid)) {
-        if ($pacsProvider && $pacsProvider->ohifBaseUrl() !== '') {
+        // Use remote_host from the provider resolved for this order.
+        // Check remoteHost directly — ohifBaseUrl() always returns a non-empty
+        // string (it falls back to a global constant), so it cannot be used as
+        // a guard to distinguish "provider has a viewer configured" from "no viewer".
+        if ($pacsProvider && $pacsProvider->remoteHost !== '') {
             $studyOhifUrl = $pacsProvider->buildOhifViewerUrl($studyUid);
         } else {
-            // Direct query to procedure_providers table
+            // PacsProvider class not available or provider has no remote_host:
+            // query procedure_providers directly for the order's provider.
             $provRow = $procedureOrderId > 0
                 ? sqlQuery(
                     "SELECT pp.remote_host FROM procedure_order po
@@ -228,17 +233,11 @@ function generateAndStorePdf(int $pid, int $formId, array $fields, $session): ?i
                     [$procedureOrderId]
                 )
                 : null;
-            if (empty($provRow['remote_host'])) {
-                $provRow = sqlQuery(
-                    "SELECT remote_host FROM procedure_providers
-                      WHERE active = 1 AND remote_host IS NOT NULL AND remote_host != ''
-                      ORDER BY ppid ASC LIMIT 1"
-                );
+            if (!empty($provRow['remote_host'])) {
+                $studyOhifUrl = rtrim((string)$provRow['remote_host'], '/') . '?StudyInstanceUIDs=' . urlencode($studyUid);
             }
-            $ohifBase = !empty($provRow['remote_host'])
-                ? rtrim((string)$provRow['remote_host'], '/')
-                : (defined('OHIF_VIEWER_BASE_URL') && OHIF_VIEWER_BASE_URL ? rtrim(OHIF_VIEWER_BASE_URL, '/') : 'https://imagenes.origen.ar/viewer');
-            $studyOhifUrl = $ohifBase . '?StudyInstanceUIDs=' . urlencode($studyUid);
+            // If neither path yielded a URL, leave $studyOhifUrl = '' so the
+            // QR in the PDF falls back to the report validation URL.
         }
     }
     $fields['study_ohif_url'] = $studyOhifUrl;
