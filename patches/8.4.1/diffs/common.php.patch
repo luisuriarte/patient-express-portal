@@ -1,0 +1,60 @@
+﻿diff --git "a/..\openemr-8.4.1\interface\forms\procedure_order\common.php" "b/patch\openemr\interface\forms\procedure_order\common.php"
+index 0d4f1ff..aa588c4 100644
+--- "a/..\openemr-8.4.1\interface\forms\procedure_order\common.php"
++++ "b/patch\openemr\interface\forms\procedure_order\common.php"
+@@ -206,7 +206,10 @@ if (($_POST['bn_save'] ?? null) || !empty($_POST['bn_xmit']) || !empty($_POST['b
+         "scheduled_start = ?, " .
+         "scheduled_end = ?, " .
+         "performer_type = ?, " .
+-        "location_id = ?";
++        "location_id = ?, " .
++        // Imaging request context
++        "requesting_service = ?, " .
++        "anatomical_region = ?";
+ 
+     $set_array = [
+         empty($_POST['form_date_ordered']) ? null : $_POST['form_date_ordered'],
+@@ -236,6 +239,9 @@ if (($_POST['bn_save'] ?? null) || !empty($_POST['bn_xmit']) || !empty($_POST['b
+         empty($_POST['form_scheduled_end']) ? null : $_POST['form_scheduled_end'],
+         trim($_POST['form_performer_type'] ?? ''),
+         (int)($_POST['form_location_id'] ?? 0),
++        // Imaging request context (option_id from the list_options dropdowns)
++        empty($_POST['form_requesting_service']) ? null : $_POST['form_requesting_service'],
++        empty($_POST['form_anatomical_region']) ? null : $_POST['form_anatomical_region'],
+     ];
+ 
+     require_once(__DIR__ . "/procedure_order_save_functions.php");
+@@ -734,11 +740,15 @@ if (!empty($row['lab_id'])) {
+ 
+             let title = <?php echo xlj("Find Procedure Order"); ?>;
+             // This replaces the previous search for an easier/faster order picker tool.
++            // The order type (procedure_order_type) is sent to the popup so that,
++            // when it is 'imaging', only the imaging catalog is shown.
++            let otype = (typeof f.procedure_type_names !== 'undefined') ? f.procedure_type_names.value : '';
+             const params = new URLSearchParams({
+                 formid: <?php echo js_escape($formid); ?>,
+                 formseq: formseq,
+                 labid: f.form_lab_id.value,
+-                order: f[ptvarname].value
++                order: f[ptvarname].value,
++                otype: otype
+             });
+             dlgopen('../../orders/find_order_popup.php?' + params,
+                 '_blank', 850, 500, '', title);
+@@ -1545,6 +1555,16 @@ $reasonCodeStatii[ReasonStatusCodes::NONE]['description'] = xl("Select a status
+                             </div>
+                             <div class="clearfix"></div>
+                         </div>
++                        <div class="form-group form-row">
++                            <div class="col-md-6">
++                                <label for="form_requesting_service" class="col-form-label"><?php echo xlt('Requesting Service'); ?></label>
++                                <?php generate_form_field(array('data_type' => 1, 'field_id' => 'requesting_service', 'list_id' => 'imaging_report_services', 'empty_title' => '-- Select Service --'), $row['requesting_service'] ?? ''); ?>
++                            </div>
++                            <div class="col-md-6">
++                                <label for="form_anatomical_region" class="col-form-label"><?php echo xlt('Anatomic Region'); ?></label>
++                                <?php generate_form_field(array('data_type' => 1, 'field_id' => 'anatomical_region', 'list_id' => 'imaging_report_anatomy', 'empty_title' => '-- Select Region --'), $row['anatomical_region'] ?? ''); ?>
++                            </div>
++                        </div>
+                         <div class="form-group form-row">
+                             <div class="col-md-6">
+                                 <label for='form_clinical_hx' class='col-form-label'><?php echo xlt('Clinical History'); ?></label>

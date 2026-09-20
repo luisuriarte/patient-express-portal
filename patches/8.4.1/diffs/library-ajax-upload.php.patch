@@ -1,0 +1,31 @@
+﻿diff --git "a/..\openemr-8.4.1\library\ajax\upload.php" "b/patch\openemr\library\ajax\upload.php"
+index 27b88d4..2a7f1c5 100644
+--- "a/..\openemr-8.4.1\library\ajax\upload.php"
++++ "b/patch\openemr\library\ajax\upload.php"
+@@ -91,6 +91,7 @@ if ($action === 'save' || $action === 'fetch') {
+ // nope! so continue on with Sherwins uploader.
+ $patient_id = filter_input(INPUT_GET, 'patient_id');
+ $category_id = filter_input(INPUT_GET, 'parent_id');
++$encounter_id = (int) ($_REQUEST['encounter_id'] ?? 0);
+ 
+ if ($isPortal ?? false) {
+     $owner = OEGlobalsBag::getInstance()->get('userauthorized');
+@@ -121,7 +122,8 @@ if ($isPortal ?? false) {
+                 $category,
+                 '',
+                 '',
+-                true
++                true,
++                $encounter_id
+             );
+             $rtn[] = $data;
+         }
+@@ -148,7 +150,7 @@ if (!empty($_FILES)) {
+     $size = $_FILES['file']['size'];
+     $owner = OEGlobalsBag::getInstance()->get('userauthorized');
+ 
+-    addNewDocument($name, $type, $tmp_name, '', $size, $owner, $patient_id, $category_id);
++    addNewDocument($name, $type, $tmp_name, '', $size, $owner, $patient_id, $category_id, '', '', false, $encounter_id);
+     exit;
+ }
+ 
