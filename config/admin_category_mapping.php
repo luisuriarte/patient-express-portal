@@ -29,6 +29,10 @@ foreach ([
 if (!$globalsLoaded) {
     die("OpenEMR globals.php not found");
 }
+$srcdir = class_exists(\OpenEMR\Core\OEGlobalsBag::class)
+    ? \OpenEMR\Core\OEGlobalsBag::getInstance()->getSrcDir()
+    : ($GLOBALS['srcdir'] ?? dirname($globalsPath, 2) . '/library');
+$GLOBALS['srcdir'] = $srcdir;
 require_once("$srcdir/api.inc.php");
 require_once(__DIR__ . '/../src/CategoryClassifier.php');
 

@@ -80,7 +80,6 @@ const IMAGING_UPLOAD_ALLOWED_MIME = [
     'application/x-zip-compressed',
 ];
 
-const IMAGING_UPLOAD_ROOT_NAME = 'Diagnostic Imaging';
 
 /**
  * Builds common DICOM tag headers for a patient/modality.
@@ -143,36 +142,18 @@ function imaging_modality_to_dicom(string $modalidad): string
 }
 
 /**
- * Returns the destination category for images (modality subcategory
- * under "Diagnostic Imaging", or the root images category as fallback).
+ * Returns the destination category for uploaded imaging files.
+ *
+ * Delegates to imaging_default_category_id() (defined in category_functions.php)
+ * which is the single authoritative source: it resolves the modality subcategory
+ * under "Imágenes" and is also used by save.php / imaging_resolve_category_id().
+ * This avoids the split where this file searched for "Diagnostic Imaging" (English)
+ * while category_functions.php searched for "Imágenes" (Spanish), causing PDFs and
+ * DICOM files to land in different OpenEMR document folders.
  */
 function imaging_upload_category_id(string $modality): int
 {
-    $root = sqlQuery(
-        "SELECT id FROM categories WHERE name = ? ORDER BY id LIMIT 1",
-        [IMAGING_UPLOAD_ROOT_NAME]
-    );
-    $rootId = (int)($root['id'] ?? 0);
-    if ($rootId <= 0) {
-        return 0;
-    }
-
-    $subName = match ($modality) {
-        'RMN' => 'Resonancia Magnética',
-        'TC'   => 'Tomografía',
-        default => '',
-    };
-    if ($subName !== '') {
-        $sub = sqlQuery(
-            "SELECT id FROM categories WHERE parent = ? AND name = ? ORDER BY id LIMIT 1",
-            [$rootId, $subName]
-        );
-        if (!empty($sub['id'])) {
-            return (int)$sub['id'];
-        }
-    }
-
-    return $rootId;
+    return imaging_default_category_id($modality);
 }
 
 /**
@@ -226,7 +207,10 @@ function imaging_upload_document(array $file, int $pid, int $procedureOrderId, i
         return ['success' => false, 'message' => $valid['error'], 'image_id' => null, 'document_id' => null, 'study_uid' => null];
     }
 
-    require_once $GLOBALS['srcdir'] . '/classes/Document.class.php';
+    $srcdir = class_exists(\OpenEMR\Core\OEGlobalsBag::class)
+        ? \OpenEMR\Core\OEGlobalsBag::getInstance()->getSrcDir()
+        : ($GLOBALS['srcdir'] ?? dirname(__DIR__, 3) . '/library');
+    require_once "$srcdir/classes/Document.class.php";
 
     $ext = $valid['ext'];
     $mime = $valid['mime'] ?: ('application/octet-stream');

@@ -23,6 +23,11 @@ use OpenEMR\Common\Session\PatientSessionUtil;
 use OpenEMR\Common\Session\SessionWrapperFactory;
 use OpenEMR\Core\OEGlobalsBag;
 
+$srcdir = class_exists(OEGlobalsBag::class)
+    ? OEGlobalsBag::getInstance()->getSrcDir()
+    : ($GLOBALS['srcdir'] ?? dirname(__DIR__, 3) . '/library');
+$GLOBALS['srcdir'] = $srcdir;
+
 $requestId = (string)($_POST['request_id'] ?? '');
 
 require_once("$srcdir/api.inc.php");
